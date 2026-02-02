@@ -120,6 +120,19 @@
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-color);
   font-weight: 500;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-badge {
+  padding: 2px 8px;
+  background: var(--accent-primary);
+  color: #ffffff;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .log-viewer-content {

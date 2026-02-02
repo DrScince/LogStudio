@@ -18,20 +18,19 @@ export function parseLogFile(content: string, schema: LogSchema = DEFAULT_SCHEMA
   const regex = new RegExp(schema.pattern);
 
   let currentEntry: LogEntry | null = null;
-  let originalLineNumber = 1;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const match = line.match(regex);
 
     if (match) {
-      // Neue Log-Zeile gefunden
+      // Neue Log-Zeile gefunden - speichere vorherigen Eintrag
       if (currentEntry) {
         entries.push(currentEntry);
       }
 
       currentEntry = {
-        originalLineNumber,
+        originalLineNumber: i + 1,
         timestamp: match[schema.fields.timestamp] || '',
         level: (match[schema.fields.level] || 'INFO') as LogLevel,
         namespace: match[schema.fields.namespace] || '',
@@ -40,7 +39,6 @@ export function parseLogFile(content: string, schema: LogSchema = DEFAULT_SCHEMA
         isMultiLine: false,
         lineCount: 1,
       };
-      originalLineNumber = i + 1;
     } else if (currentEntry && line.trim()) {
       // Fortsetzung einer mehrzeiligen Log-Nachricht
       currentEntry.fullText += '\n' + line;
@@ -51,9 +49,24 @@ export function parseLogFile(content: string, schema: LogSchema = DEFAULT_SCHEMA
       // Leere Zeile - Ende des Eintrags
       entries.push(currentEntry);
       currentEntry = null;
+    } else if (!currentEntry && line.trim()) {
+      // Zeile ohne Pattern und ohne vorherigen Eintrag - erstelle Fallback-Eintrag
+      entries.push({
+        originalLineNumber: i + 1,
+        timestamp: '',
+        level: 'INFO' as LogLevel,
+        namespace: '',
+        message: line,
+        fullText: line,
+        isMultiLine: false,
+        lineCount: 1,
+      });
+    } else if (!currentEntry && !line.trim() && i === lines.length - 1) {
+      // Letzte leere Zeile - ignoriere
     }
   }
 
+  // Speichere letzten Eintrag
   if (currentEntry) {
     entries.push(currentEntry);
   }

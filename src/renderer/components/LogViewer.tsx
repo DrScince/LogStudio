@@ -77,6 +77,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   useEffect(() => {
     const filtered = filterLogEntries(logEntries, selectedLevels, selectedNamespaces, searchQuery);
     setFilteredEntries(filtered);
+    console.log(`LogViewer: ${filtered.length} von ${logEntries.length} Einträgen nach Filterung`);
     if (listRef.current) {
       listRef.current.scrollToItem(0);
     }
@@ -90,6 +91,11 @@ const LogViewer: React.FC<LogViewerProps> = ({
       const result = await window.electronAPI.readLogFile(filePath);
       if (result.success && result.content) {
         const entries = parseLogFile(result.content, schema);
+        console.log(`LogViewer: ${entries.length} Einträge aus Datei geparst`);
+        console.log(`LogViewer: Einträge nach Level:`, entries.reduce((acc, e) => {
+          acc[e.level] = (acc[e.level] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>));
         setLogEntries(entries);
         lastFileSizeRef.current = result.content.length;
       }
@@ -236,7 +242,16 @@ const LogViewer: React.FC<LogViewerProps> = ({
           </div>
         </div>
         <div className="log-viewer-stats">
-          {filteredEntries.length} / {logEntries.length} Einträge
+          <span>{filteredEntries.length} / {logEntries.length} Einträge</span>
+          {selectedLevels.length > 0 && (
+            <span className="filter-badge">Level: {selectedLevels.join(', ')}</span>
+          )}
+          {selectedNamespaces.length > 0 && (
+            <span className="filter-badge">Namespace: {selectedNamespaces.length}</span>
+          )}
+          {searchQuery && (
+            <span className="filter-badge">Suche: "{searchQuery}"</span>
+          )}
         </div>
       </div>
       <div className="log-viewer-content" ref={containerRef}>
