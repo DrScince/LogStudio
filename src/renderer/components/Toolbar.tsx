@@ -21,11 +21,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ onSettingsClick, onOpenFile, currentF
           </svg>
         </div>
         <h1 className="toolbar-title">LogStudio</h1>
-        {currentFile && (
-          <span className="toolbar-file-name">
-            {currentFile.split(/[/\\]/).pop()}
-          </span>
-        )}
       </div>
       <div className="toolbar-right">
         <button className="toolbar-button toolbar-button-primary" onClick={onOpenFile} title="Datei öffnen">
