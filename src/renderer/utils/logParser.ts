@@ -1,8 +1,9 @@
 import { LogEntry, LogLevel, LogSchema } from '../types/log';
 
 const DEFAULT_SCHEMA: LogSchema = {
-  // Verbessertes Pattern: erlaubt Leerzeichen um die Pipe-Trenner und macht Namespace robuster
-  pattern: '^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+)\\s*\\|\\s*([A-Z]+)\\s*\\|\\s*([^|]+?)\\s*\\|\\s*(.+)$',
+  // Pattern: Timestamp | Level | Namespace | Message
+  // Erlaubt Leerzeichen um die Pipe-Trenner
+  pattern: '^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+)\\s*\\|\\s*([A-Z]+)\\s*\\|\\s*([^|]+)\\s*\\|\\s*(.+)$',
   timestampFormat: 'YYYY-MM-DD HH:mm:ss.SSS',
   separator: ' | ',
   fields: {
@@ -22,7 +23,10 @@ export function parseLogFile(content: string, schema: LogSchema = DEFAULT_SCHEMA
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const match = line.match(regex);
+    const trimmedLine = line.trim();
+    
+    // Prüfe, ob die Zeile dem Pattern entspricht
+    const match = trimmedLine.match(regex);
 
     if (match) {
       // Neue Log-Zeile gefunden - speichere vorherigen Eintrag
@@ -57,31 +61,32 @@ export function parseLogFile(content: string, schema: LogSchema = DEFAULT_SCHEMA
         isMultiLine: false,
         lineCount: 1,
       };
-    } else if (currentEntry && line.trim()) {
+    } else if (currentEntry) {
       // Fortsetzung einer mehrzeiligen Log-Nachricht
+      // Füge die Zeile hinzu, auch wenn sie leer ist (für Stack Traces wichtig)
       currentEntry.fullText += '\n' + line;
-      currentEntry.message += '\n' + line;
+      if (line.trim()) {
+        currentEntry.message += '\n' + line;
+      } else {
+        // Leere Zeile in mehrzeiligen Einträgen beibehalten
+        currentEntry.message += '\n';
+      }
       currentEntry.isMultiLine = true;
       currentEntry.lineCount++;
-    } else if (currentEntry && !line.trim()) {
-      // Leere Zeile - Ende des Eintrags
-      entries.push(currentEntry);
-      currentEntry = null;
-    } else if (!currentEntry && line.trim()) {
+    } else if (trimmedLine) {
       // Zeile ohne Pattern und ohne vorherigen Eintrag - erstelle Fallback-Eintrag
       entries.push({
         originalLineNumber: i + 1,
         timestamp: '',
-        level: 'INFO' as LogLevel,
+        level: 'UNKNOWN' as LogLevel,
         namespace: '',
         message: line,
         fullText: line,
         isMultiLine: false,
         lineCount: 1,
       });
-    } else if (!currentEntry && !line.trim() && i === lines.length - 1) {
-      // Letzte leere Zeile - ignoriere
     }
+    // Leere Zeilen ohne vorherigen Eintrag werden ignoriert
   }
 
   // Speichere letzten Eintrag
