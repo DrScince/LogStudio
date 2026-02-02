@@ -1,17 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import LogViewer from './components/LogViewer';
 import Sidebar from './components/Sidebar';
 import Toolbar from './components/Toolbar';
+import TabBar, { Tab } from './components/TabBar';
 import SettingsPanel from './components/SettingsPanel';
 import { loadSettings, saveSettings, AppSettings } from './utils/settings';
 import './App.css';
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(loadSettings());
-  const [currentLogFile, setCurrentLogFile] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedNamespaces, setSelectedNamespaces] = useState<string[]>([]);
-  const [namespaces, setNamespaces] = useState<string[]>([]);
+
+  // Aktiver Tab
+  const activeTab = tabs.find((tab) => tab.id === activeTabId);
+  const currentLogFile = activeTab?.filePath || null;
+  const selectedNamespaces = activeTab?.selectedNamespaces || [];
+  const namespaces = activeTab?.namespaces || [];
 
   useEffect(() => {
     // Setze Standard-Log-Verzeichnis, falls nicht gesetzt
@@ -46,7 +52,7 @@ function App() {
 
       if (result.success && result.filePath) {
         console.log('Selected file:', result.filePath);
-        setCurrentLogFile(result.filePath);
+        openFileInTab(result.filePath);
       } else if (result.canceled) {
         console.log('File dialog was canceled');
       } else {
@@ -59,6 +65,108 @@ function App() {
     }
   };
 
+  const openFileInTab = useCallback((filePath: string) => {
+    // Prüfe, ob die Datei bereits in einem Tab geöffnet ist
+    const existingTab = tabs.find((tab) => tab.filePath === filePath);
+    
+    if (existingTab) {
+      // Wechsle zum existierenden Tab
+      setActiveTabId(existingTab.id);
+    } else {
+      // Erstelle einen neuen Tab
+      const newTabId = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newTab: Tab = {
+        id: newTabId,
+        filePath,
+        selectedNamespaces: [],
+        namespaces: [],
+      };
+      
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTabId(newTabId);
+    }
+  }, [tabs]);
+
+  const handleTabSelect = useCallback((tabId: string) => {
+    setActiveTabId(tabId);
+  }, []);
+
+  const handleTabClose = useCallback((tabId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    setTabs((prev) => {
+      const newTabs = prev.filter((tab) => tab.id !== tabId);
+      
+      // Wenn der geschlossene Tab der aktive war, wechsle zum nächsten Tab
+      if (tabId === activeTabId) {
+        if (newTabs.length > 0) {
+          // Wechsle zum letzten Tab oder zum ersten, wenn es der letzte war
+          const closedIndex = prev.findIndex((tab) => tab.id === tabId);
+          const newActiveIndex = closedIndex > 0 ? closedIndex - 1 : 0;
+          setActiveTabId(newTabs[newActiveIndex]?.id || null);
+        } else {
+          setActiveTabId(null);
+        }
+      }
+      
+      return newTabs;
+    });
+  }, [activeTabId]);
+
+  const handleLogFileSelect = useCallback((filePath: string | null) => {
+    if (filePath) {
+      openFileInTab(filePath);
+    }
+  }, [openFileInTab]);
+
+  const handleNamespaceToggle = useCallback((namespace: string) => {
+    if (!activeTabId) return;
+    
+    setTabs((prev) =>
+      prev.map((tab) => {
+        if (tab.id !== activeTabId) return tab;
+        
+        const isCurrentlySelected = tab.selectedNamespaces.includes(namespace);
+        
+        if (isCurrentlySelected) {
+          // Namespace abwählen
+          return {
+            ...tab,
+            selectedNamespaces: tab.selectedNamespaces.filter((n) => n !== namespace),
+          };
+        } else {
+          // Namespace auswählen - entferne übergeordnete und untergeordnete Namespaces
+          let newSelection = [...tab.selectedNamespaces];
+          
+          // Entferne alle übergeordneten Namespaces
+          newSelection = newSelection.filter((selected) => {
+            return !namespace.startsWith(selected + '.');
+          });
+          
+          // Entferne alle untergeordneten Namespaces
+          newSelection = newSelection.filter((selected) => {
+            return !selected.startsWith(namespace + '.');
+          });
+          
+          return {
+            ...tab,
+            selectedNamespaces: [...newSelection, namespace],
+          };
+        }
+      })
+    );
+  }, [activeTabId]);
+
+  const handleNamespacesChange = useCallback((newNamespaces: string[]) => {
+    if (!activeTabId) return;
+    
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === activeTabId ? { ...tab, namespaces: newNamespaces } : tab
+      )
+    );
+  }, [activeTabId]);
+
   return (
     <div className="app">
       <Toolbar
@@ -66,41 +174,20 @@ function App() {
         onOpenFile={handleOpenFile}
         currentFile={currentLogFile}
       />
+      <TabBar
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onTabSelect={handleTabSelect}
+        onTabClose={handleTabClose}
+      />
       <div className="app-content">
         <Sidebar
           logDirectory={settings.logDirectory}
-          onLogFileSelect={setCurrentLogFile}
+          onLogFileSelect={handleLogFileSelect}
           currentFile={currentLogFile}
           namespaces={namespaces}
           selectedNamespaces={selectedNamespaces}
-          onNamespaceToggle={(namespace) => {
-            setSelectedNamespaces((prev) => {
-              const isCurrentlySelected = prev.includes(namespace);
-              
-              if (isCurrentlySelected) {
-                // Namespace abwählen - einfach entfernen
-                return prev.filter((n) => n !== namespace);
-              } else {
-                // Namespace auswählen - entferne übergeordnete und untergeordnete Namespaces
-                let newSelection = [...prev];
-                
-                // Entferne alle übergeordneten Namespaces (z.B. wenn "iACF.Core" ausgewählt wird, entferne "iACF")
-                newSelection = newSelection.filter((selected) => {
-                  // Wenn der ausgewählte Namespace ein Kind des zu toggle-enden Namespaces ist, behalte ihn nicht
-                  return !namespace.startsWith(selected + '.');
-                });
-                
-                // Entferne alle untergeordneten Namespaces (z.B. wenn "iACF" ausgewählt wird, entferne "iACF.Core", "iACF.Infrastructure", etc.)
-                newSelection = newSelection.filter((selected) => {
-                  // Wenn der ausgewählte Namespace ein Elternteil des zu toggle-enden Namespaces ist, behalte ihn nicht
-                  return !selected.startsWith(namespace + '.');
-                });
-                
-                // Füge den neuen Namespace hinzu
-                return [...newSelection, namespace];
-              }
-            });
-          }}
+          onNamespaceToggle={handleNamespaceToggle}
         />
         <LogViewer
           filePath={currentLogFile}
@@ -108,7 +195,7 @@ function App() {
           autoRefresh={settings.autoRefresh}
           refreshInterval={settings.refreshInterval}
           selectedNamespaces={selectedNamespaces}
-          onNamespacesChange={setNamespaces}
+          onNamespacesChange={handleNamespacesChange}
         />
         {showSettings && (
           <SettingsPanel
