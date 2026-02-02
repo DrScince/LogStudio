@@ -10,6 +10,8 @@
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
+    "build:verify": "node -e \"const fs=require('fs'); const main=fs.existsSync('dist/main.js'); const renderer=fs.existsSync('dist/renderer/index.html'); if(!main||!renderer){console.error('Build verification failed'); process.exit(1);} console.log('Build verified successfully');\"",
+    "build:push": "npm run build && npm run build:verify && git add . && git commit -m \"Build: Automatischer Build\" && git push origin main",
     "start": "electron .",
     "package": "electron-builder"
   },
