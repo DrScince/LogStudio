@@ -32,6 +32,11 @@
   font-weight: 500;
 }
 
+.namespace-tree-item.included {
+  background: rgba(88, 166, 255, 0.05);
+  opacity: 0.8;
+}
+
 .namespace-tree-toggle {
   display: flex;
   align-items: center;

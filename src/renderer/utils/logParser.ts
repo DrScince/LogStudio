@@ -109,9 +109,24 @@ export function filterLogEntries(
       return false;
     }
 
-    // Namespace-Filter
-    if (namespaceFilter.length > 0 && !namespaceFilter.includes(entry.namespace)) {
-      return false;
+    // Hierarchischer Namespace-Filter
+    // Wenn ein Namespace ausgewählt ist, werden alle untergeordneten Namespaces mit einbezogen
+    if (namespaceFilter.length > 0) {
+      const matches = namespaceFilter.some((filterNamespace) => {
+        // Exakter Match
+        if (entry.namespace === filterNamespace) {
+          return true;
+        }
+        // Hierarchischer Match: Entry-Namespace beginnt mit Filter-Namespace + "."
+        if (entry.namespace.startsWith(filterNamespace + '.')) {
+          return true;
+        }
+        return false;
+      });
+      
+      if (!matches) {
+        return false;
+      }
     }
 
     // Suchfilter

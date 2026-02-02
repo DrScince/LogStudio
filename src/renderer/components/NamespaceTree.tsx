@@ -64,6 +64,18 @@ const NamespaceTree: React.FC<NamespaceTreeProps> = ({
     });
   };
 
+  // Prüft, ob ein Namespace oder einer seiner Eltern ausgewählt ist (hierarchisch)
+  const isNamespaceIncluded = (namespacePath: string): boolean => {
+    // Prüfe exakte Übereinstimmung
+    if (selectedNamespaces.includes(namespacePath)) {
+      return true;
+    }
+    // Prüfe, ob ein übergeordneter Namespace ausgewählt ist
+    return selectedNamespaces.some((selected) => {
+      return namespacePath.startsWith(selected + '.');
+    });
+  };
+
   const renderNode = (node: NamespaceNode, level: number = 0): React.ReactNode => {
     if (node.fullPath === '') {
       // Root-Knoten - rendere alle Kinder
@@ -73,12 +85,13 @@ const NamespaceTree: React.FC<NamespaceTreeProps> = ({
     const hasChildren = node.children.size > 0;
     const isExpanded = expandedNodes.has(node.fullPath);
     const isSelected = selectedNamespaces.includes(node.fullPath);
+    const isIncluded = isNamespaceIncluded(node.fullPath);
     const indent = level * 16;
 
     return (
       <div key={node.fullPath} className="namespace-tree-node">
         <div
-          className={`namespace-tree-item ${isSelected ? 'selected' : ''}`}
+          className={`namespace-tree-item ${isSelected ? 'selected' : ''} ${isIncluded && !isSelected ? 'included' : ''}`}
           style={{ paddingLeft: `${12 + indent}px` }}
           onClick={() => onNamespaceToggle(node.fullPath)}
         >
