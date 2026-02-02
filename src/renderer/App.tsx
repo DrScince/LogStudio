@@ -197,14 +197,14 @@ function App() {
           selectedNamespaces={selectedNamespaces}
           onNamespacesChange={handleNamespacesChange}
         />
-        {showSettings && (
-          <SettingsPanel
-            settings={settings}
-            onSettingsChange={handleSettingsChange}
-            onClose={() => setShowSettings(false)}
-          />
-        )}
       </div>
+      {showSettings && (
+        <SettingsPanel
+          settings={settings}
+          onSettingsChange={handleSettingsChange}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   );
 }
