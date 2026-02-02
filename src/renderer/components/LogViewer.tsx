@@ -9,13 +9,21 @@ interface LogViewerProps {
   schema: LogSchema;
   autoRefresh: boolean;
   refreshInterval: number;
+  selectedNamespaces: string[];
+  onNamespacesChange: (namespaces: string[]) => void;
 }
 
-const LogViewer: React.FC<LogViewerProps> = ({ filePath, schema, autoRefresh, refreshInterval }) => {
+const LogViewer: React.FC<LogViewerProps> = ({
+  filePath,
+  schema,
+  autoRefresh,
+  refreshInterval,
+  selectedNamespaces,
+  onNamespacesChange,
+}) => {
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<LogEntry[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<LogLevel[]>([]);
-  const [selectedNamespaces, setSelectedNamespaces] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [expandedLines, setExpandedLines] = useState<Set<number>>(new Set());
@@ -26,6 +34,11 @@ const LogViewer: React.FC<LogViewerProps> = ({ filePath, schema, autoRefresh, re
 
   const uniqueNamespaces = useMemo(() => extractUniqueNamespaces(logEntries), [logEntries]);
   const uniqueLevels = useMemo(() => extractLogLevels(logEntries), [logEntries]);
+
+  // Aktualisiere Namespaces im Parent
+  useEffect(() => {
+    onNamespacesChange(uniqueNamespaces);
+  }, [uniqueNamespaces, onNamespacesChange]);
 
   useEffect(() => {
     const updateHeight = () => {
@@ -210,24 +223,6 @@ const LogViewer: React.FC<LogViewerProps> = ({ filePath, schema, autoRefresh, re
                 </button>
               ))}
             </div>
-          </div>
-          <div className="filter-group">
-            <label>Namespace:</label>
-            <select
-              multiple
-              className="namespace-select"
-              value={selectedNamespaces}
-              onChange={(e) => {
-                const values = Array.from(e.target.selectedOptions, (option) => option.value);
-                setSelectedNamespaces(values);
-              }}
-            >
-              {uniqueNamespaces.map((ns) => (
-                <option key={ns} value={ns}>
-                  {ns}
-                </option>
-              ))}
-            </select>
           </div>
           <div className="filter-group">
             <label>Suche:</label>

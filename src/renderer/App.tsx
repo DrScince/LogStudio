@@ -10,6 +10,8 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(loadSettings());
   const [currentLogFile, setCurrentLogFile] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [selectedNamespaces, setSelectedNamespaces] = useState<string[]>([]);
+  const [namespaces, setNamespaces] = useState<string[]>([]);
 
   useEffect(() => {
     // Setze Standard-Log-Verzeichnis, falls nicht gesetzt
@@ -69,12 +71,21 @@ function App() {
           logDirectory={settings.logDirectory}
           onLogFileSelect={setCurrentLogFile}
           currentFile={currentLogFile}
+          namespaces={namespaces}
+          selectedNamespaces={selectedNamespaces}
+          onNamespaceToggle={(namespace) => {
+            setSelectedNamespaces((prev) =>
+              prev.includes(namespace) ? prev.filter((n) => n !== namespace) : [...prev, namespace]
+            );
+          }}
         />
         <LogViewer
           filePath={currentLogFile}
           schema={settings.logSchema}
           autoRefresh={settings.autoRefresh}
           refreshInterval={settings.refreshInterval}
+          selectedNamespaces={selectedNamespaces}
+          onNamespacesChange={setNamespaces}
         />
         {showSettings && (
           <SettingsPanel

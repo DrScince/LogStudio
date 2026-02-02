@@ -1,0 +1,88 @@
+.namespace-tree {
+  padding: 8px 0;
+}
+
+.namespace-tree-node {
+  user-select: none;
+}
+
+.namespace-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin: 2px 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 12px;
+  color: var(--text-primary);
+  position: relative;
+}
+
+.namespace-tree-item:hover {
+  background: var(--bg-tertiary);
+  color: var(--accent-primary);
+}
+
+.namespace-tree-item.selected {
+  background: linear-gradient(135deg, rgba(88, 166, 255, 0.15) 0%, rgba(88, 166, 255, 0.05) 100%);
+  color: var(--accent-primary);
+  border-left: 3px solid var(--accent-primary);
+  font-weight: 500;
+}
+
+.namespace-tree-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.namespace-tree-toggle:hover {
+  color: var(--accent-primary);
+}
+
+.namespace-tree-spacer {
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.namespace-tree-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'Consolas', monospace;
+}
+
+.namespace-tree-count {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.namespace-tree-item.selected .namespace-tree-count {
+  color: var(--accent-primary);
+}
+
+.namespace-tree-children {
+  margin-left: 0;
+}
+
+.namespace-tree-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
