@@ -9,8 +9,17 @@
     "package.json"
   ],
   "win": {
-    "target": "nsis",
-    "icon": "build/icon.ico"
+    "target": [
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "build/icon.ico",
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
+  },
+  "portable": {
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
   },
   "mac": {
     "target": "dmg",
