@@ -96,6 +96,18 @@ const LogViewer: React.FC<LogViewerProps> = ({
           acc[e.level] = (acc[e.level] || 0) + 1;
           return acc;
         }, {} as Record<string, number>));
+        
+        // Zeige erste paar Einträge zur Debugging
+        if (entries.length > 0) {
+          console.log('LogViewer: Erste 3 Einträge:', entries.slice(0, 3).map(e => ({
+            line: e.originalLineNumber,
+            timestamp: e.timestamp,
+            level: e.level,
+            namespace: e.namespace,
+            message: e.message.substring(0, 50),
+          })));
+        }
+        
         setLogEntries(entries);
         lastFileSizeRef.current = result.content.length;
       }

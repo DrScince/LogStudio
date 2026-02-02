@@ -1,7 +1,8 @@
 import { LogEntry, LogLevel, LogSchema } from '../types/log';
 
 const DEFAULT_SCHEMA: LogSchema = {
-  pattern: '^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+) \\| ([A-Z]+) \\| ([^|]+) \\| (.+)$',
+  // Verbessertes Pattern: erlaubt Leerzeichen um die Pipe-Trenner und macht Namespace robuster
+  pattern: '^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+)\\s*\\|\\s*([A-Z]+)\\s*\\|\\s*([^|]+?)\\s*\\|\\s*(.+)$',
   timestampFormat: 'YYYY-MM-DD HH:mm:ss.SSS',
   separator: ' | ',
   fields: {
@@ -29,12 +30,29 @@ export function parseLogFile(content: string, schema: LogSchema = DEFAULT_SCHEMA
         entries.push(currentEntry);
       }
 
+      // Extrahiere und trimme die Felder
+      const timestamp = (match[schema.fields.timestamp] || '').trim();
+      const level = (match[schema.fields.level] || 'INFO').trim().toUpperCase() as LogLevel;
+      const namespace = (match[schema.fields.namespace] || '').trim();
+      const message = (match[schema.fields.message] || '').trim();
+
+      // Debugging: Logge erste paar Einträge
+      if (entries.length < 3) {
+        console.log(`Parsed entry ${i + 1}:`, {
+          timestamp,
+          level,
+          namespace,
+          message: message.substring(0, 50) + '...',
+          matchGroups: match.slice(1),
+        });
+      }
+
       currentEntry = {
         originalLineNumber: i + 1,
-        timestamp: match[schema.fields.timestamp] || '',
-        level: (match[schema.fields.level] || 'INFO') as LogLevel,
-        namespace: match[schema.fields.namespace] || '',
-        message: match[schema.fields.message] || '',
+        timestamp,
+        level,
+        namespace,
+        message,
         fullText: line,
         isMultiLine: false,
         lineCount: 1,
