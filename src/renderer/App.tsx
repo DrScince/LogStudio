@@ -74,9 +74,32 @@ function App() {
           namespaces={namespaces}
           selectedNamespaces={selectedNamespaces}
           onNamespaceToggle={(namespace) => {
-            setSelectedNamespaces((prev) =>
-              prev.includes(namespace) ? prev.filter((n) => n !== namespace) : [...prev, namespace]
-            );
+            setSelectedNamespaces((prev) => {
+              const isCurrentlySelected = prev.includes(namespace);
+              
+              if (isCurrentlySelected) {
+                // Namespace abwählen - einfach entfernen
+                return prev.filter((n) => n !== namespace);
+              } else {
+                // Namespace auswählen - entferne übergeordnete und untergeordnete Namespaces
+                let newSelection = [...prev];
+                
+                // Entferne alle übergeordneten Namespaces (z.B. wenn "iACF.Core" ausgewählt wird, entferne "iACF")
+                newSelection = newSelection.filter((selected) => {
+                  // Wenn der ausgewählte Namespace ein Kind des zu toggle-enden Namespaces ist, behalte ihn nicht
+                  return !namespace.startsWith(selected + '.');
+                });
+                
+                // Entferne alle untergeordneten Namespaces (z.B. wenn "iACF" ausgewählt wird, entferne "iACF.Core", "iACF.Infrastructure", etc.)
+                newSelection = newSelection.filter((selected) => {
+                  // Wenn der ausgewählte Namespace ein Elternteil des zu toggle-enden Namespaces ist, behalte ihn nicht
+                  return !selected.startsWith(namespace + '.');
+                });
+                
+                // Füge den neuen Namespace hinzu
+                return [...newSelection, namespace];
+              }
+            });
           }}
         />
         <LogViewer
