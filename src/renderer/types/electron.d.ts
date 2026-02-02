@@ -9,6 +9,7 @@ export interface ElectronAPI {
   removeLogFileChangedListener: () => void;
   getAppPath: () => Promise<{ success: boolean; path?: string; error?: string }>;
   getDefaultLogDirectory: () => Promise<{ success: boolean; path?: string; error?: string }>;
+  showOpenDialog: () => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
 }
 
 declare global {

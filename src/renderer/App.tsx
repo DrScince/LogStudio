@@ -30,10 +30,20 @@ function App() {
     setSettings(newSettings);
   };
 
+  const handleOpenFile = async () => {
+    if (window.electronAPI) {
+      const result = await window.electronAPI.showOpenDialog();
+      if (result.success && result.filePath) {
+        setCurrentLogFile(result.filePath);
+      }
+    }
+  };
+
   return (
     <div className="app">
       <Toolbar
         onSettingsClick={() => setShowSettings(!showSettings)}
+        onOpenFile={handleOpenFile}
         currentFile={currentLogFile}
       />
       <div className="app-content">

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as chokidar from 'chokidar';
@@ -10,6 +10,9 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    backgroundColor: '#0d1117',
+    frame: true,
+    titleBarStyle: 'default',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -138,4 +141,29 @@ ipcMain.handle('get-app-path', () => {
 ipcMain.handle('get-default-log-directory', () => {
   const logDir = path.join(app.getAppPath(), '..', 'Log');
   return { success: true, path: logDir };
+});
+
+ipcMain.handle('show-open-dialog', async () => {
+  if (!mainWindow) {
+    return { success: false, error: 'Main window not available' };
+  }
+
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Log-Datei öffnen',
+      filters: [
+        { name: 'Log-Dateien', extensions: ['log', 'txt'] },
+        { name: 'Alle Dateien', extensions: ['*'] },
+      ],
+      properties: ['openFile'],
+    });
+
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+
+    return { success: true, filePath: result.filePaths[0] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
 });
