@@ -1,9 +1,9 @@
-# Build and Push Script für LogStudio
+# Build and Push Script fuer LogStudio
 # Dieses Skript baut die Anwendung, verifiziert den Erfolg und pusht bei Erfolg
 
 Write-Host "=== LogStudio Build & Push Script ===" -ForegroundColor Cyan
 
-# Prüfe ob npm verfügbar ist
+# Pruefe ob npm verfuegbar ist
 try {
     $npmVersion = npm --version
     Write-Host "npm Version: $npmVersion" -ForegroundColor Green
@@ -12,7 +12,7 @@ try {
     exit 1
 }
 
-# Prüfe ob Git verfügbar ist
+# Pruefe ob Git verfuegbar ist
 try {
     $gitVersion = git --version
     Write-Host "Git Version: $gitVersion" -ForegroundColor Green
@@ -48,7 +48,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "Renderer-Prozess erfolgreich gebaut." -ForegroundColor Green
 
-# Prüfe ob dist-Verzeichnis existiert und Dateien enthält
+# Pruefe ob dist-Verzeichnis existiert und Dateien enthaelt
 Write-Host "`n[4/4] Verifiziere Build-Ergebnis..." -ForegroundColor Yellow
 if (-not (Test-Path "dist")) {
     Write-Host "FEHLER: dist-Verzeichnis wurde nicht erstellt!" -ForegroundColor Red
@@ -72,11 +72,11 @@ Write-Host "Build erfolgreich verifiziert!" -ForegroundColor Green
 Write-Host "  - Main-Prozess: $($mainFiles.Count) Datei(en) gefunden" -ForegroundColor Gray
 Write-Host "  - Renderer: $($rendererFiles.Count) Datei(en) gefunden" -ForegroundColor Gray
 
-# Git Status prüfen
+# Git Status pruefen
 Write-Host "`n=== Git Status ===" -ForegroundColor Cyan
 git status --short
 
-# Prüfe ob es Änderungen gibt
+# Pruefe ob es Aenderungen gibt
 git diff --quiet
 $hasStagedChanges = $LASTEXITCODE -ne 0
 
@@ -86,7 +86,7 @@ $hasUntracked = $untrackedFiles.Count -gt 0
 if ($hasStagedChanges -or $hasUntracked) {
     Write-Host "`nEs gibt Aenderungen zum Committen." -ForegroundColor Yellow
     
-    # Alle Änderungen hinzufügen
+    # Alle Aenderungen hinzufuegen
     git add .
     
     # Commit erstellen
@@ -96,13 +96,13 @@ if ($hasStagedChanges -or $hasUntracked) {
     if ($LASTEXITCODE -eq 0) {
         Write-Host "Commit erfolgreich erstellt: $commitMessage" -ForegroundColor Green
         
-        # Push durchführen
-        Write-Host "`nPushe Änderungen zu origin/main..." -ForegroundColor Yellow
+        # Push durchfuehren
+        Write-Host "`nPushe Aenderungen zu origin/main..." -ForegroundColor Yellow
         git push origin main
         
         if ($LASTEXITCODE -eq 0) {
             Write-Host "`n=== ERFOLG ===" -ForegroundColor Green
-            Write-Host "Build erfolgreich und Änderungen wurden gepusht!" -ForegroundColor Green
+            Write-Host "Build erfolgreich und Aenderungen wurden gepusht!" -ForegroundColor Green
         } else {
             Write-Host "FEHLER: Push fehlgeschlagen!" -ForegroundColor Red
             exit 1
