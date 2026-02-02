@@ -31,11 +31,29 @@ function App() {
   };
 
   const handleOpenFile = async () => {
-    if (window.electronAPI) {
-      const result = await window.electronAPI.showOpenDialog();
-      if (result.success && result.filePath) {
-        setCurrentLogFile(result.filePath);
+    try {
+      if (!window.electronAPI) {
+        console.error('electronAPI is not available');
+        alert('Fehler: Electron API ist nicht verfügbar. Bitte starten Sie die Anwendung neu.');
+        return;
       }
+
+      console.log('Opening file dialog...');
+      const result = await window.electronAPI.showOpenDialog();
+      console.log('File dialog result:', result);
+
+      if (result.success && result.filePath) {
+        console.log('Selected file:', result.filePath);
+        setCurrentLogFile(result.filePath);
+      } else if (result.canceled) {
+        console.log('File dialog was canceled');
+      } else {
+        console.error('Error opening file dialog:', result.error);
+        alert(`Fehler beim Öffnen der Datei: ${result.error || 'Unbekannter Fehler'}`);
+      }
+    } catch (error) {
+      console.error('Exception in handleOpenFile:', error);
+      alert(`Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
     }
   };
 
