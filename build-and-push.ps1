@@ -8,7 +8,7 @@ try {
     $npmVersion = npm --version
     Write-Host "npm Version: $npmVersion" -ForegroundColor Green
 } catch {
-    Write-Host "FEHLER: npm ist nicht verfügbar. Bitte installieren Sie Node.js." -ForegroundColor Red
+    Write-Host "FEHLER: npm ist nicht verfuegbar. Bitte installieren Sie Node.js." -ForegroundColor Red
     exit 1
 }
 
@@ -17,18 +17,18 @@ try {
     $gitVersion = git --version
     Write-Host "Git Version: $gitVersion" -ForegroundColor Green
 } catch {
-    Write-Host "FEHLER: Git ist nicht verfügbar." -ForegroundColor Red
+    Write-Host "FEHLER: Git ist nicht verfuegbar." -ForegroundColor Red
     exit 1
 }
 
 # Installiere Abhängigkeiten
-Write-Host "`n[1/4] Installiere Abhängigkeiten..." -ForegroundColor Yellow
+Write-Host "`n[1/4] Installiere Abhaengigkeiten..." -ForegroundColor Yellow
 npm install
 if ($LASTEXITCODE -ne 0) {
     Write-Host "FEHLER: npm install fehlgeschlagen!" -ForegroundColor Red
     exit 1
 }
-Write-Host "Abhängigkeiten erfolgreich installiert." -ForegroundColor Green
+Write-Host "Abhaengigkeiten erfolgreich installiert." -ForegroundColor Green
 
 # Baue Main-Prozess
 Write-Host "`n[2/4] Baue Electron Main-Prozess..." -ForegroundColor Yellow
@@ -76,17 +76,21 @@ Write-Host "  - Renderer: $($rendererFiles.Count) Datei(en) gefunden" -Foregroun
 Write-Host "`n=== Git Status ===" -ForegroundColor Cyan
 git status --short
 
-# Frage ob gepusht werden soll
-$hasChanges = git diff --quiet; $hasUntracked = (git ls-files --others --exclude-standard | Measure-Object).Count -gt 0
+# Prüfe ob es Änderungen gibt
+git diff --quiet
+$hasStagedChanges = $LASTEXITCODE -ne 0
 
-if ($LASTEXITCODE -ne 0 -or $hasUntracked) {
-    Write-Host "`nEs gibt Änderungen zum Committen." -ForegroundColor Yellow
+$untrackedFiles = git ls-files --others --exclude-standard
+$hasUntracked = $untrackedFiles.Count -gt 0
+
+if ($hasStagedChanges -or $hasUntracked) {
+    Write-Host "`nEs gibt Aenderungen zum Committen." -ForegroundColor Yellow
     
     # Alle Änderungen hinzufügen
     git add .
     
     # Commit erstellen
-    $commitMessage = "Build: Automatischer Build nach Änderungen"
+    $commitMessage = "Build: Automatischer Build nach Aenderungen"
     git commit -m $commitMessage
     
     if ($LASTEXITCODE -eq 0) {
