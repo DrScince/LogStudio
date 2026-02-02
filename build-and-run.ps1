@@ -4,11 +4,64 @@
 Write-Host "=== LogStudio Build & Run Script ===" -ForegroundColor Cyan
 
 # Pruefe ob npm verfuegbar ist
+$npmFound = $false
+$npmPath = $null
+
+# Versuche npm ueber Get-Command zu finden
 try {
-    $npmVersion = npm --version
-    Write-Host "npm Version: $npmVersion" -ForegroundColor Green
+    $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+    if ($npmCmd) {
+        $npmPath = $npmCmd.Source
+        $npmFound = $true
+    }
 } catch {
-    Write-Host "FEHLER: npm ist nicht verfuegbar. Bitte installieren Sie Node.js." -ForegroundColor Red
+    # npm nicht im PATH gefunden
+}
+
+# Falls nicht gefunden, suche in typischen Installationspfaden
+if (-not $npmFound) {
+    $commonPaths = @(
+        "$env:ProgramFiles\nodejs\npm.cmd",
+        "$env:ProgramFiles (x86)\nodejs\npm.cmd",
+        "$env:LOCALAPPDATA\Programs\nodejs\npm.cmd",
+        "$env:APPDATA\npm\npm.cmd"
+    )
+    
+    foreach ($path in $commonPaths) {
+        if (Test-Path $path) {
+            $npmPath = $path
+            $npmFound = $true
+            # Fuege zum PATH hinzu fuer diese Session
+            $nodeDir = Split-Path $path -Parent
+            $env:Path = "$nodeDir;$env:Path"
+            break
+        }
+    }
+}
+
+if (-not $npmFound) {
+    Write-Host "FEHLER: npm ist nicht verfuegbar." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Bitte installieren Sie Node.js von einer der folgenden Quellen:" -ForegroundColor Yellow
+    Write-Host "  - https://nodejs.org/ (offizielle Website)" -ForegroundColor Gray
+    Write-Host "  - https://github.com/coreybutler/nvm-windows (Node Version Manager)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Nach der Installation starten Sie PowerShell neu." -ForegroundColor Yellow
+    exit 1
+}
+
+# Teste npm
+try {
+    $npmVersion = npm --version 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "npm gefunden: $npmPath" -ForegroundColor Green
+        Write-Host "npm Version: $npmVersion" -ForegroundColor Green
+    } else {
+        throw "npm konnte nicht ausgefuehrt werden"
+    }
+} catch {
+    Write-Host "FEHLER: npm wurde gefunden, kann aber nicht ausgefuehrt werden." -ForegroundColor Red
+    Write-Host "Pfad: $npmPath" -ForegroundColor Gray
     exit 1
 }
 
