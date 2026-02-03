@@ -51,6 +51,20 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
   }
 
+  // Keyboard shortcut to toggle DevTools (F12 or Ctrl+Shift+I) - always available in dev mode
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (process.env.NODE_ENV === 'development') {
+      if (input.key === 'F12' || (input.control && input.shift && input.key === 'I')) {
+        if (mainWindow && mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.closeDevTools();
+        } else if (mainWindow) {
+          mainWindow.webContents.openDevTools();
+        }
+        event.preventDefault();
+      }
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -84,24 +98,38 @@ ipcMain.handle('read-log-file', async (event, filePath: string) => {
 
 ipcMain.handle('watch-log-file', (event, filePath: string) => {
   if (logWatchers.has(filePath)) {
+    console.log('Already watching:', filePath);
     return { success: true, alreadyWatching: true };
   }
 
   try {
+    console.log('Starting to watch:', filePath);
     const watcher = chokidar.watch(filePath, {
       persistent: true,
-      ignoreInitial: false,
+      ignoreInitial: true,
+      awaitWriteFinish: {
+        stabilityThreshold: 100,
+        pollInterval: 50
+      },
+      usePolling: true,
+      interval: 100
     });
 
-    watcher.on('change', () => {
+    watcher.on('change', (path) => {
+      console.log('File changed detected:', path);
       if (mainWindow) {
         mainWindow.webContents.send('log-file-changed', filePath);
       }
     });
 
+    watcher.on('error', (error) => {
+      console.error('Watcher error:', error);
+    });
+
     logWatchers.set(filePath, watcher);
     return { success: true };
   } catch (error) {
+    console.error('Failed to watch file:', error);
     return { success: false, error: String(error) };
   }
 });
@@ -213,4 +241,9 @@ ipcMain.handle('close-window', () => {
   if (mainWindow) {
     mainWindow.close();
   }
+});
+
+ipcMain.handle('open-external', async (_event, url: string) => {
+  const { shell } = await import('electron');
+  await shell.openExternal(url);
 });

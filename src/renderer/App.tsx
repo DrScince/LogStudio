@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Toolbar from './components/Toolbar';
 import TabBar, { Tab } from './components/TabBar';
 import SettingsPanel from './components/SettingsPanel';
+import AboutPanel from './components/AboutPanel';
 import TitleBar from './components/TitleBar';
 import { loadSettings, saveSettings, AppSettings } from './utils/settings';
 import './App.css';
@@ -13,6 +14,7 @@ function App() {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const [resetFilterTrigger, setResetFilterTrigger] = useState(0);
 
   // Active tab
@@ -188,6 +190,7 @@ function App() {
       <TitleBar />
       <Toolbar
         onSettingsClick={() => setShowSettings(!showSettings)}
+        onAboutClick={() => setShowAbout(!showAbout)}
         onOpenFile={handleOpenFile}
         onResetFilters={handleResetFilters}
         currentFile={currentLogFile}
@@ -223,6 +226,9 @@ function App() {
           onSettingsChange={handleSettingsChange}
           onClose={() => setShowSettings(false)}
         />
+      )}
+      {showAbout && (
+        <AboutPanel onClose={() => setShowAbout(false)} />
       )}
     </div>
   );

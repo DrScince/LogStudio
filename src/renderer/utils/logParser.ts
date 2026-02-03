@@ -14,7 +14,7 @@ const DEFAULT_SCHEMA: LogSchema = {
   },
 };
 
-export function parseLogFile(content: string, schema: LogSchema = DEFAULT_SCHEMA): LogEntry[] {
+export function parseLogFile(content: string, schema: LogSchema = DEFAULT_SCHEMA, lineOffset: number = 0): LogEntry[] {
   const lines = content.split('\n');
   const entries: LogEntry[] = [];
   const regex = new RegExp(schema.pattern);
@@ -40,8 +40,8 @@ export function parseLogFile(content: string, schema: LogSchema = DEFAULT_SCHEMA
       const namespace = (match[schema.fields.namespace] || '').trim();
       const message = (match[schema.fields.message] || '').trim();
 
-      // Debugging: Logge erste paar Einträge
-      if (entries.length < 3) {
+      // Debugging: Logge erste paar Einträge (nur bei initialem Load, lineOffset === 0)
+      if (entries.length < 3 && lineOffset === 0) {
         console.log(`Parsed entry ${i + 1}:`, {
           timestamp,
           level,
@@ -52,7 +52,7 @@ export function parseLogFile(content: string, schema: LogSchema = DEFAULT_SCHEMA
       }
 
       currentEntry = {
-        originalLineNumber: i + 1,
+        originalLineNumber: lineOffset + i + 1,
         timestamp,
         level,
         namespace,
@@ -76,7 +76,7 @@ export function parseLogFile(content: string, schema: LogSchema = DEFAULT_SCHEMA
     } else if (trimmedLine) {
       // Zeile ohne Pattern und ohne vorherigen Eintrag - erstelle Fallback-Eintrag
       entries.push({
-        originalLineNumber: i + 1,
+        originalLineNumber: lineOffset + i + 1,
         timestamp: '',
         level: 'UNKNOWN' as LogLevel,
         namespace: '',

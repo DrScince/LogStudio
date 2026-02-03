@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { VariableSizeList } from 'react-window';
 import { LogEntry, LogLevel, LogSchema } from '../types/log';
 import { parseLogFile, filterLogEntries, extractUniqueNamespaces, extractLogLevels } from '../utils/logParser';
@@ -34,6 +34,9 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const listRef = useRef<VariableSizeList>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastFileSizeRef = useRef<number>(0);
+  const scrollPositionRef = useRef<{ scrollOffset: number; scrollUpdateWasRequested: boolean }>({ scrollOffset: 0, scrollUpdateWasRequested: false });
+  const pendingScrollRestoreRef = useRef<number | null>(null);
+  const hasLoadedRef = useRef(false);
 
   // JSON/XML Formatting
   const formatJSON = (text: string): { formatted: string; isValid: boolean } => {
@@ -192,14 +195,25 @@ const LogViewer: React.FC<LogViewerProps> = ({
 
   useEffect(() => {
     if (filePath) {
+      // Reset loaded flag for new file
+      hasLoadedRef.current = false;
+      
       loadLogFile();
+      
       if (window.electronAPI) {
+        // Setup file watcher
         window.electronAPI.watchLogFile(filePath);
-        window.electronAPI.onLogFileChanged((changedPath) => {
-          if (changedPath === filePath && autoRefresh) {
+        
+        // Define the change handler
+        const handleFileChange = (changedPath: string) => {
+          console.log('File changed:', changedPath, 'Current file:', filePath, 'Auto-refresh:', autoRefresh);
+          if (changedPath === filePath) {
             loadLogFile();
           }
-        });
+        };
+        
+        // Register the listener
+        window.electronAPI.onLogFileChanged(handleFileChange);
       }
     }
 
@@ -209,49 +223,88 @@ const LogViewer: React.FC<LogViewerProps> = ({
         window.electronAPI.removeLogFileChangedListener();
       }
     };
-  }, [filePath, autoRefresh]);
+  }, [filePath]);
 
   useEffect(() => {
+    // Save current scroll position BEFORE any state change if tracking is off
+    if (!autoScroll && listRef.current) {
+      const currentState = listRef.current.state as any;
+      const currentOffset = currentState.scrollOffset || scrollPositionRef.current.scrollOffset;
+      if (currentOffset > 0) {
+        pendingScrollRestoreRef.current = currentOffset;
+        console.log('Saving scroll position before state change:', currentOffset);
+      }
+    }
+    
     const filtered = filterLogEntries(logEntries, selectedLevels, selectedNamespaces, searchQuery);
     setFilteredEntries(filtered);
     console.log(`LogViewer: ${filtered.length} of ${logEntries.length} entries after filtering`);
-    if (listRef.current) {
-      listRef.current.scrollToItem(0);
-    }
-  }, [logEntries, selectedLevels, selectedNamespaces, searchQuery]);
+  }, [logEntries, selectedLevels, selectedNamespaces, searchQuery, autoScroll]);
 
   const loadLogFile = async () => {
     if (!filePath || !window.electronAPI) return;
 
-    setLoading(true);
+    const isInitialLoad = !hasLoadedRef.current;
+    if (isInitialLoad) {
+      setLoading(true);
+      console.log('Initial load - showing loading state');
+    } else {
+      console.log('Incremental update - NOT showing loading state');
+    }
+    
     try {
       const result = await window.electronAPI.readLogFile(filePath);
       if (result.success && result.content) {
-        const entries = parseLogFile(result.content, schema);
-        console.log(`LogViewer: ${entries.length} Einträge aus Datei geparst`);
-        console.log(`LogViewer: Einträge nach Level:`, entries.reduce((acc, e) => {
-          acc[e.level] = (acc[e.level] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>));
+        // Check if file has grown (new content added)
+        const currentSize = result.content.length;
+        const hasNewContent = currentSize > lastFileSizeRef.current;
         
-        // Zeige erste paar Einträge zur Debugging
-        if (entries.length > 0) {
-          console.log('LogViewer: Erste 3 Einträge:', entries.slice(0, 3).map(e => ({
-            line: e.originalLineNumber,
-            timestamp: e.timestamp,
-            level: e.level,
-            namespace: e.namespace,
-            message: e.message.substring(0, 50),
-          })));
+        if (isInitialLoad) {
+          // Initial load - parse everything
+          const entries = parseLogFile(result.content, schema);
+          console.log(`LogViewer: Initial load - ${entries.length} entries parsed`);
+          setLogEntries(entries);
+          lastFileSizeRef.current = currentSize;
+          hasLoadedRef.current = true;
+        } else if (hasNewContent) {
+          // Incremental update - only parse new lines
+          const previousContent = result.content.substring(0, lastFileSizeRef.current);
+          const newContent = result.content.substring(lastFileSizeRef.current);
+          
+          // Count existing lines to get correct line numbers for new entries
+          const existingLineCount = previousContent.split('\n').length - 1;
+          
+          // Parse only the new content
+          const newEntries = parseLogFile(newContent, schema, existingLineCount);
+          
+          if (newEntries.length > 0) {
+            console.log(`LogViewer: Appending ${newEntries.length} new entries`);
+            
+            // Save current scroll position if tracking is off
+            if (!autoScroll && listRef.current) {
+              const currentState = listRef.current.state as any;
+              pendingScrollRestoreRef.current = currentState.scrollOffset || scrollPositionRef.current.scrollOffset;
+            }
+            
+            // Append new entries without re-rendering existing ones
+            setLogEntries(prevEntries => [...prevEntries, ...newEntries]);
+          }
+          
+          lastFileSizeRef.current = currentSize;
+        } else if (currentSize < lastFileSizeRef.current) {
+          // File was truncated or replaced - reload everything
+          console.log(`LogViewer: File truncated or replaced - reloading`);
+          const entries = parseLogFile(result.content, schema);
+          setLogEntries(entries);
+          lastFileSizeRef.current = currentSize;
         }
-        
-        setLogEntries(entries);
-        lastFileSizeRef.current = result.content.length;
       }
     } catch (error) {
       console.error('Error loading log file:', error);
     } finally {
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      }
     }
   };
 
@@ -289,12 +342,52 @@ const LogViewer: React.FC<LogViewerProps> = ({
     }
   }, [filteredEntries]);
 
-  // Auto-Scroll bei neuen Einträgen
-  useEffect(() => {
-    if (autoScroll && filteredEntries.length > 0) {
-      scrollToEnd();
+  // Auto-Scroll bei neuen Einträgen nur wenn tracking aktiv ist
+  const previousLengthRef = useRef(0);
+  const isFirstRenderRef = useRef(true);
+  
+  // useLayoutEffect runs synchronously after DOM mutations but before browser paint
+  // This prevents the visible "jump" to top
+  useLayoutEffect(() => {
+    // Skip first render
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      previousLengthRef.current = filteredEntries.length;
+      return;
     }
-  }, [filteredEntries.length, autoScroll, scrollToEnd]);
+    
+    const hasNewEntries = filteredEntries.length > previousLengthRef.current;
+    
+    if (autoScroll && hasNewEntries) {
+      // Scroll to end when new entries are added and tracking is on
+      console.log('Auto-scrolling to end');
+      scrollToEnd();
+    } else if (!autoScroll) {
+      // ALWAYS restore scroll position when tracking is off, on every render
+      const positionToRestore = pendingScrollRestoreRef.current;
+      console.log('Tracking OFF - Restoring scroll position:', positionToRestore);
+      if (positionToRestore !== null && positionToRestore > 0 && listRef.current) {
+        // Use requestAnimationFrame to ensure the list is fully rendered
+        requestAnimationFrame(() => {
+          if (listRef.current) {
+            listRef.current.scrollTo(positionToRestore);
+            console.log('Scroll restored to:', positionToRestore);
+          }
+        });
+      }
+    }
+    
+    previousLengthRef.current = filteredEntries.length;
+  }, [filteredEntries, autoScroll, scrollToEnd]);
+
+  const handleScroll = useCallback(({ scrollOffset, scrollUpdateWasRequested }: { scrollOffset: number; scrollUpdateWasRequested: boolean }) => {
+    scrollPositionRef.current = { scrollOffset, scrollUpdateWasRequested };
+    // Also update pending restore ref if tracking is off
+    if (!scrollUpdateWasRequested) {
+      pendingScrollRestoreRef.current = scrollOffset;
+    }
+    console.log('Scroll event:', scrollOffset);
+  }, []);
 
   const getLevelColor = (level: LogLevel): string => {
     switch (level) {
@@ -321,21 +414,25 @@ const LogViewer: React.FC<LogViewerProps> = ({
     const baseHeight = 30; // Min-Höhe für eine Zeile
     
     if (isExpanded && entry.isMultiLine) {
-      // Berechne Höhe basierend auf Textinhalt
-      const lines = entry.fullText.split('\n').length;
-      const expandedHeight = Math.max(200, Math.min(lines * 22 + 100, 850)); // Min 200px, Max 850px
-      return baseHeight + expandedHeight + 1; // +1 für Border
+      // Fixed height: 30px base + 400px for expanded content area
+      return 430;
     }
     
     // Für sehr lange einzelne Nachrichten - zeige nur bei expansion
     if (isExpanded && entry.message.length > 150) {
-      const estimatedLines = Math.ceil(entry.message.length / 100);
-      const expandedHeight = Math.max(200, Math.min(estimatedLines * 22 + 80, 750));
-      return baseHeight + expandedHeight;
+      return 430;
     }
     
     return baseHeight;
   }, [filteredEntries, expandedLines]);
+
+  const copyToClipboard = useCallback((text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      console.log('Content copied to clipboard');
+    }).catch(err => {
+      console.error('Failed to copy to clipboard:', err);
+    });
+  }, []);
 
   const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
     const entry = filteredEntries[index];
@@ -378,11 +475,29 @@ const LogViewer: React.FC<LogViewerProps> = ({
         </div>
         {isExpanded && expandedContent && (
           <div className="log-entry-details">
-            {expandedContent.type !== 'text' && (
-              <div className="log-content-type-badge">
-                {expandedContent.type.toUpperCase()}
-              </div>
-            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              {expandedContent.type !== 'text' && (
+                <div className="log-content-type-badge">
+                  {expandedContent.type.toUpperCase()}
+                </div>
+              )}
+              {(expandedContent.type === 'json' || expandedContent.type === 'xml' || expandedContent.type === 'exception') && (
+                <button 
+                  className="log-copy-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyToClipboard(expandedContent.formatted);
+                  }}
+                  title="Copy to clipboard"
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M4 4V2C4 1.44772 4.44772 1 5 1H13C13.5523 1 14 1.44772 14 2V10C14 10.5523 13.5523 11 13 11H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <rect x="2" y="5" width="9" height="10" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                  </svg>
+                  Copy
+                </button>
+              )}
+            </div>
             {expandedContent.isHtml ? (
               <pre 
                 className={`log-full-text log-content-${expandedContent.type}`}
@@ -443,18 +558,18 @@ const LogViewer: React.FC<LogViewerProps> = ({
             </div>
           </div>
           <div className="filter-group">
-            <label>Suche:</label>
+            <label>Search:</label>
             <input
               type="text"
               className="search-input"
-              placeholder="Suchtext eingeben..."
+              placeholder="Enter search text..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
         <div className="log-viewer-stats">
-          <span>{filteredEntries.length} / {logEntries.length} Einträge</span>
+          <span>{filteredEntries.length} / {logEntries.length} Entries</span>
           {selectedLevels.length > 0 && (
             <span className="filter-badge">Level: {selectedLevels.join(', ')}</span>
           )}
@@ -462,27 +577,27 @@ const LogViewer: React.FC<LogViewerProps> = ({
             <span className="filter-badge">Namespace: {selectedNamespaces.length}</span>
           )}
           {searchQuery && (
-            <span className="filter-badge">Suche: "{searchQuery}"</span>
+            <span className="filter-badge">Search: "{searchQuery}"</span>
           )}
           {filteredEntries.length > 0 && (
             <>
               <button 
                 onClick={() => setAutoScroll(!autoScroll)} 
                 className={`auto-scroll-button ${autoScroll ? 'active' : ''}`}
-                title={autoScroll ? "Auto-Tracking deaktivieren" : "Auto-Tracking aktivieren"}
+                title={autoScroll ? "Disable auto-tracking" : "Enable auto-tracking"}
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M8 2V14M8 14L12 10M8 14L4 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
                 </svg>
-                {autoScroll ? 'Tracking AN' : 'Tracking AUS'}
+                {autoScroll ? 'Tracking ON' : 'Tracking OFF'}
               </button>
-              <button onClick={scrollToEnd} className="scroll-to-end-button" title="Zum Ende springen">
+              <button onClick={scrollToEnd} className="scroll-to-end-button" title="Jump to end">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M8 12L8 4M8 12L4 8M8 12L12 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M3 14L13 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
-                Ende
+                End
               </button>
             </>
           )}
@@ -490,17 +605,19 @@ const LogViewer: React.FC<LogViewerProps> = ({
       </div>
       <div className="log-viewer-content" ref={containerRef}>
         {loading ? (
-          <div className="log-viewer-loading">Lade Log-Datei...</div>
+          <div className="log-viewer-loading">Loading log file...</div>
         ) : filteredEntries.length === 0 ? (
-          <div className="log-viewer-empty">Keine Einträge gefunden</div>
+          <div className="log-viewer-empty">No entries found</div>
         ) : (
           <VariableSizeList
             ref={listRef}
             height={viewerHeight}
             itemCount={filteredEntries.length}
             itemSize={getItemSize}
+            itemKey={(index) => filteredEntries[index]?.originalLineNumber ?? index}
             width="100%"
             estimatedItemSize={30}
+            onScroll={handleScroll}
           >
             {Row}
           </VariableSizeList>

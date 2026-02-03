@@ -3,12 +3,13 @@ import './Toolbar.css';
 
 interface ToolbarProps {
   onSettingsClick: () => void;
+  onAboutClick: () => void;
   onOpenFile: () => void;
   onResetFilters: () => void;
   currentFile: string | null;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ onSettingsClick, onOpenFile, onResetFilters, currentFile }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ onSettingsClick, onAboutClick, onOpenFile, onResetFilters, currentFile }) => {
   return (
     <div className="toolbar">
       <div className="toolbar-left">
@@ -51,6 +52,13 @@ const Toolbar: React.FC<ToolbarProps> = ({ onSettingsClick, onOpenFile, onResetF
             <path d="M3.33333 8C3.33333 8.35362 3.47281 8.69276 3.72286 8.94281C3.97291 9.19286 4.31205 9.33333 4.66667 9.33333C5.02129 9.33333 5.36043 9.19286 5.61048 8.94281C5.86052 8.69276 6 8.35362 6 8C6 7.64638 5.86052 7.30724 5.61048 7.05719C5.36043 6.80714 5.02129 6.66667 4.66667 6.66667C4.31205 6.66667 3.97291 6.80714 3.72286 7.05719C3.47281 7.30724 3.33333 7.64638 3.33333 8Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M8 3.33333C8 3.68795 7.85952 4.02709 7.60948 4.27714C7.35943 4.52719 7.02029 4.66667 6.66667 4.66667C6.31305 4.66667 5.97391 4.52719 5.72386 4.27714C5.47381 4.02709 5.33333 3.68795 5.33333 3.33333C5.33333 2.97871 5.47381 2.63957 5.72386 2.38952C5.97391 2.13948 6.31305 2 6.66667 2C7.02029 2 7.35943 2.13948 7.60948 2.38952C7.85952 2.63957 8 2.97871 8 3.33333Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M8 12.6667C8 13.0213 7.85952 13.3604 7.60948 13.6105C7.35943 13.8605 7.02029 14 6.66667 14C6.31305 14 5.97391 13.8605 5.72386 13.6105C5.47381 13.3604 5.33333 13.0213 5.33333 12.6667C5.33333 12.312 5.47381 11.9729 5.72386 11.7229C5.97391 11.4728 6.31305 11.3333 6.66667 11.3333C7.02029 11.3333 7.35943 11.4728 7.60948 11.7229C7.85952 11.9729 8 12.312 8 12.6667Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        <button className="toolbar-button" onClick={onAboutClick} title="About">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M8 11.5V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="8" cy="5.5" r="0.5" fill="currentColor"/>
           </svg>
         </button>
       </div>

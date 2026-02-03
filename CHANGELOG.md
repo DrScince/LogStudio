@@ -7,9 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-02-03
+
+### Added
+- **Copy to Clipboard**: Copy button for JSON, XML, and Exception content in expanded view
+- **DevTools Toggle**: Press F12 or Ctrl+Shift+I to toggle developer tools (development mode only)
+
+### Changed
+- **Incremental Log Loading**: Only new log entries are appended instead of reloading entire file, eliminating flickering
+- **Optimized Scroll Behavior**: Scroll position is now preserved during file updates using useLayoutEffect
+- **Improved Expanded View**: Fixed height (430px) with scrollable content (max 350px) for better consistency
+
+### Fixed
+- **Scroll Position Preservation**: Scroll position no longer jumps to top during file updates when tracking is disabled
+- **Flickering Elimination**: Removed flickering during auto-refresh by appending new entries instead of re-rendering all entries
+- **Loading State**: Loading indicator no longer flashes during incremental updates
+
 ## [1.0.2] - 2026-02-03
 
 ### Added
+- **About Panel**: New About section with project information, GitHub link, and license details
+- **Middle Mouse Button Close**: Tabs can now be closed by clicking with the middle mouse button
 - **Custom Title Bar**: Application now uses a custom title bar with integrated logo
 - **Reset Filters Button**: New button to reset all filters (namespace, level, search)
 - **Exception Formatting**: Automatic detection and colored formatting of exceptions and stack traces
@@ -29,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Date Parsing**: Fixed timezone handling for "Today/Yesterday" display
 
 ### Fixed
+- **Auto-Refresh Reliability**: Improved file watching with better polling and event handling
 - **Date Display**: Current files now correctly appear under "Today" instead of "Yesterday"
 - **Text Overflow**: Fixed issues with overlapping text in expanded entries
 - **Exception Scrolling**: Scrolling in expanded exception views now works correctly

@@ -13,6 +13,7 @@ export interface ElectronAPI {
   minimizeWindow: () => void;
   maximizeWindow: () => void;
   closeWindow: () => void;
+  openExternal: (url: string) => Promise<void>;
 }
 
 declare global {

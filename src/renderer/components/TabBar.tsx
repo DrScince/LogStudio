@@ -33,6 +33,13 @@ const TabBar: React.FC<TabBarProps> = ({ tabs, activeTabId, onTabSelect, onTabCl
             key={tab.id}
             className={`tab ${isActive ? 'active' : ''}`}
             onClick={() => onTabSelect(tab.id)}
+            onAuxClick={(e) => {
+              if (e.button === 1) {
+                // Middle mouse button
+                e.preventDefault();
+                onTabClose(tab.id, e);
+              }
+            }}
           >
             <span className="tab-label">{getFileName(tab.filePath)}</span>
             <button
