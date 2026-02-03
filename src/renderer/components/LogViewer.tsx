@@ -35,13 +35,13 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const lastFileSizeRef = useRef<number>(0);
 
-  // JSON/XML Formatierung
+  // JSON/XML Formatting
   const formatJSON = (text: string): { formatted: string; isValid: boolean } => {
     try {
-      // Trimme den Text zuerst
+      // Trim the text first
       const trimmed = text.trim();
       
-      // Prüfe ob der Text mit JSON-Zeichen beginnt/endet
+      // Check if text starts/ends with JSON characters
       if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
           (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
         const parsed = JSON.parse(trimmed);
@@ -49,11 +49,11 @@ const LogViewer: React.FC<LogViewerProps> = ({
         return { formatted, isValid: true };
       }
       
-      // Suche nach JSON innerhalb des Textes
-      // Versuche zuerst Objekt
+      // Search for JSON within the text
+      // Try object first
       let jsonMatch = text.match(/\{(?:[^{}]|(?:\{[^{}]*\}))*\}/s);
       if (!jsonMatch) {
-        // Dann Array - mit verbesserter Regex
+        // Then array - with improved regex
         jsonMatch = text.match(/\[[\s\S]*?\]/);
       }
       
@@ -63,26 +63,26 @@ const LogViewer: React.FC<LogViewerProps> = ({
           const formatted = JSON.stringify(parsed, null, 2);
           return { formatted, isValid: true };
         } catch {
-          // Versuche den gesamten Text
+          // Try the entire text
           const parsed = JSON.parse(text);
           const formatted = JSON.stringify(parsed, null, 2);
           return { formatted, isValid: true };
         }
       }
     } catch (e) {
-      // Kein gültiges JSON
+      // Not valid JSON
     }
     return { formatted: text, isValid: false };
   };
 
   const formatXML = (text: string): { formatted: string; isValid: boolean } => {
     try {
-      // Prüfe ob XML-ähnlicher Inhalt vorhanden ist
+      // Check if XML-like content is present
       if (text.includes('<') && text.includes('>')) {
         const xmlMatch = text.match(/<[\s\S]*>/);
         if (xmlMatch) {
           let formatted = xmlMatch[0];
-          // Einfache XML-Formatierung
+          // Simple XML formatting
           formatted = formatted.replace(/(>)(<)(\/*)/g, '$1\n$2$3');
           const pad = (level: number) => '  '.repeat(level);
           let level = 0;
@@ -96,13 +96,13 @@ const LogViewer: React.FC<LogViewerProps> = ({
         }
       }
     } catch (e) {
-      // Kein gültiges XML
+      // Not valid XML
     }
     return { formatted: text, isValid: false };
   };
 
   const formatException = (text: string): { formatted: string; isValid: boolean } => {
-    // Suche nach Exception-Patterns
+    // Search for exception patterns
     const exceptionPatterns = [
       /(?:Exception|Error)\s*:\s*(.+?)(?=\n|$)/gi,
       /at\s+[\w.<>$]+\([^)]*\)/gi,
@@ -147,32 +147,32 @@ const LogViewer: React.FC<LogViewerProps> = ({
   };
 
   const analyzeAndFormatContent = (text: string): { formatted: string; type: 'json' | 'xml' | 'exception' | 'text'; isHtml?: boolean } => {
-    // Prüfe zuerst auf Exception
+    // Check for exception first
     const exceptionResult = formatException(text);
     if (exceptionResult.isValid) {
       return { formatted: exceptionResult.formatted, type: 'exception', isHtml: true };
     }
 
-    // Prüfe zuerst auf JSON
+    // Check for JSON first
     const jsonResult = formatJSON(text);
     if (jsonResult.isValid) {
       return { formatted: jsonResult.formatted, type: 'json' };
     }
 
-    // Dann auf XML
+    // Then check for XML
     const xmlResult = formatXML(text);
     if (xmlResult.isValid) {
       return { formatted: xmlResult.formatted, type: 'xml' };
     }
 
-    // Ansonsten normaler Text
+    // Otherwise plain text
     return { formatted: text, type: 'text' };
   };
 
   const uniqueNamespaces = useMemo(() => extractUniqueNamespaces(logEntries), [logEntries]);
   const uniqueLevels = useMemo(() => extractLogLevels(logEntries), [logEntries]);
 
-  // Aktualisiere Namespaces im Parent
+  // Update namespaces in parent
   useEffect(() => {
     onNamespacesChange(uniqueNamespaces);
   }, [uniqueNamespaces, onNamespacesChange]);
@@ -214,7 +214,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   useEffect(() => {
     const filtered = filterLogEntries(logEntries, selectedLevels, selectedNamespaces, searchQuery);
     setFilteredEntries(filtered);
-    console.log(`LogViewer: ${filtered.length} von ${logEntries.length} Einträgen nach Filterung`);
+    console.log(`LogViewer: ${filtered.length} of ${logEntries.length} entries after filtering`);
     if (listRef.current) {
       listRef.current.scrollToItem(0);
     }
@@ -410,7 +410,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
             </svg>
             <h3 style={{ marginBottom: '8px', color: 'var(--text-primary)' }}>Keine Datei geöffnet</h3>
             <p style={{ marginBottom: '16px', color: 'var(--text-secondary)' }}>
-              Bitte wählen Sie eine Log-Datei aus der Sidebar aus oder öffnen Sie eine Datei über den "Öffnen"-Button.
+              Please select a log file from the sidebar or open a file using the "Open" button.
             </p>
           </div>
         </div>

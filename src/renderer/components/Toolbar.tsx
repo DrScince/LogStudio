@@ -24,27 +24,27 @@ const Toolbar: React.FC<ToolbarProps> = ({ onSettingsClick, onOpenFile, onResetF
         <h1 className="toolbar-title">LogStudio</h1>
       </div>
       <div className="toolbar-right">
-        <button className="toolbar-button toolbar-button-primary" onClick={onOpenFile} title="Datei öffnen">
+        <button className="toolbar-button toolbar-button-primary" onClick={onOpenFile} title="Open File">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M14 9.33333V12.6667C14 13.0203 13.8595 13.3594 13.6095 13.6095C13.3594 13.8595 13.0203 14 12.6667 14H3.33333C2.97971 14 2.64057 13.8595 2.39052 13.6095C2.14048 13.3594 2 13.0203 2 12.6667V5.33333C2 4.97971 2.14048 4.64057 2.39052 4.39052C2.64057 4.14048 2.97971 4 3.33333 4H6.66667" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M10 2H14V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M6.66667 9.33333L14 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <span>Öffnen</span>
+          <span>Open</span>
         </button>
         <button 
           className="toolbar-button" 
           onClick={onResetFilters} 
-          title="Alle Filter zurücksetzen"
+          title="Reset All Filters"
           disabled={!currentFile}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M14 8C14 11.3137 11.3137 14 8 14C4.68629 14 2 11.3137 2 8C2 4.68629 4.68629 2 8 2C9.84871 2 11.5051 2.84285 12.6 4.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M12.5 2V4.5H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <span>Filter zurücksetzen</span>
+          <span>Reset Filters</span>
         </button>
-        <button className="toolbar-button" onClick={onSettingsClick} title="Einstellungen">
+        <button className="toolbar-button" onClick={onSettingsClick} title="Settings">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M8 10C9.10457 10 10 9.10457 10 8C10 6.89543 9.10457 6 8 6C6.89543 6 6 6.89543 6 8C6 9.10457 6.89543 10 8 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M12.6667 8C12.6667 8.35362 12.8062 8.69276 13.0562 8.94281C13.3063 9.19286 13.6454 9.33333 14 9.33333C14.3546 9.33333 14.6937 9.19286 14.9438 8.94281C15.1938 8.69276 15.3333 8.35362 15.3333 8C15.3333 7.64638 15.1938 7.30724 14.9438 7.05719C14.6937 6.80714 14.3546 6.66667 14 6.66667C13.6454 6.66667 13.3063 6.80714 13.0562 7.05719C12.8062 7.30724 12.6667 7.64638 12.6667 8Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>

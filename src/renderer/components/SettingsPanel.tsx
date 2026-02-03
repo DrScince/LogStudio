@@ -48,14 +48,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
     <div className="settings-overlay" onClick={handleCancel}>
       <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
         <div className="settings-header">
-          <h2>Einstellungen</h2>
+          <h2>Settings</h2>
           <button className="settings-close" onClick={handleCancel}>
             ✕
           </button>
         </div>
         <div className="settings-content">
           <div className="settings-section">
-            <h3>Log-Verzeichnis</h3>
+            <h3>Log Directory</h3>
             <input
               type="text"
               className="settings-input"
@@ -63,7 +63,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
               onChange={(e) =>
                 setLocalSettings({ ...localSettings, logDirectory: e.target.value })
               }
-              placeholder="Pfad zum Log-Verzeichnis"
+              placeholder="Path to log directory"
             />
           </div>
 
@@ -77,10 +77,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                   setLocalSettings({ ...localSettings, autoRefresh: e.target.checked })
                 }
               />
-              Automatisch aktualisieren
+              Auto-refresh
             </label>
             <div className="settings-input-group">
-              <label>Aktualisierungsintervall (ms):</label>
+              <label>Refresh interval (ms):</label>
               <input
                 type="number"
                 className="settings-input"
@@ -98,15 +98,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
           </div>
 
           <div className="settings-section">
-            <h3>Log-Schema</h3>
+            <h3>Log Schema</h3>
             <div className="settings-input-group">
-              <label>Regex-Pattern:</label>
+              <label>Regex Pattern:</label>
               <textarea
                 className="settings-textarea"
                 value={localSettings.logSchema.pattern}
                 onChange={(e) => handleSchemaChange('pattern', e.target.value)}
                 rows={3}
-                placeholder="Regex-Pattern für Log-Zeilen"
+                placeholder="Regex pattern for log lines"
               />
             </div>
             <div className="settings-input-group">
@@ -130,9 +130,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
               />
             </div>
             <div className="settings-fields">
-              <h4>Regex-Gruppen (1-basiert):</h4>
+              <h4>Regex Groups (1-based):</h4>
               <div className="settings-input-group">
-                <label>Timestamp-Gruppe:</label>
+                <label>Timestamp Group:</label>
                 <input
                   type="number"
                   className="settings-input"
@@ -144,7 +144,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                 />
               </div>
               <div className="settings-input-group">
-                <label>Level-Gruppe:</label>
+                <label>Level Group:</label>
                 <input
                   type="number"
                   className="settings-input"
@@ -156,7 +156,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                 />
               </div>
               <div className="settings-input-group">
-                <label>Namespace-Gruppe:</label>
+                <label>Namespace Group:</label>
                 <input
                   type="number"
                   className="settings-input"
@@ -168,7 +168,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                 />
               </div>
               <div className="settings-input-group">
-                <label>Message-Gruppe:</label>
+                <label>Message Group:</label>
                 <input
                   type="number"
                   className="settings-input"
@@ -183,9 +183,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
           </div>
 
           <div className="settings-section">
-            <h3>Anzeige</h3>
+            <h3>Display</h3>
             <div className="settings-input-group">
-              <label>Schriftgröße:</label>
+              <label>Font Size:</label>
               <input
                 type="number"
                 className="settings-input"
@@ -212,18 +212,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                   })
                 }
               >
-                <option value="dark">Dunkel</option>
-                <option value="light">Hell</option>
+                <option value="dark">Dark</option>
+                <option value="light">Light</option>
               </select>
             </div>
           </div>
         </div>
         <div className="settings-footer">
           <button className="settings-button settings-button-primary" onClick={handleSave}>
-            Speichern
+            Save
           </button>
           <button className="settings-button" onClick={handleCancel}>
-            Abbrechen
+            Cancel
           </button>
         </div>
       </div>

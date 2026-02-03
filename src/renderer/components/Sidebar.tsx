@@ -31,10 +31,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [activeTab, setActiveTab] = useState<'files' | 'namespaces'>('files');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
-  // Extrahiere Datum aus Dateinamen (z.B. "2025-11-12.log" -> "2025-11-12")
+  // Extract date from filename (e.g. "2025-11-12.log" -> "2025-11-12")
   const extractDateFromFileName = (fileName: string): Date | null => {
-    // Versuche verschiedene Datumsformate im Dateinamen zu finden
-    // Format: YYYY-MM-DD oder YYYY_MM_DD oder YYYYMMDD
+    // Try to find various date formats in the filename
+    // Format: YYYY-MM-DD or YYYY_MM_DD or YYYYMMDD
     const patterns = [
       /(\d{4})-(\d{2})-(\d{2})/,  // YYYY-MM-DD
       /(\d{4})_(\d{2})_(\d{2})/,  // YYYY_MM_DD
@@ -45,7 +45,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       const match = fileName.match(pattern);
       if (match) {
         const year = parseInt(match[1]);
-        const month = parseInt(match[2]) - 1; // Monate sind 0-basiert
+        const month = parseInt(match[2]) - 1; // Months are 0-based
         const day = parseInt(match[3]);
         const date = new Date(year, month, day);
         if (!isNaN(date.getTime())) {
@@ -56,17 +56,17 @@ const Sidebar: React.FC<SidebarProps> = ({
     return null;
   };
 
-  // Gruppiere Dateien nach Datum
+  // Group files by date
   const groupedFiles = useMemo(() => {
     const filesWithDates: FileWithDate[] = logFiles.map((file) => {
       const dateFromName = extractDateFromFileName(file.name);
-      const date = dateFromName || new Date(); // Fallback auf aktuelles Datum
+      const date = dateFromName || new Date(); // Fallback to current date
       
-      // Verwende lokale Zeitzone statt UTC
+      // Use local timezone instead of UTC
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`; // YYYY-MM-DD in lokaler Zeit
+      const dateStr = `${year}-${month}-${day}`; // YYYY-MM-DD in local time
       
       return {
         ...file,
@@ -75,10 +75,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       };
     });
 
-    // Sortiere nach Datum (neueste zuerst)
+    // Sort by date (newest first)
     filesWithDates.sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime());
 
-    // Gruppiere nach Datum
+    // Group by date
     const groups = new Map<string, FileWithDate[]>();
     filesWithDates.forEach((file) => {
       if (!groups.has(file.date)) {
@@ -87,15 +87,15 @@ const Sidebar: React.FC<SidebarProps> = ({
       groups.get(file.date)!.push(file);
     });
 
-    // Konvertiere zu Array und sortiere Gruppen nach Datum (neueste zuerst)
+    // Convert to array and sort groups by date (newest first)
     return Array.from(groups.entries()).sort((a, b) => {
       return new Date(b[0]).getTime() - new Date(a[0]).getTime();
     });
   }, [logFiles]);
 
-  // Formatiere Datum für Anzeige
+  // Format date for display
   const formatDate = (dateStr: string): string => {
-    // Parse das Datum im lokalen Kontext
+    // Parse the date in local context
     const parts = dateStr.split('-');
     const year = parseInt(parts[0]);
     const month = parseInt(parts[1]) - 1;
@@ -106,17 +106,17 @@ const Sidebar: React.FC<SidebarProps> = ({
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    // Setze Zeit auf 0 für korrekten Vergleich
+    // Set time to 0 for correct comparison
     const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const yesterdayOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
 
     if (dateOnly.getTime() === todayOnly.getTime()) {
-      return 'Heute';
+      return 'Today';
     } else if (dateOnly.getTime() === yesterdayOnly.getTime()) {
-      return 'Gestern';
+      return 'Yesterday';
     } else {
-      // Formatiere als "DD.MM.YYYY"
+      // Format as "DD.MM.YYYY"
       return date.toLocaleDateString('de-DE', {
         day: '2-digit',
         month: '2-digit',
@@ -167,7 +167,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     return (
       <div className="sidebar">
         <div className="sidebar-empty">
-          <p>Bitte wählen Sie ein Log-Verzeichnis in den Einstellungen aus.</p>
+          <p>Please select a log directory in the settings.</p>
         </div>
       </div>
     );
@@ -181,7 +181,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             className={`sidebar-tab ${activeTab === 'files' ? 'active' : ''}`}
             onClick={() => setActiveTab('files')}
           >
-            Dateien
+            Files
           </button>
           <button
             className={`sidebar-tab ${activeTab === 'namespaces' ? 'active' : ''}`}
@@ -204,7 +204,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             {loading ? (
               <div className="sidebar-loading">Lade...</div>
             ) : logFiles.length === 0 ? (
-              <div className="sidebar-empty">Keine Log-Dateien gefunden</div>
+              <div className="sidebar-empty">No log files found</div>
             ) : (
               <div className="log-file-groups">
                 {groupedFiles.map(([dateStr, files]) => {

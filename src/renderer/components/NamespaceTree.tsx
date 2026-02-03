@@ -21,7 +21,7 @@ const NamespaceTree: React.FC<NamespaceTreeProps> = ({
 }) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
-  // Baue die Baumstruktur aus den Namespaces
+  // Build tree structure from namespaces
   const tree = useMemo(() => {
     const root: NamespaceNode = {
       name: '',
@@ -64,13 +64,13 @@ const NamespaceTree: React.FC<NamespaceTreeProps> = ({
     });
   };
 
-  // Prüft, ob ein Namespace oder einer seiner Eltern ausgewählt ist (hierarchisch)
+  // Check if a namespace or any of its parents is selected (hierarchical)
   const isNamespaceIncluded = (namespacePath: string): boolean => {
-    // Prüfe exakte Übereinstimmung
+    // Check exact match
     if (selectedNamespaces.includes(namespacePath)) {
       return true;
     }
-    // Prüfe, ob ein übergeordneter Namespace ausgewählt ist
+    // Check if a parent namespace is selected
     return selectedNamespaces.some((selected) => {
       return namespacePath.startsWith(selected + '.');
     });
@@ -78,7 +78,7 @@ const NamespaceTree: React.FC<NamespaceTreeProps> = ({
 
   const renderNode = (node: NamespaceNode, level: number = 0): React.ReactNode => {
     if (node.fullPath === '') {
-      // Root-Knoten - rendere alle Kinder
+      // Root node - render all children
       return Array.from(node.children.values()).map((child) => renderNode(child, 0));
     }
 

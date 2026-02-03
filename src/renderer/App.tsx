@@ -15,14 +15,14 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [resetFilterTrigger, setResetFilterTrigger] = useState(0);
 
-  // Aktiver Tab
+  // Active tab
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
   const currentLogFile = activeTab?.filePath || null;
   const selectedNamespaces = activeTab?.selectedNamespaces || [];
   const namespaces = activeTab?.namespaces || [];
 
   useEffect(() => {
-    // Setze Standard-Log-Verzeichnis, falls nicht gesetzt
+    // Set default log directory if not set
     if (!settings.logDirectory && window.electronAPI) {
       window.electronAPI.getDefaultLogDirectory().then((result) => {
         if (result.success && result.path) {
@@ -44,7 +44,7 @@ function App() {
     try {
       if (!window.electronAPI) {
         console.error('electronAPI is not available');
-        alert('Fehler: Electron API ist nicht verfügbar. Bitte starten Sie die Anwendung neu.');
+        alert('Error: Electron API is not available. Please restart the application.');
         return;
       }
 
@@ -59,23 +59,23 @@ function App() {
         console.log('File dialog was canceled');
       } else {
         console.error('Error opening file dialog:', result.error);
-        alert(`Fehler beim Öffnen der Datei: ${result.error || 'Unbekannter Fehler'}`);
+        alert(`Error opening file: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Exception in handleOpenFile:', error);
-      alert(`Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}`);
+      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const openFileInTab = useCallback((filePath: string) => {
-    // Prüfe, ob die Datei bereits in einem Tab geöffnet ist
+    // Check if file is already open in a tab
     const existingTab = tabs.find((tab) => tab.filePath === filePath);
     
     if (existingTab) {
-      // Wechsle zum existierenden Tab
+      // Switch to existing tab
       setActiveTabId(existingTab.id);
     } else {
-      // Erstelle einen neuen Tab
+      // Create a new tab
       const newTabId = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const newTab: Tab = {
         id: newTabId,
@@ -99,10 +99,10 @@ function App() {
     setTabs((prev) => {
       const newTabs = prev.filter((tab) => tab.id !== tabId);
       
-      // Wenn der geschlossene Tab der aktive war, wechsle zum nächsten Tab
+      // If the closed tab was active, switch to the next tab
       if (tabId === activeTabId) {
         if (newTabs.length > 0) {
-          // Wechsle zum letzten Tab oder zum ersten, wenn es der letzte war
+          // Switch to previous tab or first if it was the last
           const closedIndex = prev.findIndex((tab) => tab.id === tabId);
           const newActiveIndex = closedIndex > 0 ? closedIndex - 1 : 0;
           setActiveTabId(newTabs[newActiveIndex]?.id || null);
@@ -131,21 +131,21 @@ function App() {
         const isCurrentlySelected = tab.selectedNamespaces.includes(namespace);
         
         if (isCurrentlySelected) {
-          // Namespace abwählen
+          // Deselect namespace
           return {
             ...tab,
             selectedNamespaces: tab.selectedNamespaces.filter((n) => n !== namespace),
           };
         } else {
-          // Namespace auswählen - entferne übergeordnete und untergeordnete Namespaces
+          // Select namespace - remove parent and child namespaces
           let newSelection = [...tab.selectedNamespaces];
           
-          // Entferne alle übergeordneten Namespaces
+          // Remove all parent namespaces
           newSelection = newSelection.filter((selected) => {
             return !namespace.startsWith(selected + '.');
           });
           
-          // Entferne alle untergeordneten Namespaces
+          // Remove all child namespaces
           newSelection = newSelection.filter((selected) => {
             return !selected.startsWith(namespace + '.');
           });
@@ -172,14 +172,14 @@ function App() {
   const handleResetFilters = useCallback(() => {
     if (!activeTabId) return;
     
-    // Setze Namespace-Filter zurück
+    // Reset namespace filters
     setTabs((prev) =>
       prev.map((tab) =>
         tab.id === activeTabId ? { ...tab, selectedNamespaces: [] } : tab
       )
     );
     
-    // Triggere Reset im LogViewer
+    // Trigger reset in LogViewer
     setResetFilterTrigger(prev => prev + 1);
   }, [activeTabId]);
 
