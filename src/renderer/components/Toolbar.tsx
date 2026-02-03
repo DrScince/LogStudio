@@ -4,10 +4,11 @@ import './Toolbar.css';
 interface ToolbarProps {
   onSettingsClick: () => void;
   onOpenFile: () => void;
+  onResetFilters: () => void;
   currentFile: string | null;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ onSettingsClick, onOpenFile, currentFile }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ onSettingsClick, onOpenFile, onResetFilters, currentFile }) => {
   return (
     <div className="toolbar">
       <div className="toolbar-left">
@@ -30,6 +31,18 @@ const Toolbar: React.FC<ToolbarProps> = ({ onSettingsClick, onOpenFile, currentF
             <path d="M6.66667 9.33333L14 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           <span>Öffnen</span>
+        </button>
+        <button 
+          className="toolbar-button" 
+          onClick={onResetFilters} 
+          title="Alle Filter zurücksetzen"
+          disabled={!currentFile}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 8C14 11.3137 11.3137 14 8 14C4.68629 14 2 11.3137 2 8C2 4.68629 4.68629 2 8 2C9.84871 2 11.5051 2.84285 12.6 4.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M12.5 2V4.5H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span>Filter zurücksetzen</span>
         </button>
         <button className="toolbar-button" onClick={onSettingsClick} title="Einstellungen">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

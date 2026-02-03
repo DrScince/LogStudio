@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Toolbar from './components/Toolbar';
 import TabBar, { Tab } from './components/TabBar';
 import SettingsPanel from './components/SettingsPanel';
+import TitleBar from './components/TitleBar';
 import { loadSettings, saveSettings, AppSettings } from './utils/settings';
 import './App.css';
 
@@ -12,6 +13,7 @@ function App() {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [resetFilterTrigger, setResetFilterTrigger] = useState(0);
 
   // Aktiver Tab
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
@@ -167,11 +169,27 @@ function App() {
     );
   }, [activeTabId]);
 
+  const handleResetFilters = useCallback(() => {
+    if (!activeTabId) return;
+    
+    // Setze Namespace-Filter zurück
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === activeTabId ? { ...tab, selectedNamespaces: [] } : tab
+      )
+    );
+    
+    // Triggere Reset im LogViewer
+    setResetFilterTrigger(prev => prev + 1);
+  }, [activeTabId]);
+
   return (
     <div className="app">
+      <TitleBar />
       <Toolbar
         onSettingsClick={() => setShowSettings(!showSettings)}
         onOpenFile={handleOpenFile}
+        onResetFilters={handleResetFilters}
         currentFile={currentLogFile}
       />
       <TabBar
@@ -196,6 +214,7 @@ function App() {
           refreshInterval={settings.refreshInterval}
           selectedNamespaces={selectedNamespaces}
           onNamespacesChange={handleNamespacesChange}
+          key={`${activeTabId}-${resetFilterTrigger}`}
         />
       </div>
       {showSettings && (

@@ -6,7 +6,9 @@
   },
   "files": [
     "dist/**/*",
-    "package.json"
+    "package.json",
+    "public/LogStudio_Logo.ico",
+    "LogStudio_Logo.png"
   ],
   "win": {
     "target": [
@@ -15,7 +17,7 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "build/icon.ico",
+    "icon": "public/LogStudio_Logo.ico",
     "artifactName": "${productName}-${version}-${arch}.${ext}"
   },
   "portable": {
@@ -23,10 +25,10 @@
   },
   "mac": {
     "target": "dmg",
-    "icon": "build/icon.icns"
+    "icon": "LogStudio_Logo.png"
   },
   "linux": {
     "target": "AppImage",
-    "icon": "build/icon.png"
+    "icon": "LogStudio_Logo.png"
   }
 }

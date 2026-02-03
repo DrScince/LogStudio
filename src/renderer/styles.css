@@ -51,20 +51,32 @@ code {
 
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 16px;
+  height: 16px;
 }
 
 ::-webkit-scrollbar-track {
   background: var(--bg-secondary);
+  border-radius: 8px;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--bg-tertiary);
-  border-radius: 5px;
-  border: 2px solid var(--bg-secondary);
+  border-radius: 8px;
+  border: 3px solid var(--bg-secondary);
+  transition: background 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--border-color);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--text-muted);
+}
+
+/* Scrollbar für Firefox */
+* {
+  scrollbar-width: auto;
+  scrollbar-color: var(--bg-tertiary) var(--bg-secondary);
 }
