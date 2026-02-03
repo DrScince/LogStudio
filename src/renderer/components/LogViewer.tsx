@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { FixedSizeList } from 'react-window';
+import { VariableSizeList } from 'react-window';
 import { LogEntry, LogLevel, LogSchema } from '../types/log';
 import { parseLogFile, filterLogEntries, extractUniqueNamespaces, extractLogLevels } from '../utils/logParser';
 import './LogViewer.css';
@@ -11,6 +11,7 @@ interface LogViewerProps {
   refreshInterval: number;
   selectedNamespaces: string[];
   onNamespacesChange: (namespaces: string[]) => void;
+  onResetFilters?: () => void;
 }
 
 const LogViewer: React.FC<LogViewerProps> = ({
@@ -20,6 +21,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   refreshInterval,
   selectedNamespaces,
   onNamespacesChange,
+  onResetFilters,
 }) => {
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<LogEntry[]>([]);
@@ -28,9 +30,144 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const [loading, setLoading] = useState(false);
   const [expandedLines, setExpandedLines] = useState<Set<number>>(new Set());
   const [viewerHeight, setViewerHeight] = useState(600);
-  const listRef = useRef<FixedSizeList>(null);
+  const [autoScroll, setAutoScroll] = useState(false);
+  const listRef = useRef<VariableSizeList>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastFileSizeRef = useRef<number>(0);
+
+  // JSON/XML Formatierung
+  const formatJSON = (text: string): { formatted: string; isValid: boolean } => {
+    try {
+      // Trimme den Text zuerst
+      const trimmed = text.trim();
+      
+      // Prüfe ob der Text mit JSON-Zeichen beginnt/endet
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+          (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+        const parsed = JSON.parse(trimmed);
+        const formatted = JSON.stringify(parsed, null, 2);
+        return { formatted, isValid: true };
+      }
+      
+      // Suche nach JSON innerhalb des Textes
+      // Versuche zuerst Objekt
+      let jsonMatch = text.match(/\{(?:[^{}]|(?:\{[^{}]*\}))*\}/s);
+      if (!jsonMatch) {
+        // Dann Array - mit verbesserter Regex
+        jsonMatch = text.match(/\[[\s\S]*?\]/);
+      }
+      
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          const formatted = JSON.stringify(parsed, null, 2);
+          return { formatted, isValid: true };
+        } catch {
+          // Versuche den gesamten Text
+          const parsed = JSON.parse(text);
+          const formatted = JSON.stringify(parsed, null, 2);
+          return { formatted, isValid: true };
+        }
+      }
+    } catch (e) {
+      // Kein gültiges JSON
+    }
+    return { formatted: text, isValid: false };
+  };
+
+  const formatXML = (text: string): { formatted: string; isValid: boolean } => {
+    try {
+      // Prüfe ob XML-ähnlicher Inhalt vorhanden ist
+      if (text.includes('<') && text.includes('>')) {
+        const xmlMatch = text.match(/<[\s\S]*>/);
+        if (xmlMatch) {
+          let formatted = xmlMatch[0];
+          // Einfache XML-Formatierung
+          formatted = formatted.replace(/(>)(<)(\/*)/g, '$1\n$2$3');
+          const pad = (level: number) => '  '.repeat(level);
+          let level = 0;
+          formatted = formatted.split('\n').map(line => {
+            if (line.match(/^<\/\w/)) level--;
+            const padded = pad(level) + line;
+            if (line.match(/^<\w[^>]*[^\/]>.*$/)) level++;
+            return padded;
+          }).join('\n');
+          return { formatted, isValid: true };
+        }
+      }
+    } catch (e) {
+      // Kein gültiges XML
+    }
+    return { formatted: text, isValid: false };
+  };
+
+  const formatException = (text: string): { formatted: string; isValid: boolean } => {
+    // Suche nach Exception-Patterns
+    const exceptionPatterns = [
+      /(?:Exception|Error)\s*:\s*(.+?)(?=\n|$)/gi,
+      /at\s+[\w.<>$]+\([^)]*\)/gi,
+      /\s+at\s+.+?\(.+?:\d+\)/gi,
+      /Caused by:\s*.+/gi,
+    ];
+
+    let hasException = false;
+    for (const pattern of exceptionPatterns) {
+      if (pattern.test(text)) {
+        hasException = true;
+        break;
+      }
+    }
+
+    if (!hasException) {
+      return { formatted: text, isValid: false };
+    }
+
+    // Formatiere den Text für bessere Lesbarkeit
+    let formatted = text;
+
+    // Hebe Exception-Zeilen hervor
+    formatted = formatted.replace(
+      /(\w+(?:Exception|Error))\s*:\s*(.+)/gi,
+      '<span class="exception-type">$1</span>: <span class="exception-message">$2</span>'
+    );
+
+    // Formatiere Stack Trace-Zeilen
+    formatted = formatted.replace(
+      /^(\s*at\s+)([\w.<>$]+)\(([^)]*)\)/gim,
+      '$1<span class="stack-method">$2</span>(<span class="stack-location">$3</span>)'
+    );
+
+    // Formatiere "Caused by" Zeilen
+    formatted = formatted.replace(
+      /(Caused by:\s*)(.+)/gi,
+      '<span class="exception-caused">$1</span><span class="exception-type">$2</span>'
+    );
+
+    return { formatted, isValid: true };
+  };
+
+  const analyzeAndFormatContent = (text: string): { formatted: string; type: 'json' | 'xml' | 'exception' | 'text'; isHtml?: boolean } => {
+    // Prüfe zuerst auf Exception
+    const exceptionResult = formatException(text);
+    if (exceptionResult.isValid) {
+      return { formatted: exceptionResult.formatted, type: 'exception', isHtml: true };
+    }
+
+    // Prüfe zuerst auf JSON
+    const jsonResult = formatJSON(text);
+    if (jsonResult.isValid) {
+      return { formatted: jsonResult.formatted, type: 'json' };
+    }
+
+    // Dann auf XML
+    const xmlResult = formatXML(text);
+    if (xmlResult.isValid) {
+      return { formatted: xmlResult.formatted, type: 'xml' };
+    }
+
+    // Ansonsten normaler Text
+    return { formatted: text, type: 'text' };
+  };
 
   const uniqueNamespaces = useMemo(() => extractUniqueNamespaces(logEntries), [logEntries]);
   const uniqueLevels = useMemo(() => extractLogLevels(logEntries), [logEntries]);
@@ -140,7 +277,24 @@ const LogViewer: React.FC<LogViewerProps> = ({
       }
       return newSet;
     });
+    // Reset cache für dynamische Höhenberechnung
+    if (listRef.current) {
+      listRef.current.resetAfterIndex(index);
+    }
   }, []);
+
+  const scrollToEnd = useCallback(() => {
+    if (listRef.current && filteredEntries.length > 0) {
+      listRef.current.scrollToItem(filteredEntries.length - 1, 'end');
+    }
+  }, [filteredEntries]);
+
+  // Auto-Scroll bei neuen Einträgen
+  useEffect(() => {
+    if (autoScroll && filteredEntries.length > 0) {
+      scrollToEnd();
+    }
+  }, [filteredEntries.length, autoScroll, scrollToEnd]);
 
   const getLevelColor = (level: LogLevel): string => {
     switch (level) {
@@ -159,17 +313,45 @@ const LogViewer: React.FC<LogViewerProps> = ({
     }
   };
 
+  const getItemSize = useCallback((index: number): number => {
+    const entry = filteredEntries[index];
+    if (!entry) return 30;
+
+    const isExpanded = expandedLines.has(index);
+    const baseHeight = 30; // Min-Höhe für eine Zeile
+    
+    if (isExpanded && entry.isMultiLine) {
+      // Berechne Höhe basierend auf Textinhalt
+      const lines = entry.fullText.split('\n').length;
+      const expandedHeight = Math.max(200, Math.min(lines * 22 + 100, 850)); // Min 200px, Max 850px
+      return baseHeight + expandedHeight + 1; // +1 für Border
+    }
+    
+    // Für sehr lange einzelne Nachrichten - zeige nur bei expansion
+    if (isExpanded && entry.message.length > 150) {
+      const estimatedLines = Math.ceil(entry.message.length / 100);
+      const expandedHeight = Math.max(200, Math.min(estimatedLines * 22 + 80, 750));
+      return baseHeight + expandedHeight;
+    }
+    
+    return baseHeight;
+  }, [filteredEntries, expandedLines]);
+
   const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
     const entry = filteredEntries[index];
     if (!entry) return null;
 
     const isExpanded = expandedLines.has(index);
-    const shouldShowExpand = entry.isMultiLine;
+    const isLongMessage = entry.message.length > 150;
+    const shouldShowExpand = entry.isMultiLine || isLongMessage;
+
+    // Analysiere und formatiere den Inhalt wenn expandiert
+    const expandedContent = isExpanded ? analyzeAndFormatContent(entry.isMultiLine ? entry.fullText : entry.message) : null;
 
     return (
       <div style={style} className="log-entry">
         <div
-          className={`log-entry-line ${entry.isMultiLine ? 'multiline' : ''}`}
+          className={`log-entry-line ${shouldShowExpand ? 'multiline' : ''}`}
           onClick={() => shouldShowExpand && toggleExpand(index)}
         >
           <span className="log-line-number">{entry.originalLineNumber}</span>
@@ -182,22 +364,40 @@ const LogViewer: React.FC<LogViewerProps> = ({
           </span>
           <span className="log-namespace">{entry.namespace}</span>
           <span className="log-message">
-            {isExpanded || !entry.isMultiLine
+            {isExpanded
               ? entry.message
-              : entry.message.split('\n')[0] + ' ...'}
+              : entry.isMultiLine
+              ? entry.message.split('\n')[0] + ' ...'
+              : isLongMessage
+              ? entry.message.substring(0, 150) + ' ...'
+              : entry.message}
           </span>
           {shouldShowExpand && (
             <span className="log-expand-icon">{isExpanded ? '▼' : '▶'}</span>
           )}
         </div>
-        {isExpanded && entry.isMultiLine && (
+        {isExpanded && expandedContent && (
           <div className="log-entry-details">
-            <pre className="log-full-text">{entry.fullText}</pre>
+            {expandedContent.type !== 'text' && (
+              <div className="log-content-type-badge">
+                {expandedContent.type.toUpperCase()}
+              </div>
+            )}
+            {expandedContent.isHtml ? (
+              <pre 
+                className={`log-full-text log-content-${expandedContent.type}`}
+                dangerouslySetInnerHTML={{ __html: expandedContent.formatted }}
+              />
+            ) : (
+              <pre className={`log-full-text log-content-${expandedContent.type}`}>
+                {expandedContent.formatted}
+              </pre>
+            )}
           </div>
         )}
       </div>
     );
-  }, [filteredEntries, expandedLines, toggleExpand]);
+  }, [filteredEntries, expandedLines, toggleExpand, analyzeAndFormatContent]);
 
   if (!filePath) {
     return (
@@ -264,6 +464,28 @@ const LogViewer: React.FC<LogViewerProps> = ({
           {searchQuery && (
             <span className="filter-badge">Suche: "{searchQuery}"</span>
           )}
+          {filteredEntries.length > 0 && (
+            <>
+              <button 
+                onClick={() => setAutoScroll(!autoScroll)} 
+                className={`auto-scroll-button ${autoScroll ? 'active' : ''}`}
+                title={autoScroll ? "Auto-Tracking deaktivieren" : "Auto-Tracking aktivieren"}
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8 2V14M8 14L12 10M8 14L4 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
+                </svg>
+                {autoScroll ? 'Tracking AN' : 'Tracking AUS'}
+              </button>
+              <button onClick={scrollToEnd} className="scroll-to-end-button" title="Zum Ende springen">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8 12L8 4M8 12L4 8M8 12L12 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3 14L13 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                Ende
+              </button>
+            </>
+          )}
         </div>
       </div>
       <div className="log-viewer-content" ref={containerRef}>
@@ -272,15 +494,16 @@ const LogViewer: React.FC<LogViewerProps> = ({
         ) : filteredEntries.length === 0 ? (
           <div className="log-viewer-empty">Keine Einträge gefunden</div>
         ) : (
-          <FixedSizeList
+          <VariableSizeList
             ref={listRef}
             height={viewerHeight}
             itemCount={filteredEntries.length}
-            itemSize={30}
+            itemSize={getItemSize}
             width="100%"
+            estimatedItemSize={30}
           >
             {Row}
-          </FixedSizeList>
+          </VariableSizeList>
         )}
       </div>
     </div>

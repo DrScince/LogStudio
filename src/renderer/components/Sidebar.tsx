@@ -29,6 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [logFiles, setLogFiles] = useState<Array<{ name: string; path: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'files' | 'namespaces'>('files');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   // Extrahiere Datum aus Dateinamen (z.B. "2025-11-12.log" -> "2025-11-12")
   const extractDateFromFileName = (fileName: string): Date | null => {
@@ -60,7 +61,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     const filesWithDates: FileWithDate[] = logFiles.map((file) => {
       const dateFromName = extractDateFromFileName(file.name);
       const date = dateFromName || new Date(); // Fallback auf aktuelles Datum
-      const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      // Verwende lokale Zeitzone statt UTC
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`; // YYYY-MM-DD in lokaler Zeit
       
       return {
         ...file,
@@ -89,12 +95,18 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // Formatiere Datum für Anzeige
   const formatDate = (dateStr: string): string => {
-    const date = new Date(dateStr);
+    // Parse das Datum im lokalen Kontext
+    const parts = dateStr.split('-');
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1;
+    const day = parseInt(parts[2]);
+    const date = new Date(year, month, day);
+    
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    // Setze Zeit auf 0 für Vergleich
+    // Setze Zeit auf 0 für korrekten Vergleich
     const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const yesterdayOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
@@ -133,6 +145,18 @@ const Sidebar: React.FC<SidebarProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleGroup = (dateStr: string) => {
+    setCollapsedGroups((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(dateStr)) {
+        newSet.delete(dateStr);
+      } else {
+        newSet.add(dateStr);
+      }
+      return newSet;
+    });
   };
 
   const handleFileClick = (filePath: string) => {
@@ -183,25 +207,38 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className="sidebar-empty">Keine Log-Dateien gefunden</div>
             ) : (
               <div className="log-file-groups">
-                {groupedFiles.map(([dateStr, files]) => (
-                  <div key={dateStr} className="log-file-group">
-                    <div className="log-file-group-header">
-                      {formatDate(dateStr)}
-                      <span className="log-file-group-count">({files.length})</span>
+                {groupedFiles.map(([dateStr, files]) => {
+                  const isCollapsed = collapsedGroups.has(dateStr);
+                  return (
+                    <div key={dateStr} className="log-file-group">
+                      <div 
+                        className="log-file-group-header"
+                        onClick={() => toggleGroup(dateStr)}
+                      >
+                        <span className="log-file-group-toggle">
+                          {isCollapsed ? '▶' : '▼'}
+                        </span>
+                        <span className="log-file-group-title">
+                          {formatDate(dateStr)}
+                        </span>
+                        <span className="log-file-group-count">({files.length})</span>
+                      </div>
+                      {!isCollapsed && (
+                        <ul className="log-file-list">
+                          {files.map((file) => (
+                            <li
+                              key={file.path}
+                              className={`log-file-item ${currentFile === file.path ? 'active' : ''}`}
+                              onClick={() => handleFileClick(file.path)}
+                            >
+                              {file.name}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
-                    <ul className="log-file-list">
-                      {files.map((file) => (
-                        <li
-                          key={file.path}
-                          className={`log-file-item ${currentFile === file.path ? 'active' : ''}`}
-                          onClick={() => handleFileClick(file.path)}
-                        >
-                          {file.name}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>

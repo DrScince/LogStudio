@@ -2,17 +2,41 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as chokidar from 'chokidar';
+import { fileURLToPath } from 'url';
 
 let mainWindow: BrowserWindow | null = null;
 let logWatchers: Map<string, chokidar.FSWatcher> = new Map();
 
 function createWindow() {
+  // Icon-Pfad - versuche verschiedene Pfade
+  const possibleIconPaths = [
+    path.join(__dirname, '..', '..', 'LogStudio_Logo.ico'),
+    path.join(__dirname, '..', '..', 'public', 'LogStudio_Logo.ico'),
+    path.join(app.getAppPath(), 'LogStudio_Logo.ico'),
+    path.join(app.getAppPath(), 'public', 'LogStudio_Logo.ico'),
+  ];
+  
+  let iconPath = possibleIconPaths[0];
+  
+  // Finde das erste existierende Icon
+  for (const possiblePath of possibleIconPaths) {
+    if (fs.existsSync(possiblePath)) {
+      iconPath = possiblePath;
+      console.log('Icon found at:', iconPath);
+      break;
+    }
+  }
+  
+  console.log('Using icon path:', iconPath);
+  console.log('Icon exists:', fs.existsSync(iconPath));
+    
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     backgroundColor: '#0d1117',
-    frame: true,
-    titleBarStyle: 'default',
+    frame: false,
+    icon: iconPath,
+    title: 'LogStudio',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -165,5 +189,28 @@ ipcMain.handle('show-open-dialog', async () => {
     return { success: true, filePath: result.filePaths[0] };
   } catch (error) {
     return { success: false, error: String(error) };
+  }
+});
+
+// Fenstersteuerung
+ipcMain.handle('minimize-window', () => {
+  if (mainWindow) {
+    mainWindow.minimize();
+  }
+});
+
+ipcMain.handle('maximize-window', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.handle('close-window', () => {
+  if (mainWindow) {
+    mainWindow.close();
   }
 });

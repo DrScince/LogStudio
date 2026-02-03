@@ -101,6 +101,12 @@
   box-shadow: var(--shadow-sm);
 }
 
+.toolbar-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .toolbar-button-primary {
   background: linear-gradient(135deg, var(--accent-primary) 0%, #4d9eff 100%);
   border-color: var(--accent-primary);

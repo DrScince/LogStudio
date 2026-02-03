@@ -17,4 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppPath: () => ipcRenderer.invoke('get-app-path'),
   getDefaultLogDirectory: () => ipcRenderer.invoke('get-default-log-directory'),
   showOpenDialog: () => ipcRenderer.invoke('show-open-dialog'),
+  minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
+  maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
+  closeWindow: () => ipcRenderer.invoke('close-window'),
 });
