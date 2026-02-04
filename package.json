@@ -16,7 +16,8 @@
     "package": "electron-builder",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "test:report": "vitest --run --reporter=html"
   },
   "keywords": [
     "log",
