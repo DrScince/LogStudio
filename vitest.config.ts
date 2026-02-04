@@ -20,6 +20,27 @@ export default defineConfig({
         '**/dist/',
       ],
     },
+    // Suppress console output in tests unless explicitly needed
+    silent: false,
+    onConsoleLog: (log, type) => {
+      // Suppress debug logs but keep errors and warnings
+      if (type === 'log' && log.includes('Parsed entry')) {
+        return false; // Suppress parsing debug logs
+      }
+      if (type === 'log' && log.includes('LogViewer:')) {
+        return false; // Suppress LogViewer debug logs
+      }
+      if (type === 'log' && log.includes('Loading')) {
+        return false; // Suppress loading logs
+      }
+      if (type === 'log' && log.includes('Loaded')) {
+        return false; // Suppress loaded logs
+      }
+      if (type === 'log' && log.includes('Tracking')) {
+        return false; // Suppress tracking logs
+      }
+      return true; // Keep other logs
+    },
   },
   resolve: {
     alias: {

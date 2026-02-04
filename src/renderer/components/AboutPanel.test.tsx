@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import AboutPanel from './AboutPanel';
 
 // Mock fetch for changelog
@@ -14,27 +14,39 @@ describe('AboutPanel', () => {
     vi.clearAllMocks();
   });
 
-  it('should render about panel', () => {
-    render(<AboutPanel {...defaultProps} />);
+  it('should render about panel', async () => {
+    await act(async () => {
+      render(<AboutPanel {...defaultProps} />);
+    });
     
-    expect(screen.getByText(/About/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/About/i)).toBeInTheDocument();
+    });
   });
 
-  it('should call onClose when close button is clicked', () => {
+  it('should call onClose when close button is clicked', async () => {
     const onClose = vi.fn();
-    render(<AboutPanel onClose={onClose} />);
+    await act(async () => {
+      render(<AboutPanel onClose={onClose} />);
+    });
     
-    const closeButton = screen.getByText('✕');
-    fireEvent.click(closeButton);
+    await waitFor(() => {
+      const closeButton = screen.getByText('✕');
+      fireEvent.click(closeButton);
+    });
     
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('should display version information', () => {
-    render(<AboutPanel {...defaultProps} />);
+  it('should display version information', async () => {
+    await act(async () => {
+      render(<AboutPanel {...defaultProps} />);
+    });
     
-    // Version should be displayed (from AboutPanel component)
-    expect(screen.getByText(/1\.1\.0/i)).toBeInTheDocument();
+    await waitFor(() => {
+      // Version should be displayed (from AboutPanel component)
+      expect(screen.getByText(/1\.1\.0/i)).toBeInTheDocument();
+    });
   });
 
   it('should load and display changelog', async () => {

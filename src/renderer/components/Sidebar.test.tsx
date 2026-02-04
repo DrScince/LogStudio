@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Sidebar from './Sidebar';
 
 // Mock electronAPI
@@ -37,7 +37,9 @@ describe('Sidebar', () => {
     render(<Sidebar {...defaultProps} />);
     
     // Should show loading initially
-    expect(screen.getByText(/Lade/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Lade/i)).toBeInTheDocument();
+    });
   });
 
   it('should display log files when loaded', async () => {

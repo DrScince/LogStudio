@@ -1,3 +1,4 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import LogViewer from './LogViewer';
@@ -5,13 +6,13 @@ import { LogSchema } from '../types/log';
 
 // Mock react-window
 vi.mock('react-window', () => ({
-  VariableSizeList: ({ children, itemData }: any) => (
-    <div data-testid="virtualized-list">
+  VariableSizeList: React.forwardRef(({ children, itemData }: any, ref: any) => (
+    <div data-testid="virtualized-list" ref={ref}>
       {itemData?.entries?.map((entry: any, index: number) => 
         children({ index, style: {}, data: itemData })
       )}
     </div>
-  ),
+  )),
 }));
 
 const defaultSchema: LogSchema = {

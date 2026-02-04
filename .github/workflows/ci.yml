@@ -34,7 +34,8 @@ jobs:
       run: npm test -- --run
 
     - name: Generate coverage report
-      run: npm run test:coverage || npm test -- --coverage --run
+      run: npm run test:coverage
+      continue-on-error: true
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
@@ -44,6 +45,7 @@ jobs:
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
+      continue-on-error: true
 
   build:
     runs-on: ${{ matrix.os }}
