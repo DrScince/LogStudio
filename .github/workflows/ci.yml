@@ -37,14 +37,15 @@ jobs:
       run: npm run test:coverage
       continue-on-error: true
 
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
       if: always()
       with:
         file: ./coverage/coverage-final.json
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
       continue-on-error: true
 
   build:
