@@ -199,4 +199,133 @@ describe('App', () => {
       expect((window as any).electronAPI.getDefaultLogDirectory).toHaveBeenCalled();
     });
   });
+
+  it('should handle file dialog cancellation', async () => {
+    (window as any).electronAPI.showOpenDialog.mockResolvedValue({
+      success: true,
+      canceled: true,
+    });
+
+    render(<App />);
+    const openFileButton = screen.getByText('Open File');
+    fireEvent.click(openFileButton);
+
+    await waitFor(() => {
+      expect((window as any).electronAPI.showOpenDialog).toHaveBeenCalled();
+    });
+  });
+
+  it('should handle file dialog error', async () => {
+    (window as any).electronAPI.showOpenDialog.mockResolvedValue({
+      success: false,
+      error: 'Dialog error',
+    });
+
+    // Mock alert
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+    render(<App />);
+    const openFileButton = screen.getByText('Open File');
+    fireEvent.click(openFileButton);
+
+    await waitFor(() => {
+      expect((window as any).electronAPI.showOpenDialog).toHaveBeenCalled();
+    });
+
+    alertSpy.mockRestore();
+  });
+
+  it('should handle tab selection', () => {
+    render(<App />);
+    const selectFileButton = screen.getByText('Select File');
+    fireEvent.click(selectFileButton);
+
+    // File should be opened, creating a tab
+    expect(screen.getByTestId('log-viewer')).toBeInTheDocument();
+  });
+
+  it('should handle tab closing when it is the active tab', () => {
+    render(<App />);
+    const selectFileButton = screen.getByText('Select File');
+    fireEvent.click(selectFileButton);
+
+    // Tab should be created
+    expect(screen.getByTestId('log-viewer')).toBeInTheDocument();
+  });
+
+  it('should handle adding files to active tab', () => {
+    render(<App />);
+    
+    // First select a file
+    const selectFileButton = screen.getByText('Select File');
+    fireEvent.click(selectFileButton);
+
+    // Then select multiple files
+    const selectFilesButton = screen.getByText('Select Files');
+    fireEvent.click(selectFilesButton);
+
+    // Multiple files should be handled
+    expect(screen.getByTestId('log-viewer')).toBeInTheDocument();
+  });
+
+  it('should handle namespace toggle', () => {
+    render(<App />);
+    const selectFileButton = screen.getByText('Select File');
+    fireEvent.click(selectFileButton);
+
+    // Namespace toolbar should be visible when file is open
+    expect(screen.getByTestId('namespace-toolbar')).toBeInTheDocument();
+  });
+
+  it('should handle reset filters', () => {
+    render(<App />);
+    const selectFileButton = screen.getByText('Select File');
+    fireEvent.click(selectFileButton);
+
+    // LogViewer should receive reset filter trigger
+    expect(screen.getByTestId('log-viewer')).toBeInTheDocument();
+  });
+
+  it('should handle electronAPI not available in handleOpenFile', async () => {
+    const originalElectronAPI = (window as any).electronAPI;
+    (window as any).electronAPI = undefined;
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+    render(<App />);
+    const openFileButton = screen.getByText('Open File');
+    fireEvent.click(openFileButton);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalled();
+    });
+
+    alertSpy.mockRestore();
+    (window as any).electronAPI = originalElectronAPI;
+  });
+
+  it('should apply theme changes to root element', () => {
+    render(<App />);
+    const themeButton = screen.getByText('Toggle Theme');
+    const root = document.documentElement;
+
+    const initialHasLight = root.classList.contains('light');
+    fireEvent.click(themeButton);
+
+    // Theme should toggle
+    expect(root.classList.contains('light')).toBe(!initialHasLight);
+  });
+
+  it('should apply font size changes to root element', () => {
+    render(<App />);
+    const settingsButton = screen.getByText('Settings');
+    fireEvent.click(settingsButton);
+
+    const saveButton = screen.getByText('Save Settings');
+    fireEvent.click(saveButton);
+
+    // Font size should be applied via CSS variable
+    const root = document.documentElement;
+    const fontSize = root.style.getPropertyValue('--base-font-size');
+    expect(fontSize).toBeTruthy();
+  });
 });

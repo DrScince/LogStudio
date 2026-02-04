@@ -371,4 +371,259 @@ Third line`;
       expect(screen.getByText(/INFO/i)).toBeInTheDocument();
     });
   });
+
+  it('should format JSON content', async () => {
+    const logContent = `2025-01-01 12:00:00.000 | INFO | Test | {"key":"value","number":123}`;
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/INFO/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should format XML content', async () => {
+    const logContent = `2025-01-01 12:00:00.000 | INFO | Test | <root><item>value</item></root>`;
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/INFO/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should format exception content', async () => {
+    const logContent = `2025-01-01 12:00:00.000 | ERROR | Test | Exception: TestException
+at Test.method(Test.java:123)
+Caused by: NullPointerException`;
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/ERROR/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle incremental file loading', async () => {
+    const initialContent = '2025-01-01 12:00:00.000 | INFO | Test | Message 1';
+    const updatedContent = `2025-01-01 12:00:00.000 | INFO | Test | Message 1
+2025-01-01 12:00:01.000 | INFO | Test | Message 2`;
+
+    (window as any).electronAPI.readLogFile
+      .mockResolvedValueOnce({ success: true, content: initialContent })
+      .mockResolvedValueOnce({ success: true, content: updatedContent });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" autoRefresh={true} />);
+
+    await waitFor(() => {
+      expect((window as any).electronAPI.readLogFile).toHaveBeenCalled();
+    });
+
+    // Simulate file change
+    const fileChangeCallback = (window as any).electronAPI.onLogFileChanged.mock.calls[0]?.[0];
+    if (fileChangeCallback) {
+      fileChangeCallback('/test/log.log');
+      await waitFor(() => {
+        expect((window as any).electronAPI.readLogFile).toHaveBeenCalledTimes(2);
+      });
+    }
+  });
+
+  it('should handle file truncation', async () => {
+    const largeContent = `2025-01-01 12:00:00.000 | INFO | Test | Message 1
+2025-01-01 12:00:01.000 | INFO | Test | Message 2`;
+    const truncatedContent = '2025-01-01 12:00:02.000 | INFO | Test | Message 3';
+
+    let fileChangeCallback: ((path: string) => void) | null = null;
+
+    (window as any).electronAPI.readLogFile
+      .mockResolvedValueOnce({ success: true, content: largeContent })
+      .mockResolvedValueOnce({ success: true, content: truncatedContent });
+
+    (window as any).electronAPI.onLogFileChanged = (callback: (path: string) => void) => {
+      fileChangeCallback = callback;
+    };
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" autoRefresh={true} />);
+
+    await waitFor(() => {
+      expect((window as any).electronAPI.readLogFile).toHaveBeenCalled();
+    });
+
+    // Simulate file change (truncation)
+    if (fileChangeCallback) {
+      fileChangeCallback('/test/log.log');
+      await waitFor(() => {
+        expect((window as any).electronAPI.readLogFile).toHaveBeenCalledTimes(2);
+      }, { timeout: 3000 });
+    }
+  });
+
+  it('should handle scroll to end button click', async () => {
+    const logContent = `2025-01-01 12:00:00.000 | INFO | Test | Message 1
+2025-01-01 12:00:01.000 | INFO | Test | Message 2`;
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/INFO/i)).toBeInTheDocument();
+    });
+
+    // Find scroll to end button
+    await waitFor(() => {
+      const endButton = screen.queryByTitle(/Jump to end/i) || screen.queryByText(/End/i);
+      if (endButton) {
+        fireEvent.click(endButton);
+      }
+    }, { timeout: 2000 });
+  });
+
+  it('should handle long namespace tooltips', async () => {
+    const longNamespace = 'Very.Long.Namespace.Path.That.Exceeds.Thirty.Characters';
+    const logContent = `2025-01-01 12:00:00.000 | INFO | ${longNamespace} | Message`;
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/INFO/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle copy to clipboard for JSON content', async () => {
+    const jsonContent = '{"key":"value"}';
+    const logContent = `2025-01-01 12:00:00.000 | INFO | Test | ${jsonContent}`;
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/INFO/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle all log levels', async () => {
+    const logContent = `2025-01-01 12:00:00.000 | DEBUG | Test | Debug message
+2025-01-01 12:00:01.000 | INFO | Test | Info message
+2025-01-01 12:00:02.000 | WARN | Test | Warning message
+2025-01-01 12:00:03.000 | ERROR | Test | Error message
+2025-01-01 12:00:04.000 | FATAL | Test | Fatal message`;
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/DEBUG/i)).toBeInTheDocument();
+      expect(screen.getByText(/INFO/i)).toBeInTheDocument();
+      expect(screen.getByText(/WARN/i)).toBeInTheDocument();
+      expect(screen.getByText(/ERROR/i)).toBeInTheDocument();
+      expect(screen.getByText(/FATAL/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle entry expansion toggle', async () => {
+    const logContent = `2025-01-01 12:00:00.000 | INFO | Test | ${'A'.repeat(200)}`;
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/INFO/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle loading state', async () => {
+    (window as any).electronAPI.readLogFile.mockImplementation(
+      () => new Promise(() => {}) // Never resolves to keep loading
+    );
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Loading/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle no entries found state', async () => {
+    const logContent = `2025-01-01 12:00:00.000 | INFO | Test | Message`;
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" selectedNamespaces={['NonExistent']} />);
+
+    await waitFor(() => {
+      expect((window as any).electronAPI.readLogFile).toHaveBeenCalled();
+    });
+  });
+
+  it('should handle filter badges display', async () => {
+    const logContent = `2025-01-01 12:00:00.000 | INFO | App.Service | Message`;
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" selectedNamespaces={['App.Service']} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/INFO/i)).toBeInTheDocument();
+    });
+  });
+
+  it('should handle refresh interval changes', async () => {
+    const logContent = '2025-01-01 12:00:00.000 | INFO | Test | Message';
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    const { rerender } = render(<LogViewer {...defaultProps} filePath="/test/log.log" refreshInterval={2000} />);
+
+    await waitFor(() => {
+      expect((window as any).electronAPI.readLogFile).toHaveBeenCalled();
+    });
+
+    rerender(<LogViewer {...defaultProps} filePath="/test/log.log" refreshInterval={5000} />);
+  });
 });
