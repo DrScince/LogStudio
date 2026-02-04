@@ -15,9 +15,12 @@ export default defineConfig({
       exclude: [
         'node_modules/',
         'src/test/',
+        'src/main/', // Electron main process - difficult to test
+        'src/renderer/main.tsx', // Entry point - difficult to test
         '**/*.d.ts',
         '**/*.config.*',
         '**/dist/',
+        'html/', // Generated test reports
       ],
     },
     // Suppress console output in tests unless explicitly needed
