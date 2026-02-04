@@ -90,15 +90,51 @@ jobs:
         id: changelog
         run: |
           VERSION=${{ github.ref_name }}
+          VERSION_NUMBER=${VERSION#v}  # Entferne 'v' Präfix (v1.2.0 -> 1.2.0)
+          echo "Suche nach Version: [${VERSION_NUMBER}]"
+          
           # Extrahiere den Changelog-Abschnitt für diese Version
-          # Entferne das Versions-Header und alles nach dem nächsten Header
-          awk "/^## \[${VERSION#v}\]/,/^## \[/" CHANGELOG.md | sed '1d;/^## \[/,$d' > release_notes.txt
+          # Suche nach "## [1.2.0]" und extrahiere bis zum nächsten "## ["
+          awk -v version="${VERSION_NUMBER}" '
+            BEGIN { found = 0 }
+            /^## \[/ {
+              if (found) exit
+              if ($0 ~ "^## \\[" version "\\]") {
+                found = 1
+                next
+              }
+            }
+            found {
+              if (/^## \[/) exit
+              print
+            }
+          ' CHANGELOG.md > release_notes.txt
+          
           # Falls leer, versuche Unreleased zu extrahieren
           if [ ! -s release_notes.txt ]; then
-            awk "/^## \[Unreleased\]/,/^## \[/" CHANGELOG.md | sed '1d;/^## \[/,$d' > release_notes.txt
+            echo "Version [${VERSION_NUMBER}] nicht gefunden, versuche Unreleased..."
+            awk '
+              BEGIN { found = 0 }
+              /^## \[Unreleased\]/ { found = 1; next }
+              found {
+                if (/^## \[/) exit
+                print
+              }
+            ' CHANGELOG.md > release_notes.txt
           fi
+          
+          # Entferne führende/trailing Leerzeilen
+          sed -i '/^[[:space:]]*$/d' release_notes.txt
+          
           echo "Release Notes für ${VERSION}:"
+          echo "---"
           cat release_notes.txt || echo "Keine Release Notes gefunden"
+          echo "---"
+          
+          # Setze als Output für weitere Steps
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          cat release_notes.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
