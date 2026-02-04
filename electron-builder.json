@@ -1,6 +1,7 @@
 {
   "appId": "com.logstudio.app",
   "productName": "LogStudio",
+  "copyright": "Copyright © 2025 LogStudio",
   "directories": {
     "output": "release"
   },
@@ -19,17 +20,34 @@
       }
     ],
     "icon": "public/LogStudio_Logo.ico",
-    "artifactName": "${productName}-${version}-${arch}.${ext}"
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "publisherName": "LogStudio",
+    "verifyUpdateCodeSignature": false,
+    "requestedExecutionLevel": "asInvoker"
   },
   "portable": {
-    "artifactName": "${productName}-${version}-${arch}.${ext}"
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "requestedExecutionLevel": "asInvoker"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "LogStudio",
+    "installerIcon": "public/LogStudio_Logo.ico",
+    "uninstallerIcon": "public/LogStudio_Logo.ico",
+    "installerHeaderIcon": "public/LogStudio_Logo.ico",
+    "deleteAppDataOnUninstall": false
   },
   "mac": {
     "target": "dmg",
-    "icon": "LogStudio_Logo.png"
+    "icon": "LogStudio_Logo.png",
+    "category": "public.app-category.utilities"
   },
   "linux": {
     "target": "AppImage",
-    "icon": "LogStudio_Logo.png"
+    "icon": "LogStudio_Logo.png",
+    "category": "Utility"
   }
 }

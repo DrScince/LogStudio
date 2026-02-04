@@ -24,8 +24,15 @@
     "viewer",
     "monitor"
   ],
-  "author": "",
+  "author": {
+    "name": "LogStudio",
+    "url": "https://github.com/DrScince/LogStudio"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DrScince/LogStudio.git"
+  },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^14.3.1",
