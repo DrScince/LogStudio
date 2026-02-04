@@ -13,26 +13,39 @@
     "build:verify": "node -e \"const fs=require('fs'); const main=fs.existsSync('dist/main.js'); const renderer=fs.existsSync('dist/renderer/index.html'); if(!main||!renderer){console.error('Build verification failed'); process.exit(1);} console.log('Build verified successfully');\"",
     "build:run": "npm run build && npm start",
     "start": "electron .",
-    "package": "electron-builder"
+    "package": "electron-builder",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
   },
-  "keywords": ["log", "viewer", "monitor"],
+  "keywords": [
+    "log",
+    "viewer",
+    "monitor"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^14.3.1",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/ui": "^1.6.1",
     "concurrently": "^8.2.2",
     "electron": "^28.0.0",
     "electron-builder": "^24.9.1",
+    "jsdom": "^23.2.0",
     "typescript": "^5.3.3",
-    "vite": "^5.0.8"
+    "vite": "^5.0.8",
+    "vitest": "^1.6.1"
   },
   "dependencies": {
+    "chokidar": "^3.5.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-window": "^1.8.10",
-    "chokidar": "^3.5.3"
+    "react-window": "^1.8.10"
   }
 }
