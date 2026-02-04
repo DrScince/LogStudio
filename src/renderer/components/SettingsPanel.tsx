@@ -10,14 +10,33 @@ interface SettingsPanelProps {
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChange, onClose }) => {
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
+  const [patternError, setPatternError] = useState<string | null>(null);
+
+  const validatePattern = (pattern: string): boolean => {
+    try {
+      new RegExp(pattern);
+      setPatternError(null);
+      return true;
+    } catch (e) {
+      setPatternError(e instanceof Error ? e.message : 'Invalid regex pattern');
+      return false;
+    }
+  };
 
   const handleSchemaChange = (field: keyof LogSchema, value: any) => {
+    const newSchema = {
+      ...localSettings.logSchema,
+      [field]: value,
+    };
+    
+    // Validate pattern if it's being changed
+    if (field === 'pattern') {
+      validatePattern(value);
+    }
+    
     setLocalSettings({
       ...localSettings,
-      logSchema: {
-        ...localSettings.logSchema,
-        [field]: value,
-      },
+      logSchema: newSchema,
     });
   };
 
@@ -99,25 +118,29 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
 
           <div className="settings-section">
             <h3>Log Schema</h3>
+            <p className="settings-help-text">
+              Konfigurieren Sie das Regex-Pattern zum Parsen Ihrer Log-Dateien. 
+              Änderungen werden beim Speichern sofort wirksam und die geöffneten Dateien werden neu geladen.
+            </p>
             <div className="settings-input-group">
               <label>Regex Pattern:</label>
               <textarea
-                className="settings-textarea"
+                className={`settings-textarea ${patternError ? 'settings-input-error' : ''}`}
                 value={localSettings.logSchema.pattern}
                 onChange={(e) => handleSchemaChange('pattern', e.target.value)}
-                rows={3}
-                placeholder="Regex pattern for log lines"
+                rows={4}
+                placeholder="z.B.: ^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+)\\s*\\|\\s*([A-Z]+)\\s*\\|\\s*([^|]+)\\s*\\|\\s*(.+)$"
               />
-            </div>
-            <div className="settings-input-group">
-              <label>Separator:</label>
-              <input
-                type="text"
-                className="settings-input"
-                value={localSettings.logSchema.separator}
-                onChange={(e) => handleSchemaChange('separator', e.target.value)}
-                placeholder=" | "
-              />
+              {patternError && (
+                <div className="settings-error-message">
+                  Regex-Fehler: {patternError}
+                </div>
+              )}
+              <div className="settings-help-text-small">
+                Beispiel für Standard-Format: <code>^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+)\\s*\\|\\s*([A-Z]+)\\s*\\|\\s*([^|]+)\\s*\\|\\s*(.+)$</code>
+                <br />
+                Dieses Pattern erwartet: Timestamp | Level | Namespace | Message
+              </div>
             </div>
             <div className="settings-input-group">
               <label>Timestamp-Format:</label>

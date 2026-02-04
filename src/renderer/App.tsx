@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import LogViewer from './components/LogViewer';
 import Sidebar from './components/Sidebar';
+import NamespaceToolbar from './components/NamespaceToolbar';
 import Toolbar from './components/Toolbar';
-import TabBar, { Tab } from './components/TabBar';
+import { Tab } from './components/Toolbar';
 import SettingsPanel from './components/SettingsPanel';
 import AboutPanel from './components/AboutPanel';
 import TitleBar from './components/TitleBar';
@@ -17,9 +18,54 @@ function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [resetFilterTrigger, setResetFilterTrigger] = useState(0);
 
+  // Apply theme to root element
+  useEffect(() => {
+    const root = document.documentElement;
+    if (settings.theme === 'light') {
+      root.classList.add('light');
+    } else {
+      root.classList.remove('light');
+    }
+  }, [settings.theme]);
+
+  // Apply font size to root element
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--base-font-size', `${settings.fontSize}px`);
+  }, [settings.fontSize]);
+
   // Active tab
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
-  const currentLogFile = activeTab?.filePath || null;
+  const currentLogFile = useMemo(() => {
+    const activeTab = tabs.find((tab) => tab.id === activeTabId);
+    if (!activeTab) return null;
+    // Wenn mehrere Dateien, verwende null für filePath (damit loadLogFile nicht aufgerufen wird)
+    if (activeTab.filePaths && activeTab.filePaths.length > 1) {
+      return null;
+    }
+    return activeTab.filePaths && activeTab.filePaths.length === 1
+      ? activeTab.filePaths[0] 
+      : activeTab.filePath;
+  }, [tabs, activeTabId]);
+
+  const currentLogFiles = useMemo(() => {
+    const activeTab = tabs.find((tab) => tab.id === activeTabId);
+    if (!activeTab) return null;
+    // Nur zurückgeben wenn wirklich mehrere Dateien
+    return activeTab.filePaths && activeTab.filePaths.length > 1
+      ? activeTab.filePaths
+      : null;
+  }, [tabs, activeTabId]);
+
+  const activeTabFiles = useMemo(() => {
+    const activeTab = tabs.find((tab) => tab.id === activeTabId);
+    if (!activeTab) return [];
+    // Alle Dateien aus dem aktiven Tab zurückgeben (für Highlighting in Sidebar)
+    if (activeTab.filePaths && activeTab.filePaths.length > 1) {
+      return activeTab.filePaths;
+    }
+    return activeTab.filePath ? [activeTab.filePath] : [];
+  }, [tabs, activeTabId]);
   const selectedNamespaces = activeTab?.selectedNamespaces || [];
   const namespaces = activeTab?.namespaces || [];
 
@@ -40,6 +86,11 @@ function App() {
 
   const handleSettingsChange = (newSettings: AppSettings) => {
     setSettings(newSettings);
+  };
+
+  const handleThemeToggle = () => {
+    const newTheme = settings.theme === 'dark' ? 'light' : 'dark';
+    setSettings((prev) => ({ ...prev, theme: newTheme }));
   };
 
   const handleOpenFile = async () => {
@@ -91,6 +142,40 @@ function App() {
     }
   }, [tabs]);
 
+  const openMultipleFilesInTab = useCallback((filePaths: string[]) => {
+    if (filePaths.length === 0) return;
+    
+    if (filePaths.length === 1) {
+      openFileInTab(filePaths[0]);
+      return;
+    }
+
+    // Für mehrere Dateien: Erstelle einen Tab mit einem kombinierten Identifier
+    const combinedId = filePaths.sort().join('|');
+    const existingTab = tabs.find((tab) => {
+      if (Array.isArray(tab.filePaths)) {
+        return tab.filePaths.sort().join('|') === combinedId;
+      }
+      return false;
+    });
+
+    if (existingTab) {
+      setActiveTabId(existingTab.id);
+    } else {
+      const newTabId = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newTab: Tab = {
+        id: newTabId,
+        filePath: filePaths[0], // Für Kompatibilität
+        filePaths: filePaths, // Neue Eigenschaft für mehrere Dateien
+        selectedNamespaces: [],
+        namespaces: [],
+      };
+      
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTabId(newTabId);
+    }
+  }, [tabs, openFileInTab]);
+
   const handleTabSelect = useCallback((tabId: string) => {
     setActiveTabId(tabId);
   }, []);
@@ -122,6 +207,37 @@ function App() {
       openFileInTab(filePath);
     }
   }, [openFileInTab]);
+
+  const handleLogFilesSelect = useCallback((filePaths: string[]) => {
+    if (filePaths.length > 0) {
+      // Wenn bereits ein aktiver Tab existiert, füge die Dateien zu diesem Tab hinzu
+      if (activeTabId) {
+        setTabs((prev) =>
+          prev.map((tab) => {
+            if (tab.id === activeTabId) {
+              // Kombiniere bestehende Dateien mit neuen, entferne Duplikate
+              const existingFiles = tab.filePaths && tab.filePaths.length > 1 
+                ? tab.filePaths 
+                : tab.filePath 
+                  ? [tab.filePath] 
+                  : [];
+              const allFiles = [...new Set([...existingFiles, ...filePaths])];
+              
+              return {
+                ...tab,
+                filePath: allFiles[0], // Für Kompatibilität
+                filePaths: allFiles.length > 1 ? allFiles : undefined,
+              };
+            }
+            return tab;
+          })
+        );
+      } else {
+        // Kein aktiver Tab: Öffne alle ausgewählten Dateien in einem neuen Tab
+        openMultipleFilesInTab(filePaths);
+      }
+    }
+  }, [activeTabId, openMultipleFilesInTab]);
 
   const handleNamespaceToggle = useCallback((namespace: string) => {
     if (!activeTabId) return;
@@ -192,10 +308,9 @@ function App() {
         onSettingsClick={() => setShowSettings(!showSettings)}
         onAboutClick={() => setShowAbout(!showAbout)}
         onOpenFile={handleOpenFile}
-        onResetFilters={handleResetFilters}
+        onThemeToggle={handleThemeToggle}
+        currentTheme={settings.theme}
         currentFile={currentLogFile}
-      />
-      <TabBar
         tabs={tabs}
         activeTabId={activeTabId}
         onTabSelect={handleTabSelect}
@@ -205,19 +320,27 @@ function App() {
         <Sidebar
           logDirectory={settings.logDirectory}
           onLogFileSelect={handleLogFileSelect}
+          onLogFilesSelect={handleLogFilesSelect}
           currentFile={currentLogFile}
-          namespaces={namespaces}
-          selectedNamespaces={selectedNamespaces}
-          onNamespaceToggle={handleNamespaceToggle}
+          selectedFiles={[]}
+          activeTabFiles={activeTabFiles}
         />
         <LogViewer
           filePath={currentLogFile}
+          filePaths={currentLogFiles}
           schema={settings.logSchema}
           autoRefresh={settings.autoRefresh}
           refreshInterval={settings.refreshInterval}
           selectedNamespaces={selectedNamespaces}
           onNamespacesChange={handleNamespacesChange}
+          onResetFilters={handleResetFilters}
           key={`${activeTabId}-${resetFilterTrigger}`}
+        />
+        <NamespaceToolbar
+          namespaces={namespaces}
+          selectedNamespaces={selectedNamespaces}
+          onNamespaceToggle={handleNamespaceToggle}
+          isVisible={!!currentLogFile || (currentLogFiles && currentLogFiles.length > 0)}
         />
       </div>
       {showSettings && (

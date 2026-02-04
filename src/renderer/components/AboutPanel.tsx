@@ -1,11 +1,40 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { parseChangelog, ReleaseNote } from '../utils/changelogParser';
 import './AboutPanel.css';
 
 interface AboutPanelProps {
   onClose: () => void;
 }
 
+const APP_VERSION = '1.1.0';
+
 const AboutPanel: React.FC<AboutPanelProps> = ({ onClose }) => {
+  const [showChangelog, setShowChangelog] = useState(false);
+  const [releaseNotes, setReleaseNotes] = useState<ReleaseNote[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadChangelog = async () => {
+      if (!window.electronAPI) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        const result = await window.electronAPI.readChangelog();
+        if (result.success && result.content) {
+          const parsed = parseChangelog(result.content);
+          setReleaseNotes(parsed);
+        }
+      } catch (error) {
+        console.error('Error loading changelog:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadChangelog();
+  }, []);
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
@@ -34,12 +63,35 @@ const AboutPanel: React.FC<AboutPanelProps> = ({ onClose }) => {
           
           <div className="about-section">
             <h3>LogStudio</h3>
-            <p className="about-version">Version 1.0.2</p>
+            <p className="about-version">Version {APP_VERSION}</p>
             <p className="about-description">
               A modern, cross-platform application for viewing and monitoring log files.
               Built with Electron, React, and TypeScript.
             </p>
+            <button 
+              className="about-changelog-button" 
+              onClick={() => setShowChangelog(!showChangelog)}
+            >
+              {showChangelog ? '▼' : '▶'} Version History
+            </button>
           </div>
+
+          {showChangelog && (
+            <div className="about-section about-changelog">
+              <h4>Version History</h4>
+              {loading ? (
+                <div className="changelog-loading">Loading changelog...</div>
+              ) : releaseNotes.length > 0 ? (
+                <div className="changelog-list">
+                  {releaseNotes.map((release, index) => (
+                    <ReleaseNoteItem key={release.version} release={release} isLatest={index === 0} />
+                  ))}
+                </div>
+              ) : (
+                <div className="changelog-error">Unable to load changelog</div>
+              )}
+            </div>
+          )}
 
           <div className="about-section">
             <h4>Features</h4>
@@ -100,6 +152,59 @@ const AboutPanel: React.FC<AboutPanelProps> = ({ onClose }) => {
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+interface ReleaseNoteItemProps {
+  release: ReleaseNote;
+  isLatest: boolean;
+}
+
+const ReleaseNoteItem: React.FC<ReleaseNoteItemProps> = ({ release, isLatest }) => {
+  const [expanded, setExpanded] = useState(isLatest);
+
+  return (
+    <div className={`changelog-item ${isLatest ? 'latest' : ''}`}>
+      <div className="changelog-header" onClick={() => setExpanded(!expanded)}>
+        <span className="changelog-version">v{release.version}</span>
+        <span className="changelog-date">{release.date}</span>
+        <span className="changelog-toggle">{expanded ? '▼' : '▶'}</span>
+      </div>
+      {expanded && (
+        <div className="changelog-content">
+          {release.added && release.added.length > 0 && (
+            <div className="changelog-section">
+              <h5 className="changelog-section-title added">Added</h5>
+              <ul className="changelog-list-items">
+                {release.added.map((item, idx) => (
+                  <li key={idx}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {release.changed && release.changed.length > 0 && (
+            <div className="changelog-section">
+              <h5 className="changelog-section-title changed">Changed</h5>
+              <ul className="changelog-list-items">
+                {release.changed.map((item, idx) => (
+                  <li key={idx}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {release.fixed && release.fixed.length > 0 && (
+            <div className="changelog-section">
+              <h5 className="changelog-section-title fixed">Fixed</h5>
+              <ul className="changelog-list-items">
+                {release.fixed.map((item, idx) => (
+                  <li key={idx}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

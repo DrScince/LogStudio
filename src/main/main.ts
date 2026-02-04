@@ -247,3 +247,25 @@ ipcMain.handle('open-external', async (_event, url: string) => {
   const { shell } = await import('electron');
   await shell.openExternal(url);
 });
+
+ipcMain.handle('read-changelog', async () => {
+  try {
+    // Versuche verschiedene Pfade für CHANGELOG.md
+    const possiblePaths = [
+      path.join(__dirname, '..', '..', 'CHANGELOG.md'),
+      path.join(app.getAppPath(), 'CHANGELOG.md'),
+      path.join(app.getAppPath(), '..', 'CHANGELOG.md'),
+    ];
+    
+    for (const changelogPath of possiblePaths) {
+      if (fs.existsSync(changelogPath)) {
+        const content = await fs.promises.readFile(changelogPath, 'utf-8');
+        return { success: true, content };
+      }
+    }
+    
+    return { success: false, error: 'CHANGELOG.md not found' };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});

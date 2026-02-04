@@ -14,6 +14,7 @@ export interface ElectronAPI {
   maximizeWindow: () => void;
   closeWindow: () => void;
   openExternal: (url: string) => Promise<void>;
+  readChangelog: () => Promise<{ success: boolean; content?: string; error?: string }>;
 }
 
 declare global {

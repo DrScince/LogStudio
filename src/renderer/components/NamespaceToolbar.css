@@ -1,0 +1,95 @@
+.namespace-toolbar {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  width: 300px;
+  min-width: 300px;
+  transition: width 0.3s ease, min-width 0.3s ease;
+  overflow: hidden;
+}
+
+.namespace-toolbar.collapsed {
+  width: 50px;
+  min-width: 50px;
+}
+
+.namespace-toolbar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+  min-height: 44px;
+}
+
+.namespace-toolbar-header:hover {
+  background: var(--bg-hover);
+}
+
+.namespace-toolbar.collapsed .namespace-toolbar-header {
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px 8px;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.namespace-toolbar-title {
+  font-size: 1.167rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.namespace-toolbar.collapsed .namespace-toolbar-title {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+}
+
+.namespace-toolbar-toggle {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.namespace-toolbar.collapsed .namespace-toolbar-toggle {
+  margin-left: 0;
+  margin-top: 8px;
+}
+
+.namespace-toolbar-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+}
+
+.namespace-toolbar.collapsed .namespace-toolbar-content {
+  display: none;
+}
+
+/* Scrollbar styling */
+.namespace-toolbar-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.namespace-toolbar-content::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+.namespace-toolbar-content::-webkit-scrollbar-thumb {
+  background: var(--text-secondary);
+  border-radius: 4px;
+}
+
+.namespace-toolbar-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-primary);
+}

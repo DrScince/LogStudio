@@ -38,7 +38,7 @@
 
 .about-header h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 1.667rem;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -47,7 +47,7 @@
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-size: 24px;
+  font-size: 2rem;
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -87,7 +87,7 @@
 
 .about-section h3 {
   margin: 0 0 8px 0;
-  font-size: 24px;
+  font-size: 2rem;
   font-weight: 700;
   color: var(--accent-primary);
   text-align: center;
@@ -95,7 +95,7 @@
 
 .about-section h4 {
   margin: 0 0 12px 0;
-  font-size: 16px;
+  font-size: 1.333rem;
   font-weight: 600;
   color: var(--text-primary);
   border-bottom: 2px solid var(--accent-primary);
@@ -105,7 +105,7 @@
 .about-version {
   text-align: center;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 1.167rem;
   margin: 0 0 16px 0;
 }
 
@@ -147,7 +147,7 @@
   color: var(--accent-primary);
   padding: 6px 12px;
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 1.083rem;
   font-weight: 500;
   border: 1px solid var(--border-color);
 }
@@ -162,7 +162,7 @@
   padding: 12px 20px;
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 1.167rem;
   font-weight: 500;
   transition: all 0.2s;
   width: 100%;
@@ -185,7 +185,7 @@
 
 .about-license-text {
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 1rem;
   line-height: 1.5;
   margin: 0 0 8px 0;
 }
@@ -218,4 +218,168 @@
 
 .about-content::-webkit-scrollbar-thumb:hover {
   background: var(--text-primary);
+}
+
+/* Changelog Styles */
+.about-changelog-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 1.083rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  width: 100%;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.about-changelog-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.about-changelog {
+  margin-top: 8px;
+}
+
+.changelog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.changelog-item {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.changelog-item.latest {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px var(--accent-primary);
+}
+
+.changelog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+  gap: 12px;
+}
+
+.changelog-header:hover {
+  background: var(--bg-hover);
+}
+
+.changelog-version {
+  font-weight: 600;
+  color: var(--accent-primary);
+  font-size: 1.167rem;
+  flex-shrink: 0;
+}
+
+.changelog-item.latest .changelog-version {
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+
+.changelog-date {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  flex: 1;
+  text-align: right;
+}
+
+.changelog-toggle {
+  color: var(--text-muted);
+  font-size: 1rem;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.changelog-content {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.changelog-section {
+  margin-bottom: 16px;
+}
+
+.changelog-section:last-child {
+  margin-bottom: 0;
+}
+
+.changelog-section-title {
+  font-size: 1.083rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  padding-bottom: 6px;
+  border-bottom: 2px solid;
+}
+
+.changelog-section-title.added {
+  color: var(--success);
+  border-bottom-color: var(--success);
+}
+
+.changelog-section-title.changed {
+  color: var(--warning);
+  border-bottom-color: var(--warning);
+}
+
+.changelog-section-title.fixed {
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
+}
+
+.changelog-list-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  padding-left: 16px;
+}
+
+.changelog-list-items li {
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 6px;
+  position: relative;
+}
+
+.changelog-list-items li::before {
+  content: '•';
+  position: absolute;
+  left: -16px;
+  color: var(--text-muted);
+}
+
+.changelog-list-items li:last-child {
+  margin-bottom: 0;
+}
+
+.changelog-loading,
+.changelog-error {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-secondary);
+  font-size: 1.083rem;
+}
+
+.changelog-error {
+  color: var(--error);
 }

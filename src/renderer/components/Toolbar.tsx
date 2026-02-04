@@ -1,15 +1,50 @@
 import React from 'react';
 import './Toolbar.css';
 
+export interface Tab {
+  id: string;
+  filePath: string;
+  filePaths?: string[]; // Für mehrere Dateien
+  selectedNamespaces: string[];
+  namespaces: string[];
+}
+
 interface ToolbarProps {
   onSettingsClick: () => void;
   onAboutClick: () => void;
   onOpenFile: () => void;
-  onResetFilters: () => void;
+  onThemeToggle: () => void;
+  currentTheme: 'dark' | 'light';
   currentFile: string | null;
+  tabs: Tab[];
+  activeTabId: string | null;
+  onTabSelect: (tabId: string) => void;
+  onTabClose: (tabId: string, e: React.MouseEvent) => void;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ onSettingsClick, onAboutClick, onOpenFile, onResetFilters, currentFile }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ 
+  onSettingsClick, 
+  onAboutClick, 
+  onOpenFile, 
+  onThemeToggle, 
+  currentTheme, 
+  currentFile,
+  tabs,
+  activeTabId,
+  onTabSelect,
+  onTabClose,
+}) => {
+  const getFileName = (filePath: string): string => {
+    return filePath.split(/[/\\]/).pop() || 'Unbekannt';
+  };
+
+  const getTabLabel = (tab: Tab): string => {
+    if (tab.filePaths && tab.filePaths.length > 1) {
+      return `${tab.filePaths.length} Dateien`;
+    }
+    return getFileName(tab.filePath);
+  };
+
   return (
     <div className="toolbar">
       <div className="toolbar-left">
@@ -23,6 +58,43 @@ const Toolbar: React.FC<ToolbarProps> = ({ onSettingsClick, onAboutClick, onOpen
           </svg>
         </div>
         <h1 className="toolbar-title">LogStudio</h1>
+        {tabs.length > 0 && (
+          <div className="toolbar-tabs">
+            {tabs.map((tab) => {
+              const isActive = tab.id === activeTabId;
+              const hasMultipleFiles = tab.filePaths && tab.filePaths.length > 1;
+              const tooltipText = hasMultipleFiles 
+                ? tab.filePaths.map(path => path.split(/[/\\]/).pop() || path).join('\n')
+                : getTabLabel(tab);
+              
+              return (
+                <div
+                  key={tab.id}
+                  className={`toolbar-tab ${isActive ? 'active' : ''}`}
+                  onClick={() => onTabSelect(tab.id)}
+                  onAuxClick={(e) => {
+                    if (e.button === 1) {
+                      e.preventDefault();
+                      onTabClose(tab.id, e);
+                    }
+                  }}
+                  title={tooltipText}
+                >
+                  <span className="toolbar-tab-label">{getTabLabel(tab)}</span>
+                  <button
+                    className="toolbar-tab-close"
+                    onClick={(e) => onTabClose(tab.id, e)}
+                    title="Close Tab"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
       <div className="toolbar-right">
         <button className="toolbar-button toolbar-button-primary" onClick={onOpenFile} title="Open File">
@@ -33,18 +105,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ onSettingsClick, onAboutClick, onOpen
           </svg>
           <span>Open</span>
         </button>
-        <button 
-          className="toolbar-button" 
-          onClick={onResetFilters} 
-          title="Reset All Filters"
-          disabled={!currentFile}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M14 8C14 11.3137 11.3137 14 8 14C4.68629 14 2 11.3137 2 8C2 4.68629 4.68629 2 8 2C9.84871 2 11.5051 2.84285 12.6 4.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M12.5 2V4.5H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span>Reset Filters</span>
-        </button>
         <button className="toolbar-button" onClick={onSettingsClick} title="Settings">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M8 10C9.10457 10 10 9.10457 10 8C10 6.89543 9.10457 6 8 6C6.89543 6 6 6.89543 6 8C6 9.10457 6.89543 10 8 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -53,6 +113,37 @@ const Toolbar: React.FC<ToolbarProps> = ({ onSettingsClick, onAboutClick, onOpen
             <path d="M8 3.33333C8 3.68795 7.85952 4.02709 7.60948 4.27714C7.35943 4.52719 7.02029 4.66667 6.66667 4.66667C6.31305 4.66667 5.97391 4.52719 5.72386 4.27714C5.47381 4.02709 5.33333 3.68795 5.33333 3.33333C5.33333 2.97871 5.47381 2.63957 5.72386 2.38952C5.97391 2.13948 6.31305 2 6.66667 2C7.02029 2 7.35943 2.13948 7.60948 2.38952C7.85952 2.63957 8 2.97871 8 3.33333Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M8 12.6667C8 13.0213 7.85952 13.3604 7.60948 13.6105C7.35943 13.8605 7.02029 14 6.66667 14C6.31305 14 5.97391 13.8605 5.72386 13.6105C5.47381 13.3604 5.33333 13.0213 5.33333 12.6667C5.33333 12.312 5.47381 11.9729 5.72386 11.7229C5.97391 11.4728 6.31305 11.3333 6.66667 11.3333C7.02029 11.3333 7.35943 11.4728 7.60948 11.7229C7.85952 11.9729 8 12.312 8 12.6667Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
+        </button>
+        <button 
+          className="toolbar-button" 
+          onClick={onThemeToggle} 
+          title={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          {currentTheme === 'dark' ? (
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 2V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M8 13V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M3 8H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M14 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M4.34314 4.34314L5.05025 5.05025" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M10.9497 10.9497L11.6569 11.6569" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M4.34314 11.6569L5.05025 10.9497" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M10.9497 5.05025L11.6569 4.34314" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.5"/>
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 2C5.23858 2 3 4.23858 3 7C3 9.76142 5.23858 12 8 12C10.7614 12 13 9.76142 13 7C13 4.23858 10.7614 2 8 2Z" stroke="currentColor" strokeWidth="1.5" fill="currentColor"/>
+              <path d="M8 1V2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M8 12V13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M1 8H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M14 8H15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M3.34314 3.34314L4.05025 4.05025" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M11.9497 11.9497L12.6569 12.6569" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M3.34314 12.6569L4.05025 11.9497" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M11.9497 4.05025L12.6569 3.34314" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          )}
         </button>
         <button className="toolbar-button" onClick={onAboutClick} title="About">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

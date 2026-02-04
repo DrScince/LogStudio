@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-04
+
+### Added
+- **Tooltips für abgeschnittenen Text**: Beim Hovern über lange Namespaces oder abgeschnittene Nachrichten wird der vollständige Text in einem Tooltip angezeigt
+- **Regex-Pattern-Validierung**: Echtzeit-Validierung des Regex-Patterns in den Einstellungen mit Fehlermeldungen
+- **Verbesserte Settings-Hilfetexte**: Beispiel-Pattern und Erklärungen für einfacheres Konfigurieren des Log-Schemas
+- **Batch-Script für Windows**: `build-and-run.bat` für einfacheres Ausführen ohne PowerShell Execution Policy Probleme
+- **Separate Namespace-Toolbar**: Namespace-Filter als separate, rechts platzierte, expandierbare Toolbar (nur sichtbar wenn Datei geöffnet, standardmäßig eingeklappt)
+- **Expand/Collapse All Button**: Button in der Sidebar zum gleichzeitigen Auf- und Zuklappen aller Datei-Gruppen
+- **Tab-Leiste integriert**: Tab-Leiste wurde in die Toolbar integriert, um Platz zu sparen und die UI zu vereinfachen
+- **Mehrfachauswahl von Log-Dateien**: Mit Strg+Klick können mehrere Dateien ausgewählt werden, die dann als kombinierte Ansicht angezeigt werden (sortiert nach Timestamp). Dateien können zum aktiven Tab hinzugefügt werden
+- **Versionshistorie im About-Panel**: Automatische Anzeige der Release Notes direkt aus der CHANGELOG.md
+- **Tab-Tooltips**: Bei Tabs mit mehreren Dateien wird beim Hovern ein Tooltip mit allen Dateinamen angezeigt
+- **Datei-Highlighting**: Dateien aus dem aktiven Tab werden in der Sidebar hervorgehoben
+
+### Changed
+- **Expander-Icon**: Deutlich kleineres und weniger aufdringliches Expander-Icon für bessere Optik
+- **Schema-Einstellungen**: Änderungen am Regex-Pattern und anderen Schema-Einstellungen werden sofort wirksam und laden die Datei automatisch neu
+- **Separator-Einstellung entfernt**: Separator-Feld aus Einstellungen entfernt, da es nicht verwendet wurde
+- **Sidebar-Layout**: Sidebar zeigt jetzt nur noch Dateien, Namespace-Filter wurde in separate rechte Toolbar verschoben
+- **Reset Filters Button**: Button wurde von der oberen Toolbar in die LogViewer-Toolbar verschoben (neben End-Button und Filter-Anzeige)
+- **Font-Size-Einstellung**: Font-Size-Einstellung funktioniert jetzt und passt alle Schriftgrößen relativ zur Basis-Schriftgröße an (alle font-size Werte auf rem umgestellt)
+
+### Fixed
+- **Expansion nach Filteränderung**: Expandierte Zeilen bleiben nicht mehr an falscher Position nach Filteränderungen
+- **List-Reset bei Filteränderung**: Bei großen Listen werden gefilterte Einträge sofort angezeigt, ohne dass man auf "End" klicken muss
+- **Expansion basiert auf originalLineNumber**: Expansion wird jetzt korrekt anhand der originalen Zeilennummer identifiziert, nicht mehr über den Index
+
 ## [1.1.0] - 2026-02-03
 
 ### Added
@@ -74,7 +102,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Settings panel
 - Cross-platform support (Windows, Linux)
 
-[Unreleased]: https://github.com/yourusername/LogStudio/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/yourusername/LogStudio/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/yourusername/LogStudio/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/yourusername/LogStudio/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/yourusername/LogStudio/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/yourusername/LogStudio/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/yourusername/LogStudio/releases/tag/v1.0.0

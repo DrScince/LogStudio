@@ -5,7 +5,6 @@ const DEFAULT_SCHEMA: LogSchema = {
   // Erlaubt Leerzeichen um die Pipe-Trenner
   pattern: '^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+)\\s*\\|\\s*([A-Z]+)\\s*\\|\\s*([^|]+)\\s*\\|\\s*(.+)$',
   timestampFormat: 'YYYY-MM-DD HH:mm:ss.SSS',
-  separator: ' | ',
   fields: {
     timestamp: 1,
     level: 2,

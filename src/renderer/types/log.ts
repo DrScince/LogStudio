@@ -9,12 +9,12 @@ export interface LogEntry {
   fullText: string;
   isMultiLine: boolean;
   lineCount: number;
+  sourceFile?: string; // Für mehrere Dateien
 }
 
 export interface LogSchema {
   pattern: string;
   timestampFormat: string;
-  separator: string;
   fields: {
     timestamp: number;
     level: number;

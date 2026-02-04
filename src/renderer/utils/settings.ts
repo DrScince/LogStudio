@@ -4,7 +4,6 @@ const SETTINGS_KEY = 'logstudio-settings';
 const DEFAULT_SCHEMA: LogSchema = {
   pattern: '^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+) \\| ([A-Z]+) \\| ([^|]+) \\| (.+)$',
   timestampFormat: 'YYYY-MM-DD HH:mm:ss.SSS',
-  separator: ' | ',
   fields: {
     timestamp: 1,
     level: 2,

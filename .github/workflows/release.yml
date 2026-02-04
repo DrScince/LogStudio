@@ -91,9 +91,14 @@ jobs:
         run: |
           VERSION=${{ github.ref_name }}
           # Extrahiere den Changelog-Abschnitt für diese Version
-          awk "/## \[${VERSION#v}\]/,/## \[/" CHANGELOG.md | sed '1d;$d' > release_notes.txt
+          # Entferne das Versions-Header und alles nach dem nächsten Header
+          awk "/^## \[${VERSION#v}\]/,/^## \[/" CHANGELOG.md | sed '1d;/^## \[/,$d' > release_notes.txt
+          # Falls leer, versuche Unreleased zu extrahieren
+          if [ ! -s release_notes.txt ]; then
+            awk "/^## \[Unreleased\]/,/^## \[/" CHANGELOG.md | sed '1d;/^## \[/,$d' > release_notes.txt
+          fi
           echo "Release Notes für ${VERSION}:"
-          cat release_notes.txt
+          cat release_notes.txt || echo "Keine Release Notes gefunden"
 
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4

@@ -8,7 +8,8 @@
     "dist/**/*",
     "package.json",
     "public/LogStudio_Logo.ico",
-    "LogStudio_Logo.png"
+    "LogStudio_Logo.png",
+    "CHANGELOG.md"
   ],
   "win": {
     "target": [

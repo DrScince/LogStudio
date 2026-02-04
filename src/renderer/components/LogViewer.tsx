@@ -6,6 +6,7 @@ import './LogViewer.css';
 
 interface LogViewerProps {
   filePath: string | null;
+  filePaths?: string[] | null; // Für mehrere Dateien
   schema: LogSchema;
   autoRefresh: boolean;
   refreshInterval: number;
@@ -16,6 +17,7 @@ interface LogViewerProps {
 
 const LogViewer: React.FC<LogViewerProps> = ({
   filePath,
+  filePaths,
   schema,
   autoRefresh,
   refreshInterval,
@@ -37,6 +39,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const scrollPositionRef = useRef<{ scrollOffset: number; scrollUpdateWasRequested: boolean }>({ scrollOffset: 0, scrollUpdateWasRequested: false });
   const pendingScrollRestoreRef = useRef<number | null>(null);
   const hasLoadedRef = useRef(false);
+  const previousFiltersRef = useRef<{ levels: LogLevel[]; namespaces: string[]; search: string }>({ levels: [], namespaces: [], search: '' });
 
   // JSON/XML Formatting
   const formatJSON = (text: string): { formatted: string; isValid: boolean } => {
@@ -194,14 +197,20 @@ const LogViewer: React.FC<LogViewerProps> = ({
   }, []);
 
   useEffect(() => {
-    if (filePath) {
-      // Reset loaded flag for new file
+    // Multiple files: use loadMultipleLogFiles
+    if (filePaths && filePaths.length > 1) {
       hasLoadedRef.current = false;
-      
+      loadMultipleLogFiles(filePaths);
+      return;
+    }
+    
+    // Single file: use loadLogFile
+    if (filePath) {
+      hasLoadedRef.current = false;
       loadLogFile();
       
       if (window.electronAPI) {
-        // Setup file watcher
+        // Setup file watcher only for single file
         window.electronAPI.watchLogFile(filePath);
         
         // Define the change handler
@@ -214,18 +223,45 @@ const LogViewer: React.FC<LogViewerProps> = ({
         
         // Register the listener
         window.electronAPI.onLogFileChanged(handleFileChange);
+        
+        return () => {
+          window.electronAPI.unwatchLogFile(filePath);
+          window.electronAPI.removeLogFileChangedListener();
+        };
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filePath, filePaths?.join('|')]); // Use join to create stable dependency for filePaths
 
-    return () => {
-      if (filePath && window.electronAPI) {
-        window.electronAPI.unwatchLogFile(filePath);
-        window.electronAPI.removeLogFileChangedListener();
-      }
-    };
-  }, [filePath]);
+  // Reload file when schema changes
+  useEffect(() => {
+    if (filePath && hasLoadedRef.current) {
+      console.log('Schema changed - reloading file with new schema');
+      // Reset loaded flag to force full reload
+      hasLoadedRef.current = false;
+      lastFileSizeRef.current = 0;
+      setLogEntries([]);
+      loadLogFile();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schema.pattern, schema.timestampFormat, schema.fields.timestamp, schema.fields.level, schema.fields.namespace, schema.fields.message, filePath]);
 
   useEffect(() => {
+    // Prüfe ob sich die Filterung geändert hat
+    const filtersChanged = 
+      previousFiltersRef.current.levels.length !== selectedLevels.length ||
+      previousFiltersRef.current.levels.some((l, i) => l !== selectedLevels[i]) ||
+      previousFiltersRef.current.namespaces.length !== selectedNamespaces.length ||
+      previousFiltersRef.current.namespaces.some((n, i) => n !== selectedNamespaces[i]) ||
+      previousFiltersRef.current.search !== searchQuery;
+    
+    // Update previous filters
+    previousFiltersRef.current = {
+      levels: [...selectedLevels],
+      namespaces: [...selectedNamespaces],
+      search: searchQuery,
+    };
+    
     // Save current scroll position BEFORE any state change if tracking is off
     if (!autoScroll && listRef.current) {
       const currentState = listRef.current.state as any;
@@ -239,7 +275,92 @@ const LogViewer: React.FC<LogViewerProps> = ({
     const filtered = filterLogEntries(logEntries, selectedLevels, selectedNamespaces, searchQuery);
     setFilteredEntries(filtered);
     console.log(`LogViewer: ${filtered.length} of ${logEntries.length} entries after filtering`);
+    
+    // Bereinige expandierte Zeilen: entferne nur Expansionen für Zeilen, die nicht mehr sichtbar sind
+    // Behalte Expansionen für Zeilen, die noch in der gefilterten Liste sind
+    setExpandedLines((prev) => {
+      if (prev.size === 0) return prev; // Keine Änderung nötig wenn nichts expandiert ist
+      
+      const visibleLineNumbers = new Set(filtered.map(e => e.originalLineNumber));
+      const cleaned = new Set<number>();
+      
+      prev.forEach(lineNumber => {
+        if (visibleLineNumbers.has(lineNumber)) {
+          // Zeile ist noch sichtbar, behalte Expansion
+          cleaned.add(lineNumber);
+        }
+        // Zeile ist nicht mehr sichtbar, entferne Expansion (nicht hinzufügen)
+      });
+      
+      return cleaned;
+    });
+    
+    // Wenn sich die Filterung geändert hat, reset die List und scroll zum Anfang
+    if (filtersChanged && listRef.current) {
+      console.log('Filter changed - resetting list and scrolling to top');
+      // Reset den Cache der List
+      listRef.current.resetAfterIndex(0, true);
+      // Scroll zum Anfang
+      requestAnimationFrame(() => {
+        if (listRef.current) {
+          listRef.current.scrollTo(0);
+          pendingScrollRestoreRef.current = null; // Clear pending restore
+        }
+      });
+    }
   }, [logEntries, selectedLevels, selectedNamespaces, searchQuery, autoScroll]);
+
+  const loadMultipleLogFiles = useCallback(async (filePaths: string[]) => {
+    if (!window.electronAPI || filePaths.length === 0) return;
+
+    setLoading(true);
+    console.log(`Loading ${filePaths.length} log files...`);
+
+    try {
+      // Load all files in parallel
+      const filePromises = filePaths.map(async (path) => {
+        const result = await window.electronAPI.readLogFile(path);
+        if (result.success && result.content) {
+          const entries = parseLogFile(result.content, schema);
+          // Add source file path to each entry for identification
+          return entries.map(entry => ({
+            ...entry,
+            sourceFile: path.split(/[/\\]/).pop() || path,
+          }));
+        }
+        return [];
+      });
+
+      const allEntriesArrays = await Promise.all(filePromises);
+      
+      // Merge all entries
+      let allEntries: LogEntry[] = [];
+      allEntriesArrays.forEach(entries => {
+        allEntries = [...allEntries, ...entries];
+      });
+
+      // Sort by timestamp
+      allEntries.sort((a, b) => {
+        const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+        const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+        return timeA - timeB;
+      });
+
+      // Reassign line numbers after sorting
+      allEntries = allEntries.map((entry, index) => ({
+        ...entry,
+        originalLineNumber: index + 1,
+      }));
+
+      console.log(`Loaded ${allEntries.length} entries from ${filePaths.length} files`);
+      setLogEntries(allEntries);
+      hasLoadedRef.current = true;
+    } catch (error) {
+      console.error('Error loading multiple log files:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [schema]);
 
   const loadLogFile = async () => {
     if (!filePath || !window.electronAPI) return;
@@ -315,26 +436,28 @@ const LogViewer: React.FC<LogViewerProps> = ({
   };
 
   const toggleNamespace = (namespace: string) => {
-    setSelectedNamespaces((prev) =>
-      prev.includes(namespace) ? prev.filter((n) => n !== namespace) : [...prev, namespace]
-    );
+    const newNamespaces = selectedNamespaces.includes(namespace)
+      ? selectedNamespaces.filter((n) => n !== namespace)
+      : [...selectedNamespaces, namespace];
+    onNamespacesChange(newNamespaces);
   };
 
-  const toggleExpand = useCallback((index: number) => {
+  const toggleExpand = useCallback((originalLineNumber: number) => {
     setExpandedLines((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(index)) {
-        newSet.delete(index);
+      if (newSet.has(originalLineNumber)) {
+        newSet.delete(originalLineNumber);
       } else {
-        newSet.add(index);
+        newSet.add(originalLineNumber);
       }
       return newSet;
     });
-    // Reset cache für dynamische Höhenberechnung
-    if (listRef.current) {
+    // Finde den Index in der gefilterten Liste für Cache-Reset
+    const index = filteredEntries.findIndex(e => e.originalLineNumber === originalLineNumber);
+    if (listRef.current && index >= 0) {
       listRef.current.resetAfterIndex(index);
     }
-  }, []);
+  }, [filteredEntries]);
 
   const scrollToEnd = useCallback(() => {
     if (listRef.current && filteredEntries.length > 0) {
@@ -410,7 +533,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
     const entry = filteredEntries[index];
     if (!entry) return 30;
 
-    const isExpanded = expandedLines.has(index);
+    const isExpanded = expandedLines.has(entry.originalLineNumber);
     const baseHeight = 30; // Min-Höhe für eine Zeile
     
     if (isExpanded && entry.isMultiLine) {
@@ -438,36 +561,61 @@ const LogViewer: React.FC<LogViewerProps> = ({
     const entry = filteredEntries[index];
     if (!entry) return null;
 
-    const isExpanded = expandedLines.has(index);
+    const isExpanded = expandedLines.has(entry.originalLineNumber);
     const isLongMessage = entry.message.length > 150;
     const shouldShowExpand = entry.isMultiLine || isLongMessage;
 
     // Analysiere und formatiere den Inhalt wenn expandiert
     const expandedContent = isExpanded ? analyzeAndFormatContent(entry.isMultiLine ? entry.fullText : entry.message) : null;
 
+    // Bereite Tooltips vor für abgeschnittenen Text
+    const displayedMessage = isExpanded
+      ? entry.message
+      : entry.isMultiLine
+      ? entry.message.split('\n')[0] + ' ...'
+      : isLongMessage
+      ? entry.message.substring(0, 150) + ' ...'
+      : entry.message;
+    
+    // Tooltip nur anzeigen wenn Text abgeschnitten wurde
+    const messageTooltip = !isExpanded && (entry.isMultiLine || isLongMessage) 
+      ? entry.message 
+      : undefined;
+    
+    // Prüfe ob Namespace abgeschnitten ist (wenn er länger als die verfügbare Breite ist)
+    const namespaceTooltip = entry.namespace.length > 30 ? entry.namespace : undefined;
+
     return (
       <div style={style} className="log-entry">
         <div
           className={`log-entry-line ${shouldShowExpand ? 'multiline' : ''}`}
-          onClick={() => shouldShowExpand && toggleExpand(index)}
+          onClick={() => shouldShowExpand && toggleExpand(entry.originalLineNumber)}
         >
           <span className="log-line-number">{entry.originalLineNumber}</span>
-          <span className="log-timestamp">{entry.timestamp}</span>
+          <span 
+            className="log-timestamp" 
+            title={entry.timestamp}
+          >
+            {entry.timestamp}
+          </span>
           <span
             className="log-level"
             style={{ color: getLevelColor(entry.level) }}
+            title={entry.level}
           >
             {entry.level}
           </span>
-          <span className="log-namespace">{entry.namespace}</span>
-          <span className="log-message">
-            {isExpanded
-              ? entry.message
-              : entry.isMultiLine
-              ? entry.message.split('\n')[0] + ' ...'
-              : isLongMessage
-              ? entry.message.substring(0, 150) + ' ...'
-              : entry.message}
+          <span 
+            className="log-namespace" 
+            title={namespaceTooltip}
+          >
+            {entry.namespace}
+          </span>
+          <span 
+            className="log-message"
+            title={messageTooltip}
+          >
+            {displayedMessage}
           </span>
           {shouldShowExpand && (
             <span className="log-expand-icon">{isExpanded ? '▼' : '▶'}</span>
@@ -514,7 +662,10 @@ const LogViewer: React.FC<LogViewerProps> = ({
     );
   }, [filteredEntries, expandedLines, toggleExpand, analyzeAndFormatContent]);
 
-  if (!filePath) {
+  // Check if we have any files to display (single or multiple)
+  const hasFiles = filePath || (filePaths && filePaths.length > 0);
+  
+  if (!hasFiles) {
     return (
       <div className="log-viewer">
         <div className="log-viewer-empty">
@@ -579,6 +730,19 @@ const LogViewer: React.FC<LogViewerProps> = ({
           {searchQuery && (
             <span className="filter-badge">Search: "{searchQuery}"</span>
           )}
+          {(selectedLevels.length > 0 || selectedNamespaces.length > 0 || searchQuery) && onResetFilters && (
+            <button 
+              onClick={onResetFilters} 
+              className="reset-filters-button"
+              title="Reset All Filters"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 8C14 11.3137 11.3137 14 8 14C4.68629 14 2 11.3137 2 8C2 4.68629 4.68629 2 8 2C9.84871 2 11.5051 2.84285 12.6 4.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12.5 2V4.5H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Reset
+            </button>
+          )}
           {filteredEntries.length > 0 && (
             <>
               <button 
@@ -614,7 +778,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
             height={viewerHeight}
             itemCount={filteredEntries.length}
             itemSize={getItemSize}
-            itemKey={(index) => filteredEntries[index]?.originalLineNumber ?? index}
+            itemKey={(index: number) => filteredEntries[index]?.originalLineNumber ?? index}
             width="100%"
             estimatedItemSize={30}
             onScroll={handleScroll}

@@ -43,7 +43,7 @@
   min-width: 120px;
   max-width: 250px;
   margin-top: 4px;
-  font-size: 12px;
+  font-size: 1rem;
   color: var(--text-secondary);
 }
 
