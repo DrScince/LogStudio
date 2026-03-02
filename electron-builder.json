@@ -24,10 +24,7 @@
     "publisherName": "LogStudio",
     "verifyUpdateCodeSignature": false,
     "requestedExecutionLevel": "asInvoker",
-    "signingHashAlgorithms": ["sha256"],
-    "certificateFile": "${env.CSC_LINK}",
-    "certificatePassword": "${env.CSC_KEY_PASSWORD}",
-    "timeStampServer": "http://timestamp.digicert.com"
+    "signingHashAlgorithms": ["sha256"]
   },
   "portable": {
     "artifactName": "${productName}-${version}-${arch}.${ext}",
