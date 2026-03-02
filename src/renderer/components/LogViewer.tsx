@@ -235,6 +235,10 @@ const LogViewer: React.FC<LogViewerProps> = ({
 
     const updateCompactMode = () => {
       const width = toolbarRow.clientWidth;
+      if (width <= 0) {
+        setIsCompactSearchMode(false);
+        return;
+      }
       const hasOverflow = toolbarRow.scrollWidth > toolbarRow.clientWidth + 1;
       setIsCompactSearchMode(width < 980 || hasOverflow);
     };
