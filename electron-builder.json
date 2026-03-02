@@ -31,7 +31,7 @@
   },
   "portable": {
     "artifactName": "${productName}-${version}-${arch}.${ext}",
-    "requestedExecutionLevel": "asInvoker"
+    "requestExecutionLevel": "user"
   },
   "nsis": {
     "oneClick": false,
