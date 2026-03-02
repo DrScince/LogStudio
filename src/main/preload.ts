@@ -17,9 +17,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppPath: () => ipcRenderer.invoke('get-app-path'),
   getDefaultLogDirectory: () => ipcRenderer.invoke('get-default-log-directory'),
   showOpenDialog: () => ipcRenderer.invoke('show-open-dialog'),
+  showOpenDirectoryDialog: () => ipcRenderer.invoke('show-open-directory-dialog'),
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
   maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   readChangelog: () => ipcRenderer.invoke('read-changelog'),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
 });

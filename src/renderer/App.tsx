@@ -17,6 +17,8 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [resetFilterTrigger, setResetFilterTrigger] = useState(0);
+  const [isFileSidebarCollapsed, setIsFileSidebarCollapsed] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<{ latestVersion: string; releaseUrl: string } | null>(null);
 
   // Apply theme to root element
   useEffect(() => {
@@ -83,6 +85,25 @@ function App() {
   useEffect(() => {
     saveSettings(settings);
   }, [settings]);
+
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      if (!window.electronAPI?.checkForUpdates) return;
+      try {
+        const result = await window.electronAPI.checkForUpdates();
+        if (result.success && result.updateAvailable && result.latestVersion && result.releaseUrl) {
+          setUpdateInfo({
+            latestVersion: result.latestVersion,
+            releaseUrl: result.releaseUrl,
+          });
+        }
+      } catch (error) {
+        console.error('Update check failed:', error);
+      }
+    };
+
+    checkForUpdates();
+  }, []);
 
   const handleSettingsChange = (newSettings: AppSettings) => {
     setSettings(newSettings);
@@ -316,6 +337,26 @@ function App() {
         onTabSelect={handleTabSelect}
         onTabClose={handleTabClose}
       />
+      {updateInfo && (
+        <div className="update-banner" role="status">
+          <span className="update-banner-text">
+            Neue Version verfügbar: v{updateInfo.latestVersion}
+          </span>
+          <button
+            className="update-banner-link"
+            onClick={() => window.electronAPI?.openExternal(updateInfo.releaseUrl)}
+          >
+            Download
+          </button>
+          <button
+            className="update-banner-dismiss"
+            onClick={() => setUpdateInfo(null)}
+            aria-label="Update Hinweis schließen"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <div className="app-content">
         <Sidebar
           logDirectory={settings.logDirectory}
@@ -324,6 +365,8 @@ function App() {
           currentFile={currentLogFile}
           selectedFiles={[]}
           activeTabFiles={activeTabFiles}
+          isCollapsed={isFileSidebarCollapsed}
+          onToggleCollapse={() => setIsFileSidebarCollapsed((prev) => !prev)}
         />
         <LogViewer
           filePath={currentLogFile}

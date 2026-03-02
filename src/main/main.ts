@@ -2,10 +2,75 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as chokidar from 'chokidar';
+import * as https from 'https';
 import { fileURLToPath } from 'url';
 
 let mainWindow: BrowserWindow | null = null;
 let logWatchers: Map<string, chokidar.FSWatcher> = new Map();
+
+const RELEASES_LATEST_API_URL = 'https://api.github.com/repos/DrScince/LogStudio/releases/latest';
+const RELEASES_PAGE_URL = 'https://github.com/DrScince/LogStudio/releases';
+
+const normalizeVersion = (version: string): string => version.replace(/^v/i, '').split('-')[0];
+
+const isVersionNewer = (latest: string, current: string): boolean => {
+  const latestParts = normalizeVersion(latest).split('.').map((part) => Number.parseInt(part, 10) || 0);
+  const currentParts = normalizeVersion(current).split('.').map((part) => Number.parseInt(part, 10) || 0);
+  const maxLength = Math.max(latestParts.length, currentParts.length);
+
+  for (let index = 0; index < maxLength; index++) {
+    const latestValue = latestParts[index] ?? 0;
+    const currentValue = currentParts[index] ?? 0;
+    if (latestValue > currentValue) return true;
+    if (latestValue < currentValue) return false;
+  }
+
+  return false;
+};
+
+const fetchLatestRelease = (): Promise<{ tagName: string; htmlUrl: string }> => {
+  return new Promise((resolve, reject) => {
+    const request = https.get(
+      RELEASES_LATEST_API_URL,
+      {
+        headers: {
+          'User-Agent': 'LogStudio',
+          Accept: 'application/vnd.github+json',
+        },
+      },
+      (response) => {
+        let data = '';
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+        response.on('end', () => {
+          if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+            reject(new Error(`GitHub API responded with status ${response.statusCode}`));
+            return;
+          }
+
+          try {
+            const parsed = JSON.parse(data);
+            const tagName = typeof parsed.tag_name === 'string' ? parsed.tag_name : '';
+            const htmlUrl = typeof parsed.html_url === 'string' ? parsed.html_url : RELEASES_PAGE_URL;
+
+            if (!tagName) {
+              reject(new Error('No tag_name returned by GitHub API'));
+              return;
+            }
+
+            resolve({ tagName, htmlUrl });
+          } catch (error) {
+            reject(error);
+          }
+        });
+      }
+    );
+
+    request.on('error', (error) => reject(error));
+    request.end();
+  });
+};
 
 function createWindow() {
   // Icon-Pfad - versuche verschiedene Pfade
@@ -220,6 +285,27 @@ ipcMain.handle('show-open-dialog', async () => {
   }
 });
 
+ipcMain.handle('show-open-directory-dialog', async () => {
+  if (!mainWindow) {
+    return { success: false, error: 'Main window not available' };
+  }
+
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Log-Ordner auswählen',
+      properties: ['openDirectory'],
+    });
+
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+
+    return { success: true, directoryPath: result.filePaths[0] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
+
 // Fenstersteuerung
 ipcMain.handle('minimize-window', () => {
   if (mainWindow) {
@@ -267,5 +353,28 @@ ipcMain.handle('read-changelog', async () => {
     return { success: false, error: 'CHANGELOG.md not found' };
   } catch (error) {
     return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    const currentVersion = app.getVersion();
+    const latestRelease = await fetchLatestRelease();
+    const updateAvailable = isVersionNewer(latestRelease.tagName, currentVersion);
+
+    return {
+      success: true,
+      updateAvailable,
+      currentVersion,
+      latestVersion: normalizeVersion(latestRelease.tagName),
+      releaseUrl: latestRelease.htmlUrl || RELEASES_PAGE_URL,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: String(error),
+      updateAvailable: false,
+      releaseUrl: RELEASES_PAGE_URL,
+    };
   }
 });

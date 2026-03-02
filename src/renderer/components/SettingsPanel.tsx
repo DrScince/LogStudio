@@ -11,6 +11,7 @@ interface SettingsPanelProps {
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChange, onClose }) => {
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
   const [patternError, setPatternError] = useState<string | null>(null);
+  const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
 
   const validatePattern = (pattern: string): boolean => {
     try {
@@ -63,6 +64,25 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
     onClose();
   };
 
+  const handleSelectDirectory = async () => {
+    if (!window.electronAPI?.showOpenDirectoryDialog) {
+      return;
+    }
+
+    setIsSelectingDirectory(true);
+    try {
+      const result = await window.electronAPI.showOpenDirectoryDialog();
+      if (result.success && result.directoryPath) {
+        setLocalSettings((prev) => ({
+          ...prev,
+          logDirectory: result.directoryPath as string,
+        }));
+      }
+    } finally {
+      setIsSelectingDirectory(false);
+    }
+  };
+
   return (
     <div className="settings-overlay" onClick={handleCancel}>
       <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
@@ -75,15 +95,25 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
         <div className="settings-content">
           <div className="settings-section">
             <h3>Log Directory</h3>
-            <input
-              type="text"
-              className="settings-input"
-              value={localSettings.logDirectory}
-              onChange={(e) =>
-                setLocalSettings({ ...localSettings, logDirectory: e.target.value })
-              }
-              placeholder="Path to log directory"
-            />
+            <div className="settings-directory-row">
+              <input
+                type="text"
+                className="settings-input"
+                value={localSettings.logDirectory}
+                onChange={(e) =>
+                  setLocalSettings({ ...localSettings, logDirectory: e.target.value })
+                }
+                placeholder="Path to log directory"
+              />
+              <button
+                type="button"
+                className="settings-button settings-directory-button"
+                onClick={handleSelectDirectory}
+                disabled={isSelectingDirectory}
+              >
+                {isSelectingDirectory ? 'Wird geöffnet…' : 'Ordner wählen'}
+              </button>
+            </div>
           </div>
 
           <div className="settings-section">
