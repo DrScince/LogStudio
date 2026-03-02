@@ -7,33 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-03-02
+
+### Added
+- **Resizable columns in LogViewer**: Timestamp, level, and namespace columns can be resized directly with the mouse
+- **Startup update notification**: Automatic check for new GitHub releases on app start, including a download link
+- **Folder picker in Settings**: A native folder dialog can now be opened to choose the log directory
+
+### Changed
+- **Search field under constrained width**: Compact search mode with magnifier button and dropdown input on narrow layouts
+- **Filter/toolbar layout**: More stable behavior with many active filters, including ellipsis handling and improved alignment
+- **File sidebar**: Left file sidebar is collapsible/expandable and expanded by default, including animation
+- **Update banner visibility**: Stronger visual highlight for the update notification
+
+### Fixed
+- **CI/test error in LogViewer**: Added robust guards for virtual list ref methods (`scrollToItem`, `scrollTo`, `resetAfterIndex`)
+- **Message tooltip**: Full message text is now shown consistently as a tooltip
+
 ## [1.2.0] - 2026-02-04
 
 ### Added
-- **Tooltips für abgeschnittenen Text**: Beim Hovern über lange Namespaces oder abgeschnittene Nachrichten wird der vollständige Text in einem Tooltip angezeigt
-- **Regex-Pattern-Validierung**: Echtzeit-Validierung des Regex-Patterns in den Einstellungen mit Fehlermeldungen
-- **Verbesserte Settings-Hilfetexte**: Beispiel-Pattern und Erklärungen für einfacheres Konfigurieren des Log-Schemas
-- **Batch-Script für Windows**: `build-and-run.bat` für einfacheres Ausführen ohne PowerShell Execution Policy Probleme
-- **Separate Namespace-Toolbar**: Namespace-Filter als separate, rechts platzierte, expandierbare Toolbar (nur sichtbar wenn Datei geöffnet, standardmäßig eingeklappt)
-- **Expand/Collapse All Button**: Button in der Sidebar zum gleichzeitigen Auf- und Zuklappen aller Datei-Gruppen
-- **Tab-Leiste integriert**: Tab-Leiste wurde in die Toolbar integriert, um Platz zu sparen und die UI zu vereinfachen
-- **Mehrfachauswahl von Log-Dateien**: Mit Strg+Klick können mehrere Dateien ausgewählt werden, die dann als kombinierte Ansicht angezeigt werden (sortiert nach Timestamp). Dateien können zum aktiven Tab hinzugefügt werden
-- **Versionshistorie im About-Panel**: Automatische Anzeige der Release Notes direkt aus der CHANGELOG.md
-- **Tab-Tooltips**: Bei Tabs mit mehreren Dateien wird beim Hovern ein Tooltip mit allen Dateinamen angezeigt
-- **Datei-Highlighting**: Dateien aus dem aktiven Tab werden in der Sidebar hervorgehoben
+- **Tooltips for truncated text**: Hovering long namespaces or truncated messages shows the full text in a tooltip
+- **Regex pattern validation**: Real-time validation of the regex pattern in Settings with error messages
+- **Improved Settings help text**: Example patterns and explanations for easier log schema configuration
+- **Windows batch script**: `build-and-run.bat` for easier execution without PowerShell execution policy issues
+- **Separate namespace toolbar**: Namespace filters moved to a separate, right-side, expandable toolbar (visible only when a file is open, collapsed by default)
+- **Expand/Collapse All button**: Sidebar button to expand or collapse all file groups at once
+- **Integrated tab bar**: Tab bar moved into the toolbar to save space and simplify the UI
+- **Multi-select log files**: Multiple files can be selected with Ctrl+click and shown in a combined view (sorted by timestamp); files can be added to the active tab
+- **Version history in About panel**: Automatic display of release notes directly from `CHANGELOG.md`
+- **Tab tooltips**: Hovering tabs with multiple files shows a tooltip listing all file names
+- **File highlighting**: Files belonging to the active tab are highlighted in the sidebar
 
 ### Changed
-- **Expander-Icon**: Deutlich kleineres und weniger aufdringliches Expander-Icon für bessere Optik
-- **Schema-Einstellungen**: Änderungen am Regex-Pattern und anderen Schema-Einstellungen werden sofort wirksam und laden die Datei automatisch neu
-- **Separator-Einstellung entfernt**: Separator-Feld aus Einstellungen entfernt, da es nicht verwendet wurde
-- **Sidebar-Layout**: Sidebar zeigt jetzt nur noch Dateien, Namespace-Filter wurde in separate rechte Toolbar verschoben
-- **Reset Filters Button**: Button wurde von der oberen Toolbar in die LogViewer-Toolbar verschoben (neben End-Button und Filter-Anzeige)
-- **Font-Size-Einstellung**: Font-Size-Einstellung funktioniert jetzt und passt alle Schriftgrößen relativ zur Basis-Schriftgröße an (alle font-size Werte auf rem umgestellt)
+- **Expander icon**: Smaller and less intrusive expander icon for a cleaner look
+- **Schema settings**: Changes to regex pattern and other schema settings now apply immediately and trigger an automatic reload
+- **Removed separator setting**: Separator field removed from Settings because it was unused
+- **Sidebar layout**: Sidebar now shows files only; namespace filters moved to a separate right toolbar
+- **Reset Filters button**: Moved from the top toolbar into the LogViewer toolbar (next to End button and filter indicators)
+- **Font size setting**: Font size setting now works correctly and scales all text sizes relative to the base font size (font-size values converted to rem)
 
 ### Fixed
-- **Expansion nach Filteränderung**: Expandierte Zeilen bleiben nicht mehr an falscher Position nach Filteränderungen
-- **List-Reset bei Filteränderung**: Bei großen Listen werden gefilterte Einträge sofort angezeigt, ohne dass man auf "End" klicken muss
-- **Expansion basiert auf originalLineNumber**: Expansion wird jetzt korrekt anhand der originalen Zeilennummer identifiziert, nicht mehr über den Index
+- **Expansion after filter changes**: Expanded rows no longer appear at incorrect positions after filtering
+- **List reset on filter changes**: In large lists, filtered entries now appear immediately without needing to click "End"
+- **Expansion based on original line number**: Expansion is now correctly keyed by `originalLineNumber` instead of list index
 
 ## [1.1.0] - 2026-02-03
 
@@ -102,7 +119,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Settings panel
 - Cross-platform support (Windows, Linux)
 
-[Unreleased]: https://github.com/yourusername/LogStudio/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/yourusername/LogStudio/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/yourusername/LogStudio/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/yourusername/LogStudio/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/yourusername/LogStudio/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/yourusername/LogStudio/compare/v1.0.1...v1.0.2

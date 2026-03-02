@@ -15,6 +15,20 @@ interface LogViewerProps {
   onResetFilters?: () => void;
 }
 
+type ResizableColumn = 'timestamp' | 'level' | 'namespace';
+
+const COLUMN_LIMITS: Record<ResizableColumn, { min: number; max: number }> = {
+  timestamp: { min: 120, max: 420 },
+  level: { min: 50, max: 180 },
+  namespace: { min: 100, max: 520 },
+};
+
+const DEFAULT_COLUMN_WIDTHS: Record<ResizableColumn, number> = {
+  timestamp: 200,
+  level: 70,
+  namespace: 280,
+};
+
 const LogViewer: React.FC<LogViewerProps> = ({
   filePath,
   filePaths,
@@ -29,12 +43,19 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const [filteredEntries, setFilteredEntries] = useState<LogEntry[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<LogLevel[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isCompactSearchOpen, setIsCompactSearchOpen] = useState(false);
+  const [isCompactSearchMode, setIsCompactSearchMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [expandedLines, setExpandedLines] = useState<Set<number>>(new Set());
   const [viewerHeight, setViewerHeight] = useState(600);
   const [autoScroll, setAutoScroll] = useState(false);
+  const [columnWidths, setColumnWidths] = useState<Record<ResizableColumn, number>>(DEFAULT_COLUMN_WIDTHS);
   const listRef = useRef<VariableSizeList>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const toolbarMainRowRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchControlRef = useRef<HTMLDivElement>(null);
+  const resizeStateRef = useRef<{ column: ResizableColumn; startX: number; startWidth: number } | null>(null);
   const lastFileSizeRef = useRef<number>(0);
   const scrollPositionRef = useRef<{ scrollOffset: number; scrollUpdateWasRequested: boolean }>({ scrollOffset: 0, scrollUpdateWasRequested: false });
   const pendingScrollRestoreRef = useRef<number | null>(null);
@@ -194,6 +215,83 @@ const LogViewer: React.FC<LogViewerProps> = ({
     updateHeight();
     window.addEventListener('resize', updateHeight);
     return () => window.removeEventListener('resize', updateHeight);
+  }, []);
+
+  useEffect(() => {
+    const handleDocumentMouseDown = (event: MouseEvent) => {
+      if (!searchControlRef.current) return;
+      if (!searchControlRef.current.contains(event.target as Node)) {
+        setIsCompactSearchOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleDocumentMouseDown);
+    return () => document.removeEventListener('mousedown', handleDocumentMouseDown);
+  }, []);
+
+  useEffect(() => {
+    const toolbarRow = toolbarMainRowRef.current;
+    if (!toolbarRow) return;
+
+    const updateCompactMode = () => {
+      const width = toolbarRow.clientWidth;
+      if (width <= 0) {
+        setIsCompactSearchMode(false);
+        return;
+      }
+      const hasOverflow = toolbarRow.scrollWidth > toolbarRow.clientWidth + 1;
+      setIsCompactSearchMode(width < 980 || hasOverflow);
+    };
+
+    updateCompactMode();
+
+    const observer = new ResizeObserver(() => {
+      updateCompactMode();
+    });
+    observer.observe(toolbarRow);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [filteredEntries.length, logEntries.length, selectedLevels.length, selectedNamespaces.length, searchQuery]);
+
+  useEffect(() => {
+    if (!isCompactSearchMode) {
+      setIsCompactSearchOpen(false);
+    }
+  }, [isCompactSearchMode]);
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      const resizeState = resizeStateRef.current;
+      if (!resizeState) return;
+
+      const { column, startX, startWidth } = resizeState;
+      const { min, max } = COLUMN_LIMITS[column];
+      const nextWidth = Math.min(max, Math.max(min, startWidth + (event.clientX - startX)));
+
+      setColumnWidths((prev) => {
+        if (prev[column] === nextWidth) return prev;
+        return { ...prev, [column]: nextWidth };
+      });
+    };
+
+    const handleMouseUp = () => {
+      if (!resizeStateRef.current) return;
+      resizeStateRef.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
   }, []);
 
   useEffect(() => {
@@ -521,6 +619,38 @@ const LogViewer: React.FC<LogViewerProps> = ({
     console.log('Scroll event:', scrollOffset);
   }, []);
 
+  const getResizableColumnStyle = useCallback((column: ResizableColumn): React.CSSProperties => {
+    const width = columnWidths[column];
+    return {
+      width,
+      minWidth: width,
+      maxWidth: width,
+    };
+  }, [columnWidths]);
+
+  const startColumnResize = useCallback((column: ResizableColumn, event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    resizeStateRef.current = {
+      column,
+      startX: event.clientX,
+      startWidth: columnWidths[column],
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [columnWidths]);
+
+  const toggleCompactSearch = useCallback(() => {
+    if (!isCompactSearchMode) return;
+    setIsCompactSearchOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        requestAnimationFrame(() => searchInputRef.current?.focus());
+      }
+      return next;
+    });
+  }, [isCompactSearchMode]);
+
   const getLevelColor = (level: LogLevel): string => {
     switch (level) {
       case 'DEBUG':
@@ -586,10 +716,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
       ? entry.message.substring(0, 150) + ' ...'
       : entry.message;
     
-    // Tooltip nur anzeigen wenn Text abgeschnitten wurde
-    const messageTooltip = !isExpanded && (entry.isMultiLine || isLongMessage) 
-      ? entry.message 
-      : undefined;
+    const messageTooltip = entry.message || undefined;
     
     // Prüfe ob Namespace abgeschnitten ist (wenn er länger als die verfügbare Breite ist)
     const namespaceTooltip = entry.namespace.length > 30 ? entry.namespace : undefined;
@@ -603,19 +730,21 @@ const LogViewer: React.FC<LogViewerProps> = ({
           <span className="log-line-number">{entry.originalLineNumber}</span>
           <span 
             className="log-timestamp" 
+            style={getResizableColumnStyle('timestamp')}
             title={entry.timestamp}
           >
             {entry.timestamp}
           </span>
           <span
             className="log-level"
-            style={{ color: getLevelColor(entry.level) }}
+            style={{ ...getResizableColumnStyle('level'), color: getLevelColor(entry.level) }}
             title={entry.level}
           >
             {entry.level}
           </span>
           <span 
             className="log-namespace" 
+            style={getResizableColumnStyle('namespace')}
             title={namespaceTooltip}
           >
             {entry.namespace}
@@ -669,10 +798,18 @@ const LogViewer: React.FC<LogViewerProps> = ({
         )}
       </div>
     );
-  }, [filteredEntries, expandedLines, toggleExpand, analyzeAndFormatContent]);
+  }, [filteredEntries, expandedLines, toggleExpand, analyzeAndFormatContent, getResizableColumnStyle]);
 
   // Check if we have any files to display (single or multiple)
   const hasFiles = filePath || (filePaths && filePaths.length > 0);
+  const hasActiveFilters = selectedLevels.length > 0 || selectedNamespaces.length > 0 || Boolean(searchQuery);
+  const visibleLevelCount = 3;
+  const selectedLevelsBadge = selectedLevels.length > visibleLevelCount
+    ? `${selectedLevels.slice(0, visibleLevelCount).join(', ')}, ...`
+    : selectedLevels.join(', ');
+  const searchBadge = searchQuery.length > 28
+    ? `${searchQuery.slice(0, 28)}...`
+    : searchQuery;
   
   if (!hasFiles) {
     return (
@@ -696,10 +833,10 @@ const LogViewer: React.FC<LogViewerProps> = ({
   return (
     <div className="log-viewer">
       <div className="log-viewer-toolbar">
-        <div className="log-viewer-filters">
-          <div className="filter-group">
+        <div className="log-level-row">
+          <div className="filter-group log-level-group">
             <label>Log-Level:</label>
-            <div className="filter-buttons">
+            <div className="filter-buttons log-level-buttons">
               {uniqueLevels.map((level) => (
                 <button
                   key={level}
@@ -717,29 +854,74 @@ const LogViewer: React.FC<LogViewerProps> = ({
               ))}
             </div>
           </div>
-          <div className="filter-group">
-            <label>Search:</label>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Enter search text..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
         </div>
-        <div className="log-viewer-stats">
-          <span>{filteredEntries.length} / {logEntries.length} Entries</span>
+        <div className="toolbar-main-row" ref={toolbarMainRowRef}>
+          <div className="log-viewer-filters">
+            <div className={`filter-group filter-group-search ${isCompactSearchMode ? 'compact-mode' : ''}`}>
+              <label className="search-label">Search:</label>
+              <div
+                ref={searchControlRef}
+                className={`search-control ${isCompactSearchMode ? 'compact-mode' : ''} ${isCompactSearchOpen ? 'compact-open' : ''}`}
+              >
+                {!isCompactSearchMode && (
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    className="search-input"
+                    placeholder="Enter search text..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                )}
+                <button
+                  type="button"
+                  className="search-toggle-button"
+                  aria-label="Toggle search"
+                  onClick={toggleCompactSearch}
+                >
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5"/>
+                    <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
+                {isCompactSearchMode && isCompactSearchOpen && (
+                  <div className="search-dropdown">
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      className="search-input"
+                      placeholder="Enter search text..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setIsCompactSearchOpen(false);
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className={`log-viewer-stats ${hasActiveFilters ? 'has-filters' : ''}`}>
+          <span className="stats-count">{filteredEntries.length} / {logEntries.length} Entries</span>
           {selectedLevels.length > 0 && (
-            <span className="filter-badge">Level: {selectedLevels.join(', ')}</span>
+            <span className="filter-badge filter-badge-level" title={`Level: ${selectedLevels.join(', ')}`}>
+              Level: {selectedLevelsBadge}
+            </span>
           )}
           {selectedNamespaces.length > 0 && (
-            <span className="filter-badge">Namespace: {selectedNamespaces.length}</span>
+            <span className="filter-badge" title={`Namespace: ${selectedNamespaces.length}`}>
+              Namespace: {selectedNamespaces.length}
+            </span>
           )}
           {searchQuery && (
-            <span className="filter-badge">Search: "{searchQuery}"</span>
+            <span className="filter-badge filter-badge-search" title={`Search: "${searchQuery}"`}>
+              Search: "{searchBadge}"
+            </span>
           )}
-          {(selectedLevels.length > 0 || selectedNamespaces.length > 0 || searchQuery) && onResetFilters && (
+          {hasActiveFilters && onResetFilters && (
             <button 
               onClick={onResetFilters} 
               className="reset-filters-button"
@@ -774,9 +956,45 @@ const LogViewer: React.FC<LogViewerProps> = ({
               </button>
             </>
           )}
+          </div>
         </div>
       </div>
       <div className="log-viewer-content" ref={containerRef}>
+        {filteredEntries.length > 0 && (
+          <div className="log-column-header" role="presentation">
+            <div className="log-column-header-line">
+              <span className="log-column-header-cell log-column-header-line-number">Line</span>
+              <span className="log-column-header-cell log-column-header-resizable" style={getResizableColumnStyle('timestamp')}>
+                Timestamp
+                <button
+                  type="button"
+                  className="log-column-resize-handle"
+                  aria-label="Resize timestamp column"
+                  onMouseDown={(event) => startColumnResize('timestamp', event)}
+                />
+              </span>
+              <span className="log-column-header-cell log-column-header-resizable" style={getResizableColumnStyle('level')}>
+                Level
+                <button
+                  type="button"
+                  className="log-column-resize-handle"
+                  aria-label="Resize level column"
+                  onMouseDown={(event) => startColumnResize('level', event)}
+                />
+              </span>
+              <span className="log-column-header-cell log-column-header-resizable" style={getResizableColumnStyle('namespace')}>
+                Namespace
+                <button
+                  type="button"
+                  className="log-column-resize-handle"
+                  aria-label="Resize namespace column"
+                  onMouseDown={(event) => startColumnResize('namespace', event)}
+                />
+              </span>
+              <span className="log-column-header-cell log-column-header-message">Message</span>
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="log-viewer-loading">Loading log file...</div>
         ) : filteredEntries.length === 0 ? (

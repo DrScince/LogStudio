@@ -8,6 +8,8 @@ interface SidebarProps {
   currentFile: string | null;
   selectedFiles: string[];
   activeTabFiles?: string[]; // Dateien aus dem aktiven Tab (für Highlighting)
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 interface FileWithDate {
@@ -24,6 +26,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   currentFile,
   selectedFiles,
   activeTabFiles = [],
+  isCollapsed = false,
+  onToggleCollapse,
 }) => {
   const [logFiles, setLogFiles] = useState<Array<{ name: string; path: string }>>([]);
   const [loading, setLoading] = useState(false);
@@ -183,22 +187,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  if (!logDirectory) {
-    return (
-      <div className="sidebar">
-        <div className="sidebar-empty">
-          <p>Please select a log directory in the settings.</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="sidebar">
+    <div className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
-        <div className="sidebar-title">Files</div>
+        {!isCollapsed && <div className="sidebar-title">Files</div>}
         <div className="sidebar-header-buttons">
-          {groupedFiles.length > 0 && (
+          {!isCollapsed && groupedFiles.length > 0 && (
             <button 
               onClick={toggleAllGroups} 
               className="expand-all-button" 
@@ -213,59 +207,79 @@ const Sidebar: React.FC<SidebarProps> = ({
               </svg>
             </button>
           )}
-          <button onClick={loadLogFiles} className="refresh-button" title="Aktualisieren">
+          {!isCollapsed && <button onClick={loadLogFiles} className="refresh-button" title="Aktualisieren">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M8 2.66667V5.33333M8 10.6667V13.3333M13.3333 8H10.6667M5.33333 8H2.66667M11.7267 4.27333L9.72667 6.27333M6.27333 9.72667L4.27333 11.7267M11.7267 11.7267L9.72667 9.72667M6.27333 6.27333L4.27333 4.27333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>}
+          <button
+            onClick={onToggleCollapse}
+            className="collapse-sidebar-button"
+            title={isCollapsed ? 'Dateileiste ausklappen' : 'Dateileiste einklappen'}
+            aria-label={isCollapsed ? 'Expand file sidebar' : 'Collapse file sidebar'}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {isCollapsed ? (
+                <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              ) : (
+                <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              )}
             </svg>
           </button>
         </div>
       </div>
-      <div className="sidebar-content">
-        {loading ? (
-          <div className="sidebar-loading">Lade...</div>
-        ) : logFiles.length === 0 ? (
-          <div className="sidebar-empty">No log files found</div>
-        ) : (
-          <div className="log-file-groups">
-            {groupedFiles.map(([dateStr, files]) => {
-              const isCollapsed = collapsedGroups.has(dateStr);
-              return (
-                <div key={dateStr} className="log-file-group">
-                  <div 
-                    className="log-file-group-header"
-                    onClick={() => toggleGroup(dateStr)}
-                  >
-                    <span className="log-file-group-toggle">
-                      {isCollapsed ? '▶' : '▼'}
-                    </span>
-                    <span className="log-file-group-title">
-                      {formatDate(dateStr)}
-                    </span>
-                    <span className="log-file-group-count">({files.length})</span>
+      {!isCollapsed && (
+        <div className="sidebar-content">
+          {!logDirectory ? (
+            <div className="sidebar-empty">
+              <p>Please select a log directory in the settings.</p>
+            </div>
+          ) : loading ? (
+            <div className="sidebar-loading">Lade...</div>
+          ) : logFiles.length === 0 ? (
+            <div className="sidebar-empty">No log files found</div>
+          ) : (
+            <div className="log-file-groups">
+              {groupedFiles.map(([dateStr, files]) => {
+                const isGroupCollapsed = collapsedGroups.has(dateStr);
+                return (
+                  <div key={dateStr} className="log-file-group">
+                    <div 
+                      className="log-file-group-header"
+                      onClick={() => toggleGroup(dateStr)}
+                    >
+                      <span className="log-file-group-toggle">
+                        {isGroupCollapsed ? '▶' : '▼'}
+                      </span>
+                      <span className="log-file-group-title">
+                        {formatDate(dateStr)}
+                      </span>
+                      <span className="log-file-group-count">({files.length})</span>
+                    </div>
+                    {!isGroupCollapsed && (
+                      <ul className="log-file-list">
+                        {files.map((file) => {
+                          const isActive = currentFile === file.path;
+                          const isInActiveTab = activeTabFiles.includes(file.path);
+                          return (
+                            <li
+                              key={file.path}
+                              className={`log-file-item ${isActive ? 'active' : ''} ${isInActiveTab ? 'in-active-tab' : ''}`}
+                              onClick={(e) => handleFileClick(file.path, e)}
+                            >
+                              {file.name}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                   </div>
-                  {!isCollapsed && (
-                    <ul className="log-file-list">
-                      {files.map((file) => {
-                        const isActive = currentFile === file.path;
-                        const isInActiveTab = activeTabFiles.includes(file.path);
-                        return (
-                          <li
-                            key={file.path}
-                            className={`log-file-item ${isActive ? 'active' : ''} ${isInActiveTab ? 'in-active-tab' : ''}`}
-                            onClick={(e) => handleFileClick(file.path, e)}
-                          >
-                            {file.name}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

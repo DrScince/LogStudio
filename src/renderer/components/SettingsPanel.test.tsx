@@ -30,6 +30,12 @@ describe('SettingsPanel', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    (window as any).electronAPI = {
+      showOpenDirectoryDialog: vi.fn().mockResolvedValue({
+        success: true,
+        directoryPath: '/selected/logs',
+      }),
+    };
   });
 
   it('should render settings panel', () => {
@@ -107,5 +113,16 @@ describe('SettingsPanel', () => {
     fireEvent.change(patternInput, { target: { value: 'new-pattern' } });
     
     expect(patternInput).toHaveValue('new-pattern');
+  });
+
+  it('should pick directory via dialog button', async () => {
+    render(<SettingsPanel {...defaultProps} />);
+
+    const selectButton = screen.getByRole('button', { name: /Ordner wählen/i });
+    fireEvent.click(selectButton);
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('/selected/logs')).toBeInTheDocument();
+    });
   });
 });

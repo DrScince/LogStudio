@@ -44,8 +44,7 @@ describe('AboutPanel', () => {
     });
     
     await waitFor(() => {
-      // Version should be displayed (from AboutPanel component)
-      expect(screen.getByText(/1\.1\.0/i)).toBeInTheDocument();
+      expect(screen.getByText(/Version\s+\d+\.\d+\.\d+/i)).toBeInTheDocument();
     });
   });
 

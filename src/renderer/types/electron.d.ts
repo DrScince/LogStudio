@@ -10,11 +10,20 @@ export interface ElectronAPI {
   getAppPath: () => Promise<{ success: boolean; path?: string; error?: string }>;
   getDefaultLogDirectory: () => Promise<{ success: boolean; path?: string; error?: string }>;
   showOpenDialog: () => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
+  showOpenDirectoryDialog: () => Promise<{ success: boolean; directoryPath?: string; canceled?: boolean; error?: string }>;
   minimizeWindow: () => void;
   maximizeWindow: () => void;
   closeWindow: () => void;
   openExternal: (url: string) => Promise<void>;
   readChangelog: () => Promise<{ success: boolean; content?: string; error?: string }>;
+  checkForUpdates: () => Promise<{
+    success: boolean;
+    updateAvailable?: boolean;
+    currentVersion?: string;
+    latestVersion?: string;
+    releaseUrl?: string;
+    error?: string;
+  }>;
 }
 
 declare global {

@@ -105,6 +105,27 @@
   margin-bottom: 16px;
 }
 
+.settings-directory-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-directory-row .settings-input {
+  flex: 1;
+}
+
+.settings-directory-button {
+  white-space: nowrap;
+  padding: 10px 14px;
+}
+
+.settings-directory-button:disabled {
+  opacity: 0.7;
+  cursor: default;
+  transform: none;
+}
+
 .settings-input-group label {
   display: block;
   font-size: 1.083rem;
