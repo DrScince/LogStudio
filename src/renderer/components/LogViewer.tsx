@@ -454,14 +454,23 @@ const LogViewer: React.FC<LogViewerProps> = ({
     });
     // Finde den Index in der gefilterten Liste für Cache-Reset
     const index = filteredEntries.findIndex(e => e.originalLineNumber === originalLineNumber);
-    if (listRef.current && index >= 0) {
-      listRef.current.resetAfterIndex(index);
+    const listApi = listRef.current as unknown as { resetAfterIndex?: (index: number, shouldForceUpdate?: boolean) => void } | null;
+    if (listApi && index >= 0 && typeof listApi.resetAfterIndex === 'function') {
+      listApi.resetAfterIndex(index);
     }
   }, [filteredEntries]);
 
   const scrollToEnd = useCallback(() => {
-    if (listRef.current && filteredEntries.length > 0) {
-      listRef.current.scrollToItem(filteredEntries.length - 1, 'end');
+    const listApi = listRef.current as unknown as {
+      scrollToItem?: (index: number, align?: 'auto' | 'smart' | 'center' | 'end' | 'start') => void;
+      scrollTo?: (offset: number) => void;
+    } | null;
+    if (listApi && filteredEntries.length > 0) {
+      if (typeof listApi.scrollToItem === 'function') {
+        listApi.scrollToItem(filteredEntries.length - 1, 'end');
+      } else if (typeof listApi.scrollTo === 'function') {
+        listApi.scrollTo(Number.MAX_SAFE_INTEGER);
+      }
     }
   }, [filteredEntries]);
 

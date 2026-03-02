@@ -7,7 +7,6 @@ import { LogSchema } from '../types/log';
 // Mock react-window
 vi.mock('react-window', () => ({
   VariableSizeList: React.forwardRef(({ children, itemData }: any, ref: any) => {
-    // Create a mock ref object with state property
     if (ref) {
       ref.current = {
         state: { scrollOffset: 0 },
@@ -17,7 +16,7 @@ vi.mock('react-window', () => ({
       };
     }
     return (
-      <div data-testid="virtualized-list" ref={ref}>
+      <div data-testid="virtualized-list">
         {itemData?.entries?.map((entry: any, index: number) => 
           children({ index, style: {}, data: itemData })
         )}
