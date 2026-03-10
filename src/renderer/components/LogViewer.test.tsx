@@ -4,9 +4,14 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import LogViewer from './LogViewer';
 import { LogSchema } from '../types/log';
 
+const variableSizeListMock = vi.hoisted(() => ({
+  calls: [] as Array<{ height: number; itemCount: number }>,
+}));
+
 // Mock react-window
 vi.mock('react-window', () => ({
-  VariableSizeList: React.forwardRef(({ children, itemData }: any, ref: any) => {
+  VariableSizeList: React.forwardRef(({ height, itemCount }: any, ref: any) => {
+    variableSizeListMock.calls.push({ height, itemCount });
     if (ref) {
       ref.current = {
         state: { scrollOffset: 0 },
@@ -16,11 +21,7 @@ vi.mock('react-window', () => ({
       };
     }
     return (
-      <div data-testid="virtualized-list">
-        {itemData?.entries?.map((entry: any, index: number) => 
-          children({ index, style: {}, data: itemData })
-        )}
-      </div>
+      <div data-testid="virtualized-list" data-height={String(height)} data-item-count={String(itemCount)} />
     );
   }),
 }));
@@ -48,6 +49,7 @@ const defaultProps = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  variableSizeListMock.calls.length = 0;
   (window as any).electronAPI = {
     readLogFile: vi.fn(),
     watchLogFile: vi.fn(),
@@ -68,6 +70,33 @@ describe('LogViewer', () => {
     render(<LogViewer {...defaultProps} />);
     
     expect(screen.getByText(/Keine Datei geöffnet/i)).toBeInTheDocument();
+  });
+
+  it('should subtract the header height from the virtual list height', async () => {
+    const clientHeightSpy = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('log-viewer-content') ? 500 : 0;
+    });
+    const offsetHeightSpy = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.classList.contains('log-column-header') ? 48 : 0;
+    });
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: `2025-01-01 12:00:00.000 | INFO | Test.Namespace | First message
+2025-01-01 12:00:01.000 | ERROR | Test.Namespace | Last visible message`,
+    });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" />);
+
+    await waitFor(() => {
+      expect(variableSizeListMock.calls.at(-1)).toMatchObject({
+        itemCount: 2,
+        height: 452,
+      });
+    });
+
+    clientHeightSpy.mockRestore();
+    offsetHeightSpy.mockRestore();
   });
 
   it('should load and display log entries', async () => {

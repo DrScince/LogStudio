@@ -52,6 +52,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const [columnWidths, setColumnWidths] = useState<Record<ResizableColumn, number>>(DEFAULT_COLUMN_WIDTHS);
   const listRef = useRef<VariableSizeList>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
   const toolbarMainRowRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchControlRef = useRef<HTMLDivElement>(null);
@@ -61,6 +62,16 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const pendingScrollRestoreRef = useRef<number | null>(null);
   const hasLoadedRef = useRef(false);
   const previousFiltersRef = useRef<{ levels: LogLevel[]; namespaces: string[]; search: string }>({ levels: [], namespaces: [], search: '' });
+
+  const updateViewerHeight = useCallback(() => {
+    const containerHeight = containerRef.current?.clientHeight ?? 0;
+    const headerHeight = headerRef.current?.offsetHeight ?? 0;
+    const nextHeight = Math.max(containerHeight - headerHeight, 0);
+
+    setViewerHeight((previousHeight) => (
+      previousHeight === nextHeight ? previousHeight : nextHeight
+    ));
+  }, []);
 
   // JSON/XML Formatting
   const formatJSON = (text: string): { formatted: string; isValid: boolean } => {
@@ -204,18 +215,33 @@ const LogViewer: React.FC<LogViewerProps> = ({
     onNamespacesChange(uniqueNamespaces);
   }, [uniqueNamespaces, onNamespacesChange]);
 
-  useEffect(() => {
-    const updateHeight = () => {
-      if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setViewerHeight(rect.height);
-      }
-    };
+  useLayoutEffect(() => {
+    updateViewerHeight();
 
-    updateHeight();
-    window.addEventListener('resize', updateHeight);
-    return () => window.removeEventListener('resize', updateHeight);
-  }, []);
+    const container = containerRef.current;
+    const header = headerRef.current;
+    const supportsResizeObserver = typeof ResizeObserver !== 'undefined';
+    const resizeObserver = supportsResizeObserver
+      ? new ResizeObserver(() => {
+          updateViewerHeight();
+        })
+      : null;
+
+    if (resizeObserver && container) {
+      resizeObserver.observe(container);
+    }
+
+    if (resizeObserver && header) {
+      resizeObserver.observe(header);
+    }
+
+    window.addEventListener('resize', updateViewerHeight);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', updateViewerHeight);
+    };
+  }, [filteredEntries.length, updateViewerHeight]);
 
   useEffect(() => {
     const handleDocumentMouseDown = (event: MouseEvent) => {
@@ -961,7 +987,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
       </div>
       <div className="log-viewer-content" ref={containerRef}>
         {filteredEntries.length > 0 && (
-          <div className="log-column-header" role="presentation">
+          <div className="log-column-header" role="presentation" ref={headerRef}>
             <div className="log-column-header-line">
               <span className="log-column-header-cell log-column-header-line-number">Line</span>
               <span className="log-column-header-cell log-column-header-resizable" style={getResizableColumnStyle('timestamp')}>

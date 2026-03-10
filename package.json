@@ -1,6 +1,6 @@
 {
   "name": "logstudio",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Modern log file viewer and monitor",
   "main": "dist/main.js",
   "scripts": {

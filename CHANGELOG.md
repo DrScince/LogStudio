@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-03-10
+
+### Fixed
+- **Last visible log entry**: Corrected the virtualized LogViewer height calculation so the final log row remains reachable below the column header
+- **LogViewer regression coverage**: Added a dedicated test to lock in the header-aware list height behavior
+
 ## [1.3.0] - 2026-03-02
 
 ### Added
@@ -119,8 +125,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Settings panel
 - Cross-platform support (Windows, Linux)
 
-[Unreleased]: https://github.com/yourusername/LogStudio/compare/v1.3.0...HEAD
-[1.3.0]: https://github.com/yourusername/LogStudio/compare/v1.2.0...v1.3.0
+[Unreleased]: https://github.com/DrScince/LogStudio/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/DrScince/LogStudio/compare/v1.3.0...v1.3.1
+[1.3.0]: https://github.com/DrScince/LogStudio/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/yourusername/LogStudio/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/yourusername/LogStudio/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/yourusername/LogStudio/compare/v1.0.1...v1.0.2
