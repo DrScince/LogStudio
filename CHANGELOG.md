@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - **Build target**: The Windows build now produces both an NSIS installer and a portable EXE
-- **Update mechanism**: Replaced manual GitHub API polling with \`electron-updater\` for the installer build
+- **Update mechanism**: Replaced manual GitHub API polling with `electron-updater` for the installer build
 
 
 ## [1.3.1] - 2026-03-10
