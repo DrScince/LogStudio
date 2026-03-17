@@ -44,7 +44,7 @@ describe('AboutPanel', () => {
     });
     
     await waitFor(() => {
-      expect(screen.getByText(/Version\s+1\.3\.1/i)).toBeInTheDocument();
+      expect(screen.getByText(/Version\s+2\.0\.0/i)).toBeInTheDocument();
     });
   });
 
