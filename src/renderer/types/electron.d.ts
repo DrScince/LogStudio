@@ -16,14 +16,18 @@ export interface ElectronAPI {
   closeWindow: () => void;
   openExternal: (url: string) => Promise<void>;
   readChangelog: () => Promise<{ success: boolean; content?: string; error?: string }>;
-  checkForUpdates: () => Promise<{
-    success: boolean;
-    updateAvailable?: boolean;
-    currentVersion?: string;
-    latestVersion?: string;
-    releaseUrl?: string;
-    error?: string;
-  }>;
+  checkForUpdates: () => Promise<{ success: boolean; error?: string }>;
+  downloadUpdate: () => Promise<{ success: boolean; error?: string }>;
+  installUpdate: () => void;
+  onUpdateAvailable: (callback: (info: { version: string; portable: boolean; releaseUrl?: string }) => void) => void;
+  onDownloadProgress: (callback: (info: { percent: number }) => void) => void;
+  onUpdateDownloaded: (callback: (info: { version: string }) => void) => void;
+  onUpdateError: (callback: (info: { message: string }) => void) => void;
+  removeUpdateListeners: () => void;
+  onFilesDropped: (callback: (paths: string[]) => void) => void;
+  removeFilesDroppedListener: () => void;
+  onOpenFileFromCli: (callback: (filePath: string) => void) => void;
+  removeOpenFileFromCliListener: () => void;
 }
 
 declare global {

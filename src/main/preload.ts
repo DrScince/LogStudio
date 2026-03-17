@@ -1,5 +1,23 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+// Dateipfade aus dem Drop-Event werden hier im Preload extrahiert,
+// weil file.path nur im Preload-Kontext verfügbar ist.
+let _dropCallback: ((paths: string[]) => void) | null = null;
+
+window.addEventListener('dragover', (e: DragEvent) => {
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+}, false);
+
+window.addEventListener('drop', (e: DragEvent) => {
+  e.preventDefault();
+  if (_dropCallback) {
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    const paths = files.map((f) => (f as any).path as string).filter(Boolean);
+    if (paths.length > 0) _dropCallback(paths);
+  }
+}, false);
+
 contextBridge.exposeInMainWorld('electronAPI', {
   readLogFile: (filePath: string) => ipcRenderer.invoke('read-log-file', filePath),
   watchLogFile: (filePath: string) => ipcRenderer.invoke('watch-log-file', filePath),
@@ -24,4 +42,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
   readChangelog: () => ipcRenderer.invoke('read-changelog'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  onUpdateAvailable: (callback: (info: { version: string }) => void) => {
+    ipcRenderer.on('update-available', (_event, info) => callback(info));
+  },
+  onDownloadProgress: (callback: (info: { percent: number }) => void) => {
+    ipcRenderer.on('update-download-progress', (_event, info) => callback(info));
+  },
+  onUpdateDownloaded: (callback: (info: { version: string }) => void) => {
+    ipcRenderer.on('update-downloaded', (_event, info) => callback(info));
+  },
+  onUpdateError: (callback: (info: { message: string }) => void) => {
+    ipcRenderer.on('update-error', (_event, info) => callback(info));
+  },
+  removeUpdateListeners: () => {
+    ipcRenderer.removeAllListeners('update-available');
+    ipcRenderer.removeAllListeners('update-download-progress');
+    ipcRenderer.removeAllListeners('update-downloaded');
+    ipcRenderer.removeAllListeners('update-error');
+  },
+  onFilesDropped: (callback: (paths: string[]) => void) => {
+    _dropCallback = callback;
+  },
+  removeFilesDroppedListener: () => {
+    _dropCallback = null;
+  },
+  onOpenFileFromCli: (callback: (filePath: string) => void) => {
+    ipcRenderer.on('open-file-from-cli', (_event, filePath) => callback(filePath));
+  },
+  removeOpenFileFromCliListener: () => {
+    ipcRenderer.removeAllListeners('open-file-from-cli');
+  },
 });

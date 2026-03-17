@@ -65,3 +65,100 @@
   height: 28px;
   padding: 0;
 }
+
+.update-progress-track {
+  flex: 1;
+  height: 6px;
+  background: color-mix(in srgb, var(--accent-primary) 20%, var(--bg-tertiary));
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.update-progress-fill {
+  height: 100%;
+  background: var(--accent-primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+/* Drag & Drop */
+.app.drag-over {
+  outline: 2px dashed var(--accent-primary);
+  outline-offset: -2px;
+}
+
+.drag-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.drag-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 56px;
+  border: 2px dashed var(--accent-primary);
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-secondary));
+}
+
+.drag-overlay-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.drag-overlay-text {
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.drag-overlay-hint {
+  color: var(--text-secondary, #8b949e);
+  font-size: 0.833rem;
+}
+
+.drag-error-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, #e05252 18%, var(--bg-secondary));
+  border-bottom: 1px solid color-mix(in srgb, #e05252 55%, var(--border-color));
+  white-space: pre-line;
+}
+
+.drag-error-text {
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  flex: 1;
+}
+
+.drag-error-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, #e05252 45%, var(--border-color));
+  background: color-mix(in srgb, #e05252 22%, var(--bg-tertiary));
+  color: var(--text-primary);
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  font-size: 0.833rem;
+  transition: all 0.2s;
+}
+
+.drag-error-dismiss:hover {
+  background: color-mix(in srgb, #e05252 40%, var(--bg-tertiary));
+  border-color: #e05252;
+}

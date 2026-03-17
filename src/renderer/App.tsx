@@ -18,7 +18,18 @@ function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [resetFilterTrigger, setResetFilterTrigger] = useState(0);
   const [isFileSidebarCollapsed, setIsFileSidebarCollapsed] = useState(false);
-  const [updateInfo, setUpdateInfo] = useState<{ latestVersion: string; releaseUrl: string } | null>(null);
+
+  type UpdateState =
+    | { phase: 'available'; version: string; portable: boolean; releaseUrl?: string }
+    | { phase: 'downloading'; percent: number }
+    | { phase: 'ready'; version: string }
+    | { phase: 'error'; message: string };
+
+  const [updateState, setUpdateState] = useState<UpdateState | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [dragError, setDragError] = useState<string | null>(null);
+
+  const ALLOWED_EXTENSIONS = ['.log', '.txt'];
 
   // Apply theme to root element
   useEffect(() => {
@@ -87,23 +98,27 @@ function App() {
   }, [settings]);
 
   useEffect(() => {
-    const checkForUpdates = async () => {
-      if (!window.electronAPI?.checkForUpdates) return;
-      try {
-        const result = await window.electronAPI.checkForUpdates();
-        if (result.success && result.updateAvailable && result.latestVersion && result.releaseUrl) {
-          setUpdateInfo({
-            latestVersion: result.latestVersion,
-            releaseUrl: result.releaseUrl,
-          });
-        }
-      } catch (error) {
-        console.error('Update check failed:', error);
-      }
+    window.electronAPI?.onUpdateAvailable?.((info) => {
+      setUpdateState({ phase: 'available', version: info.version, portable: info.portable, releaseUrl: info.releaseUrl });
+    });
+    window.electronAPI?.onDownloadProgress?.((info) => {
+      setUpdateState({ phase: 'downloading', percent: info.percent });
+    });
+    window.electronAPI?.onUpdateDownloaded?.((info) => {
+      setUpdateState({ phase: 'ready', version: info.version });
+    });
+    window.electronAPI?.onUpdateError?.((info) => {
+      setUpdateState({ phase: 'error', message: info.message });
+    });
+    return () => {
+      window.electronAPI?.removeUpdateListeners?.();
     };
-
-    checkForUpdates();
   }, []);
+
+  const handleDownloadUpdate = async () => {
+    setUpdateState({ phase: 'downloading', percent: 0 });
+    await window.electronAPI?.downloadUpdate();
+  };
 
   const handleSettingsChange = (newSettings: AppSettings) => {
     setSettings(newSettings);
@@ -322,8 +337,83 @@ function App() {
     setResetFilterTrigger(prev => prev + 1);
   }, [activeTabId]);
 
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragOver(false);
+  }, []);
+
+  const handleDroppedPaths = useCallback((paths: string[]) => {
+    setIsDragOver(false);
+
+    const invalid = paths.filter(
+      (p) => !ALLOWED_EXTENSIONS.some((ext) => p.toLowerCase().endsWith(ext))
+    );
+
+    if (invalid.length > 0) {
+      const names = invalid.map((p) => p.split(/[\\/]/).pop() ?? p).join(', ');
+      setDragError(
+        invalid.length === paths.length
+          ? `Datei${invalid.length > 1 ? 'en' : ''} nicht unterstützt: ${names}\nErlaubte Formate: ${ALLOWED_EXTENSIONS.join(', ')}`
+          : `Folgende Dateien werden nicht unterstützt: ${names}\nErlaubte Formate: ${ALLOWED_EXTENSIONS.join(', ')}`
+      );
+    }
+
+    const valid = paths.filter((p) =>
+      ALLOWED_EXTENSIONS.some((ext) => p.toLowerCase().endsWith(ext))
+    );
+
+    if (valid.length === 1) {
+      openFileInTab(valid[0]);
+    } else if (valid.length > 1) {
+      openMultipleFilesInTab(valid);
+    }
+  }, [openFileInTab, openMultipleFilesInTab, ALLOWED_EXTENSIONS]);
+
+  useEffect(() => {
+    window.electronAPI?.onFilesDropped?.(handleDroppedPaths);
+    return () => { window.electronAPI?.removeFilesDroppedListener?.(); };
+  }, [handleDroppedPaths]);
+
+  useEffect(() => {
+    window.electronAPI?.onOpenFileFromCli?.((filePath) => {
+      openFileInTab(filePath);
+    });
+    return () => { window.electronAPI?.removeOpenFileFromCliListener?.(); };
+  }, [openFileInTab]);
+
   return (
-    <div className="app">
+    <div
+      className={`app${isDragOver ? ' drag-over' : ''}`}
+      onDragEnter={handleDragOver}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+    >
+      {isDragOver && (
+        <div className="drag-overlay">
+          <div className="drag-overlay-content">
+            <span className="drag-overlay-icon">📂</span>
+            <span className="drag-overlay-text">Dateien hier ablegen</span>
+            <span className="drag-overlay-hint">{ALLOWED_EXTENSIONS.join(', ')}</span>
+          </div>
+        </div>
+      )}
+      {dragError && (
+        <div className="drag-error-banner" role="alert">
+          <span className="drag-error-text">{dragError}</span>
+          <button
+            className="drag-error-dismiss"
+            onClick={() => setDragError(null)}
+            aria-label="Fehler schließen"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <TitleBar />
       <Toolbar
         onSettingsClick={() => setShowSettings(!showSettings)}
@@ -337,24 +427,81 @@ function App() {
         onTabSelect={handleTabSelect}
         onTabClose={handleTabClose}
       />
-      {updateInfo && (
+      {updateState && (
         <div className="update-banner" role="status">
-          <span className="update-banner-text">
-            Neue Version verfügbar: v{updateInfo.latestVersion}
-          </span>
-          <button
-            className="update-banner-link"
-            onClick={() => window.electronAPI?.openExternal(updateInfo.releaseUrl)}
-          >
-            Download
-          </button>
-          <button
-            className="update-banner-dismiss"
-            onClick={() => setUpdateInfo(null)}
-            aria-label="Update Hinweis schließen"
-          >
-            ✕
-          </button>
+          {updateState.phase === 'available' && (
+            <>
+              <span className="update-banner-text">
+                Neue Version verfügbar: v{updateState.version}
+              </span>
+              {updateState.portable ? (
+                <button
+                  className="update-banner-link"
+                  onClick={() => window.electronAPI?.openExternal(updateState.releaseUrl!)}
+                >
+                  Download
+                </button>
+              ) : (
+                <button className="update-banner-link" onClick={handleDownloadUpdate}>
+                  Herunterladen
+                </button>
+              )}
+              <button
+                className="update-banner-dismiss"
+                onClick={() => setUpdateState(null)}
+                aria-label="Update Hinweis schließen"
+              >
+                ✕
+              </button>
+            </>
+          )}
+          {updateState.phase === 'downloading' && (
+            <>
+              <span className="update-banner-text">
+                Wird heruntergeladen… {Math.round(updateState.percent)}%
+              </span>
+              <div className="update-progress-track">
+                <div
+                  className="update-progress-fill"
+                  style={{ width: `${updateState.percent}%` }}
+                />
+              </div>
+            </>
+          )}
+          {updateState.phase === 'ready' && (
+            <>
+              <span className="update-banner-text">
+                Update bereit: v{updateState.version}
+              </span>
+              <button
+                className="update-banner-link"
+                onClick={() => window.electronAPI?.installUpdate()}
+              >
+                Jetzt installieren
+              </button>
+              <button
+                className="update-banner-dismiss"
+                onClick={() => setUpdateState(null)}
+                aria-label="Update Hinweis schließen"
+              >
+                ✕
+              </button>
+            </>
+          )}
+          {updateState.phase === 'error' && (
+            <>
+              <span className="update-banner-text">
+                Update fehlgeschlagen
+              </span>
+              <button
+                className="update-banner-dismiss"
+                onClick={() => setUpdateState(null)}
+                aria-label="Fehler schließen"
+              >
+                ✕
+              </button>
+            </>
+          )}
         </div>
       )}
       <div className="app-content">

@@ -82,15 +82,17 @@ jobs:
             $env:CSC_KEY_PASSWORD = "${{ secrets.CSC_KEY_PASSWORD }}"
           }
 
-          npm run package -- --win portable
+          npm run package -- --win nsis portable
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Windows executable
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: LogStudio-Windows-${{ github.ref_name }}
-          path: release/*.exe
+          path: |
+            release/*.exe
+            release/latest.yml
           retention-days: 90
 
   build-linux:
@@ -155,11 +157,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Linux executable
+      - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
           name: LogStudio-Linux-${{ github.ref_name }}
-          path: release/*.AppImage
+          path: |
+            release/*.AppImage
+            release/latest-linux.yml
           retention-days: 90
 
   release:
@@ -239,7 +243,9 @@ jobs:
         with:
           files: |
             release-windows/*.exe
+            release-windows/latest.yml
             release-linux/*.AppImage
+            release-linux/latest-linux.yml
           draft: false
           prerelease: false
           body_path: release_notes.txt

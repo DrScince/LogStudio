@@ -5,6 +5,11 @@
   "directories": {
     "output": "release"
   },
+  "publish": {
+    "provider": "github",
+    "owner": "DrScince",
+    "repo": "LogStudio"
+  },
   "files": [
     "dist/**/*",
     "package.json",
@@ -12,8 +17,28 @@
     "LogStudio_Logo.png",
     "CHANGELOG.md"
   ],
+  "fileAssociations": [
+    {
+      "ext": "log",
+      "name": "Log File",
+      "description": "Log File",
+      "icon": "public/LogStudio_Logo.ico",
+      "role": "Editor"
+    },
+    {
+      "ext": "txt",
+      "name": "Text File",
+      "description": "Text File",
+      "icon": "public/LogStudio_Logo.ico",
+      "role": "Editor"
+    }
+  ],
   "win": {
     "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
       {
         "target": "portable",
         "arch": ["x64"]
