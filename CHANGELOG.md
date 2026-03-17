@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-03-17
+
+### Added
+- **Automatic updates (NSIS installer)**: The installer automatically checks for new versions on startup, downloads them in the background, and installs them with a single click
+- **Update progress indicator**: Progress bar in the update banner shows download progress in percent
+- **Portable build with update notification**: The portable EXE also detects new versions and shows a download link -- without automatic installation
+- **Drag & Drop**: Log and text files can be dragged directly into the window and open as a new tab
+- **File type validation on drop**: Unsupported file formats show an error banner listing the allowed extensions
+- **Windows context menu "Open with LogStudio"**: The NSIS installer registers `.log` and `.txt` files -- right-clicking such a file now includes an entry to open it directly in LogStudio
+- **Single-instance handling**: If LogStudio is launched via context menu while already running, the existing window is focused and the file is opened within it
+
+### Changed
+- **Build target**: The Windows build now produces both an NSIS installer and a portable EXE
+- **Update mechanism**: Replaced manual GitHub API polling with \`electron-updater\` for the installer build
+
+
 ## [1.3.1] - 2026-03-10
 
 ### Fixed
