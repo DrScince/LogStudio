@@ -16,10 +16,11 @@ describe('Toolbar', () => {
     onTabClose: vi.fn(),
   };
 
-  it('should render toolbar with logo and title', () => {
+  it('should render toolbar with open button and action buttons', () => {
     render(<Toolbar {...defaultProps} />);
     
-    expect(screen.getByText('LogStudio')).toBeInTheDocument();
+    expect(screen.getByText('Open')).toBeInTheDocument();
+    expect(screen.getByTitle('Settings')).toBeInTheDocument();
   });
 
   it('should call onOpenFile when open button is clicked', () => {
