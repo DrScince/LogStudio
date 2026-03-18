@@ -82,9 +82,7 @@ jobs:
             $env:CSC_KEY_PASSWORD = "${{ secrets.CSC_KEY_PASSWORD }}"
           }
 
-          npm run package -- --win nsis portable
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          npm run package -- --win nsis portable --publish never
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -153,9 +151,7 @@ jobs:
         run: npm run build
 
       - name: Build Linux executable
-        run: npm run package -- --linux AppImage
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run package -- --linux AppImage --publish never
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
