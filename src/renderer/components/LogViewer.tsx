@@ -50,6 +50,21 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const [loading, setLoading] = useState(false);
   const [expandedLines, setExpandedLines] = useState<Set<number>>(new Set());
   const [viewerHeight, setViewerHeight] = useState(600);
+
+  // Allows scrolling past the last entry so it can be centered on screen
+  const innerElementType = useMemo(
+    () =>
+      React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+        ({ style, ...rest }, ref) => {
+          const extraSpace = Math.floor(viewerHeight / 2);
+          const originalHeight = parseFloat((style?.height as string) ?? '0');
+          return (
+            <div ref={ref} style={{ ...style, height: originalHeight + extraSpace }} {...rest} />
+          );
+        }
+      ),
+    [viewerHeight]
+  );
   const [autoScroll, setAutoScroll] = useState(false);
   const [columnWidths, setColumnWidths] = useState<Record<ResizableColumn, number>>(DEFAULT_COLUMN_WIDTHS);
   const [logContextMenu, setLogContextMenu] = useState<{ x: number; y: number; entry: LogEntry } | null>(null);
@@ -1050,6 +1065,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
             width="100%"
             estimatedItemSize={30}
             onScroll={handleScroll}
+            innerElementType={innerElementType}
           >
             {Row}
           </VariableSizeList>

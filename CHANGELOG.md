@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-03-18
+
+### Added
+- **Scroll beyond last line**: The log viewer can now be scrolled past the last entry so it can be centered on screen (similar to VS Code)
+
+### Fixed
+- **About panel version**: Version number in the About panel was hardcoded and not updated with releases
+
 ## [2.1.0] - 2026-03-18
 
 ### Added
