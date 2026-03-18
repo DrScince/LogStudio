@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.3] - 2026-03-18
+
+### Fixed
+- **App not starting after install (black screen)**: `__APP_VERSION__` was not correctly injected during Vite build due to a wrong `package.json` path in `vite.config.ts`. Replaced with `process.env.npm_package_version` which is always available when building via npm scripts. Added a `'0.0.0'` fallback as safety net.
+
 ## [2.1.2] - 2026-03-18
 
 ### Fixed
