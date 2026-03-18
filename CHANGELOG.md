@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-03-18
+
+### Added
+- **Right-click context menu on tabs**: Options to close all tabs or close all other tabs
+- **Right-click context menu on log entries**: Copy entry to clipboard (timestamp, level, namespace, message) or open the source file directly in an editor at the exact line
+- **Open in Editor**: Supports VS Code, Notepad++, and Notepad as fallback; tries each editor in configurable order
+- **Configurable editor order in Settings**: Drag ▲/▼ buttons to set the preferred editor priority (VS Code → Notepad++ → Notepad)
+- **Source file tracking for multi-file tabs**: "Open in Editor" correctly opens the originating file and line number even when multiple files are merged in one tab
+- **File info in log context menu**: When multiple files are open, the context menu shows the source filename and line number of the selected entry
+
+### Changed
+- **Settings icon**: Replaced with a proper gear/cog icon
+- **Theme toggle icons**: Dark mode shows a sun (switch to light), light mode shows a moon (switch to dark)
+- **Refresh button in sidebar**: Replaced with a standard circular-arrow icon (Firefox/Edge style)
+- **Toolbar buttons**: Increased size (32 px height, larger padding and icon size) for better usability
+- **Logo and app title**: Moved exclusively to the title bar; toolbar now uses the full width for tabs and action buttons
+- **VS Code-style tab bar**: Tabs span the full toolbar height with a blue top border on the active tab, close button visible only on hover
+- **Tab wrapping**: Tabs wrap to multiple rows instead of scrolling off-screen when many files are open
+- **Middle-mouse click closes tab**: Middle mouse button on a tab now reliably closes it
+- **Single file click opens single tab**: Clicking a file in the sidebar that is part of a group tab now opens it as a standalone tab instead of switching to the group
+
+### Fixed
+- **Notepad++ detection**: Added multiple fallback paths (`notepad++` on PATH, `Program Files`, `Program Files (x86)`) to reliably find Notepad++
+- **"Open in Editor" always opened first file**: Multi-file tabs now preserve the original source file path and line number per log entry
+
 ## [2.0.0] - 2026-03-17
 
 ### Added

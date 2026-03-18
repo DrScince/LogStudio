@@ -157,8 +157,11 @@ function App() {
   };
 
   const openFileInTab = useCallback((filePath: string) => {
-    // Check if file is already open in a tab
-    const existingTab = tabs.find((tab) => tab.filePath === filePath);
+    // Check if file is already open in a single-file tab (not a group tab)
+    const existingTab = tabs.find((tab) => 
+      tab.filePath === filePath && 
+      (!tab.filePaths || tab.filePaths.length <= 1)
+    );
     
     if (existingTab) {
       // Switch to existing tab
@@ -426,6 +429,14 @@ function App() {
         activeTabId={activeTabId}
         onTabSelect={handleTabSelect}
         onTabClose={handleTabClose}
+        onCloseAll={() => {
+          setTabs([]);
+          setActiveTabId(null);
+        }}
+        onCloseOthers={(tabId) => {
+          setTabs((prev) => prev.filter((t) => t.id === tabId));
+          setActiveTabId(tabId);
+        }}
       />
       {updateState && (
         <div className="update-banner" role="status">
@@ -524,6 +535,7 @@ function App() {
           selectedNamespaces={selectedNamespaces}
           onNamespacesChange={handleNamespacesChange}
           onResetFilters={handleResetFilters}
+          editorOrder={settings.editorOrder}
           key={`${activeTabId}-${resetFilterTrigger}`}
         />
         <NamespaceToolbar

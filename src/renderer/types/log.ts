@@ -9,7 +9,8 @@ export interface LogEntry {
   fullText: string;
   isMultiLine: boolean;
   lineCount: number;
-  sourceFile?: string; // Für mehrere Dateien
+  sourceFile?: string;        // Voller Pfad der Quelldatei (bei mehreren Dateien)
+  sourceLineNumber?: number;  // Originale Zeilennummer in der Quelldatei
 }
 
 export interface LogSchema {

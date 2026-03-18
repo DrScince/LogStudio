@@ -208,8 +208,9 @@ const Sidebar: React.FC<SidebarProps> = ({
             </button>
           )}
           {!isCollapsed && <button onClick={loadLogFiles} className="refresh-button" title="Aktualisieren">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M8 2.66667V5.33333M8 10.6667V13.3333M13.3333 8H10.6667M5.33333 8H2.66667M11.7267 4.27333L9.72667 6.27333M6.27333 9.72667L4.27333 11.7267M11.7267 11.7267L9.72667 9.72667M6.27333 6.27333L4.27333 4.27333" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M23 4v6h-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>}
           <button

@@ -403,6 +403,43 @@ ipcMain.handle('open-external', async (_event, url: string) => {
   await shell.openExternal(url);
 });
 
+ipcMain.handle('open-file-in-editor', async (_event, filePath: string, lineNumber: number, editorOrder?: string[]) => {
+  const { exec } = await import('child_process');
+  const escaped = filePath.replace(/"/g, '\\"');
+  const order = editorOrder ?? ['vscode', 'notepadplusplus', 'notepad'];
+
+  const notepadPlusPlusPaths = [
+    'notepad++',
+    'C:\\Program Files\\Notepad++\\notepad++.exe',
+    'C:\\Program Files (x86)\\Notepad++\\notepad++.exe',
+  ];
+
+  const tryCmd = (cmd: string): Promise<boolean> =>
+    new Promise((resolve) => exec(cmd, (err) => resolve(!err)));
+
+  const tryEditors = async (remaining: string[]): Promise<{ success: boolean }> => {
+    if (remaining.length === 0) return { success: false };
+    const [editor, ...rest] = remaining;
+
+    if (editor === 'vscode') {
+      const ok = await tryCmd(`code --goto "${escaped}:${lineNumber}"`);
+      if (ok) return { success: true };
+    } else if (editor === 'notepadplusplus') {
+      for (const nppPath of notepadPlusPlusPaths) {
+        const ok = await tryCmd(`"${nppPath}" -n${lineNumber} "${escaped}"`);
+        if (ok) return { success: true };
+      }
+    } else if (editor === 'notepad') {
+      await tryCmd(`notepad "${escaped}"`);
+      return { success: true };
+    }
+
+    return tryEditors(rest);
+  };
+
+  return tryEditors(order);
+});
+
 ipcMain.handle('read-changelog', async () => {
   try {
     // Versuche verschiedene Pfade für CHANGELOG.md

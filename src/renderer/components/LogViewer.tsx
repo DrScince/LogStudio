@@ -13,6 +13,7 @@ interface LogViewerProps {
   selectedNamespaces: string[];
   onNamespacesChange: (namespaces: string[]) => void;
   onResetFilters?: () => void;
+  editorOrder?: string[];
 }
 
 type ResizableColumn = 'timestamp' | 'level' | 'namespace';
@@ -38,6 +39,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   selectedNamespaces,
   onNamespacesChange,
   onResetFilters,
+  editorOrder,
 }) => {
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<LogEntry[]>([]);
@@ -50,6 +52,14 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const [viewerHeight, setViewerHeight] = useState(600);
   const [autoScroll, setAutoScroll] = useState(false);
   const [columnWidths, setColumnWidths] = useState<Record<ResizableColumn, number>>(DEFAULT_COLUMN_WIDTHS);
+  const [logContextMenu, setLogContextMenu] = useState<{ x: number; y: number; entry: LogEntry } | null>(null);
+
+  useEffect(() => {
+    if (!logContextMenu) return;
+    const close = () => setLogContextMenu(null);
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [logContextMenu]);
   const listRef = useRef<VariableSizeList>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -446,10 +456,11 @@ const LogViewer: React.FC<LogViewerProps> = ({
         const result = await window.electronAPI.readLogFile(path);
         if (result.success && result.content) {
           const entries = parseLogFile(result.content, schema);
-          // Add source file path to each entry for identification
+          // Store full path and original line number before merging
           return entries.map(entry => ({
             ...entry,
-            sourceFile: path.split(/[/\\]/).pop() || path,
+            sourceFile: path,
+            sourceLineNumber: entry.originalLineNumber,
           }));
         }
         return [];
@@ -752,6 +763,10 @@ const LogViewer: React.FC<LogViewerProps> = ({
         <div
           className={`log-entry-line ${shouldShowExpand ? 'multiline' : ''}`}
           onClick={() => shouldShowExpand && toggleExpand(entry.originalLineNumber)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setLogContextMenu({ x: e.clientX, y: e.clientY, entry });
+          }}
         >
           <span className="log-line-number">{entry.originalLineNumber}</span>
           <span 
@@ -1040,6 +1055,46 @@ const LogViewer: React.FC<LogViewerProps> = ({
           </VariableSizeList>
         )}
       </div>
+      {logContextMenu && (
+        <div
+          className="log-context-menu"
+          style={{ top: logContextMenu.y, left: logContextMenu.x }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <button
+            className="log-context-menu-item"
+            onClick={() => {
+              const { entry } = logContextMenu;
+              const text = [entry.timestamp, entry.level, entry.namespace, entry.message].filter(Boolean).join(' | ');
+              navigator.clipboard.writeText(text);
+              setLogContextMenu(null);
+            }}
+          >
+            Eintrag kopieren
+          </button>
+          <button
+            className="log-context-menu-item"
+            onClick={() => {
+              const { entry } = logContextMenu;
+              const currentFile = entry.sourceFile ?? (filePaths && filePaths.length > 0 ? filePaths[0] : filePath);
+              const lineNum = entry.sourceLineNumber ?? entry.originalLineNumber;
+              if (currentFile) {
+                window.electronAPI?.openFileInEditor(currentFile, lineNum, editorOrder);
+              }
+              setLogContextMenu(null);
+            }}
+          >
+            In Editor öffnen
+          </button>
+          {filePaths && filePaths.length > 1 && logContextMenu.entry.sourceFile && (
+            <div className="log-context-menu-info">
+              📄 {logContextMenu.entry.sourceFile.split(/[/\\]/).pop()}
+              {logContextMenu.entry.sourceLineNumber && ` · Zeile ${logContextMenu.entry.sourceLineNumber}`}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

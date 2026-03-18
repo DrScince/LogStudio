@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './Toolbar.css';
 
 export interface Tab {
@@ -20,6 +20,8 @@ interface ToolbarProps {
   activeTabId: string | null;
   onTabSelect: (tabId: string) => void;
   onTabClose: (tabId: string, e: React.MouseEvent) => void;
+  onCloseAll: () => void;
+  onCloseOthers: (tabId: string) => void;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({ 
@@ -33,7 +35,19 @@ const Toolbar: React.FC<ToolbarProps> = ({
   activeTabId,
   onTabSelect,
   onTabClose,
+  onCloseAll,
+  onCloseOthers,
 }) => {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    if (contextMenu) {
+      document.addEventListener('mousedown', handleClick);
+      return () => document.removeEventListener('mousedown', handleClick);
+    }
+  }, [contextMenu]);
   const getFileName = (filePath: string): string => {
     return filePath.split(/[/\\]/).pop() || 'Unbekannt';
   };
@@ -48,16 +62,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   return (
     <div className="toolbar">
       <div className="toolbar-left">
-        <div className="toolbar-logo">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M16 13H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M16 17H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            <path d="M10 9H9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-        </div>
-        <h1 className="toolbar-title">LogStudio</h1>
         {tabs.length > 0 && (
           <div className="toolbar-tabs">
             {tabs.map((tab) => {
@@ -72,11 +76,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   key={tab.id}
                   className={`toolbar-tab ${isActive ? 'active' : ''}`}
                   onClick={() => onTabSelect(tab.id)}
-                  onAuxClick={(e) => {
+                  onMouseDown={(e) => {
                     if (e.button === 1) {
                       e.preventDefault();
-                      onTabClose(tab.id, e);
+                      onTabClose(tab.id, e as unknown as React.MouseEvent);
                     }
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, tabId: tab.id });
                   }}
                   title={tooltipText}
                 >
@@ -106,12 +114,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <span>Open</span>
         </button>
         <button className="toolbar-button" onClick={onSettingsClick} title="Settings">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8 10C9.10457 10 10 9.10457 10 8C10 6.89543 9.10457 6 8 6C6.89543 6 6 6.89543 6 8C6 9.10457 6.89543 10 8 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M12.6667 8C12.6667 8.35362 12.8062 8.69276 13.0562 8.94281C13.3063 9.19286 13.6454 9.33333 14 9.33333C14.3546 9.33333 14.6937 9.19286 14.9438 8.94281C15.1938 8.69276 15.3333 8.35362 15.3333 8C15.3333 7.64638 15.1938 7.30724 14.9438 7.05719C14.6937 6.80714 14.3546 6.66667 14 6.66667C13.6454 6.66667 13.3063 6.80714 13.0562 7.05719C12.8062 7.30724 12.6667 7.64638 12.6667 8Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M3.33333 8C3.33333 8.35362 3.47281 8.69276 3.72286 8.94281C3.97291 9.19286 4.31205 9.33333 4.66667 9.33333C5.02129 9.33333 5.36043 9.19286 5.61048 8.94281C5.86052 8.69276 6 8.35362 6 8C6 7.64638 5.86052 7.30724 5.61048 7.05719C5.36043 6.80714 5.02129 6.66667 4.66667 6.66667C4.31205 6.66667 3.97291 6.80714 3.72286 7.05719C3.47281 7.30724 3.33333 7.64638 3.33333 8Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M8 3.33333C8 3.68795 7.85952 4.02709 7.60948 4.27714C7.35943 4.52719 7.02029 4.66667 6.66667 4.66667C6.31305 4.66667 5.97391 4.52719 5.72386 4.27714C5.47381 4.02709 5.33333 3.68795 5.33333 3.33333C5.33333 2.97871 5.47381 2.63957 5.72386 2.38952C5.97391 2.13948 6.31305 2 6.66667 2C7.02029 2 7.35943 2.13948 7.60948 2.38952C7.85952 2.63957 8 2.97871 8 3.33333Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M8 12.6667C8 13.0213 7.85952 13.3604 7.60948 13.6105C7.35943 13.8605 7.02029 14 6.66667 14C6.31305 14 5.97391 13.8605 5.72386 13.6105C5.47381 13.3604 5.33333 13.0213 5.33333 12.6667C5.33333 12.312 5.47381 11.9729 5.72386 11.7229C5.97391 11.4728 6.31305 11.3333 6.66667 11.3333C7.02029 11.3333 7.35943 11.4728 7.60948 11.7229C7.85952 11.9729 8 12.312 8 12.6667Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
         <button 
@@ -120,28 +125,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
           title={currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
           {currentTheme === 'dark' ? (
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M8 2V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M8 13V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M3 8H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M14 8H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M4.34314 4.34314L5.05025 5.05025" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M10.9497 10.9497L11.6569 11.6569" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M4.34314 11.6569L5.05025 10.9497" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M10.9497 5.05025L11.6569 4.34314" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.5"/>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
           ) : (
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M8 2C5.23858 2 3 4.23858 3 7C3 9.76142 5.23858 12 8 12C10.7614 12 13 9.76142 13 7C13 4.23858 10.7614 2 8 2Z" stroke="currentColor" strokeWidth="1.5" fill="currentColor"/>
-              <path d="M8 1V2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M8 12V13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M1 8H2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M14 8H15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M3.34314 3.34314L4.05025 4.05025" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M11.9497 11.9497L12.6569 12.6569" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M3.34314 12.6569L4.05025 11.9497" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M11.9497 4.05025L12.6569 3.34314" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           )}
         </button>
@@ -153,6 +143,27 @@ const Toolbar: React.FC<ToolbarProps> = ({
           </svg>
         </button>
       </div>
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="tab-context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <button
+            className="tab-context-menu-item"
+            onClick={() => { onCloseOthers(contextMenu.tabId); setContextMenu(null); }}
+          >
+            Alle anderen schließen
+          </button>
+          <button
+            className="tab-context-menu-item"
+            onClick={() => { onCloseAll(); setContextMenu(null); }}
+          >
+            Alle schließen
+          </button>
+        </div>
+      )}
     </div>
   );
 };

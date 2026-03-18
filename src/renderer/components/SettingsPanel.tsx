@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
-import { AppSettings, LogSchema } from '../utils/settings';
+import { AppSettings, LogSchema, EditorId } from '../utils/settings';
 import './SettingsPanel.css';
+
+const EDITOR_LABELS: Record<EditorId, string> = {
+  vscode: 'Visual Studio Code',
+  notepadplusplus: 'Notepad++',
+  notepad: 'Notepad (Windows)',
+};
 
 interface SettingsPanelProps {
   settings: AppSettings;
@@ -269,6 +275,43 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                 <option value="light">Light</option>
               </select>
             </div>
+          </div>
+        </div>
+        <div className="settings-section">
+          <h3 className="settings-section-title">Editor-Reihenfolge</h3>
+          <p className="settings-help-text">Reihenfolge der Editoren, die beim "In Editor öffnen" versucht werden.</p>
+          <div className="editor-order-list">
+            {(localSettings.editorOrder ?? ['vscode', 'notepadplusplus', 'notepad']).map((editorId, index) => {
+              const order = localSettings.editorOrder ?? ['vscode', 'notepadplusplus', 'notepad'];
+              return (
+                <div key={editorId} className="editor-order-item">
+                  <span className="editor-order-index">{index + 1}</span>
+                  <span className="editor-order-label">{EDITOR_LABELS[editorId as EditorId]}</span>
+                  <div className="editor-order-buttons">
+                    <button
+                      className="editor-order-btn"
+                      disabled={index === 0}
+                      onClick={() => {
+                        const newOrder = [...order];
+                        [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
+                        setLocalSettings({ ...localSettings, editorOrder: newOrder });
+                      }}
+                      title="Nach oben"
+                    >▲</button>
+                    <button
+                      className="editor-order-btn"
+                      disabled={index === order.length - 1}
+                      onClick={() => {
+                        const newOrder = [...order];
+                        [newOrder[index + 1], newOrder[index]] = [newOrder[index], newOrder[index + 1]];
+                        setLocalSettings({ ...localSettings, editorOrder: newOrder });
+                      }}
+                      title="Nach unten"
+                    >▼</button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
         <div className="settings-footer">

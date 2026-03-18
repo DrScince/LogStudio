@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
+  openFileInEditor: (filePath: string, lineNumber: number, editorOrder?: string[]) => ipcRenderer.invoke('open-file-in-editor', filePath, lineNumber, editorOrder),
   readChangelog: () => ipcRenderer.invoke('read-changelog'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),

@@ -15,6 +15,7 @@ export interface ElectronAPI {
   maximizeWindow: () => void;
   closeWindow: () => void;
   openExternal: (url: string) => Promise<void>;
+  openFileInEditor: (filePath: string, lineNumber: number, editorOrder?: string[]) => Promise<{ success: boolean }>;
   readChangelog: () => Promise<{ success: boolean; content?: string; error?: string }>;
   checkForUpdates: () => Promise<{ success: boolean; error?: string }>;
   downloadUpdate: () => Promise<{ success: boolean; error?: string }>;

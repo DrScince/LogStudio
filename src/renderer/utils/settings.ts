@@ -12,6 +12,8 @@ const DEFAULT_SCHEMA: LogSchema = {
   },
 };
 
+export type EditorId = 'vscode' | 'notepadplusplus' | 'notepad';
+
 export interface AppSettings {
   logSchema: LogSchema;
   logDirectory: string;
@@ -19,6 +21,7 @@ export interface AppSettings {
   refreshInterval: number;
   fontSize: number;
   theme: 'dark' | 'light';
+  editorOrder: EditorId[];
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -28,6 +31,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   refreshInterval: 1000,
   fontSize: 12,
   theme: 'dark',
+  editorOrder: ['vscode', 'notepadplusplus', 'notepad'],
 };
 
 export function loadSettings(): AppSettings {
