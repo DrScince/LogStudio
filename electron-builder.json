@@ -52,7 +52,7 @@
     "signingHashAlgorithms": ["sha256"]
   },
   "portable": {
-    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "artifactName": "${productName}-${version}-${arch}-portable.${ext}",
     "requestExecutionLevel": "user"
   },
   "nsis": {
