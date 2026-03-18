@@ -43,8 +43,9 @@ describe('AboutPanel', () => {
       render(<AboutPanel {...defaultProps} />);
     });
     
+    const { version } = await import('../../../package.json');
     await waitFor(() => {
-      expect(screen.getByText(/Version\s+2\.0\.0/i)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(`Version\\s+${version.replace(/\./g, '\\.')}`, 'i'))).toBeInTheDocument();
     });
   });
 

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-03-18
+
+### Fixed
+- **Version number in About panel**: Version is now read dynamically from `package.json` at build time — no more manual updates needed
+- **CI tests**: AboutPanel test no longer depends on a hardcoded version string
+
 ## [2.1.1] - 2026-03-18
 
 ### Added

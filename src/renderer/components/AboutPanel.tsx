@@ -6,7 +6,8 @@ interface AboutPanelProps {
   onClose: () => void;
 }
 
-const APP_VERSION = '2.1.1';
+declare const __APP_VERSION__: string;
+const APP_VERSION = __APP_VERSION__;
 
 const AboutPanel: React.FC<AboutPanelProps> = ({ onClose }) => {
   const [showChangelog, setShowChangelog] = useState(false);
