@@ -58,11 +58,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateError: (callback: (info: { message: string }) => void) => {
     ipcRenderer.on('update-error', (_event, info) => callback(info));
   },
+  onUpdateNotAvailable: (callback: () => void) => {
+    ipcRenderer.on('update-not-available', () => callback());
+  },
   removeUpdateListeners: () => {
     ipcRenderer.removeAllListeners('update-available');
     ipcRenderer.removeAllListeners('update-download-progress');
     ipcRenderer.removeAllListeners('update-downloaded');
     ipcRenderer.removeAllListeners('update-error');
+    ipcRenderer.removeAllListeners('update-not-available');
   },
   onFilesDropped: (callback: (paths: string[]) => void) => {
     _dropCallback = callback;

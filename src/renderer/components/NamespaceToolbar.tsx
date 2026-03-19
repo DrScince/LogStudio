@@ -15,7 +15,12 @@ const NamespaceToolbar: React.FC<NamespaceToolbarProps> = ({
   onNamespaceToggle,
   isVisible,
 }) => {
+  // Default: immer eingeklappt — reine Nutzerentscheidung
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleToggle = () => {
+    setIsExpanded((prev) => !prev);
+  };
 
   if (!isVisible) {
     return null;
@@ -23,7 +28,7 @@ const NamespaceToolbar: React.FC<NamespaceToolbarProps> = ({
 
   return (
     <div className={`namespace-toolbar ${isExpanded ? 'expanded' : 'collapsed'}`}>
-      <div className="namespace-toolbar-header" onClick={() => setIsExpanded(!isExpanded)}>
+      <div className="namespace-toolbar-header" onClick={handleToggle}>
         <span className="namespace-toolbar-title">Namespaces</span>
         <span className="namespace-toolbar-toggle">
           {isExpanded ? '◀' : '▶'}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import './NamespaceTree.css';
 
 interface NamespaceNode {
@@ -20,6 +20,22 @@ const NamespaceTree: React.FC<NamespaceTreeProps> = ({
   onNamespaceToggle,
 }) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+
+  // Alle Elternknoten von gefilterten Namespaces automatisch aufklappen
+  useEffect(() => {
+    if (selectedNamespaces.length === 0) return;
+    setExpandedNodes((prev) => {
+      const next = new Set(prev);
+      selectedNamespaces.forEach((ns) => {
+        const parts = ns.split('.');
+        // Jeden Vorfahren-Pfad hinzufügen (inkl. den Knoten selbst, falls er Kinder hat)
+        for (let i = 1; i <= parts.length; i++) {
+          next.add(parts.slice(0, i).join('.'));
+        }
+      });
+      return next;
+    });
+  }, [selectedNamespaces]);
 
   // Build tree structure from namespaces
   const tree = useMemo(() => {

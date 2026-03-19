@@ -84,6 +84,8 @@ function setupAutoUpdater() {
             portable: true,
             releaseUrl: release.htmlUrl || RELEASES_PAGE_URL,
           });
+        } else {
+          mainWindow?.webContents.send('update-not-available');
         }
       })
       .catch(() => {});
@@ -96,6 +98,10 @@ function setupAutoUpdater() {
 
   autoUpdater.on('update-available', (info) => {
     mainWindow?.webContents.send('update-available', { version: info.version, portable: false });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    mainWindow?.webContents.send('update-not-available');
   });
 
   autoUpdater.on('download-progress', (progress) => {
@@ -469,7 +475,20 @@ ipcMain.handle('read-changelog', async () => {
 ipcMain.handle('check-for-updates', async () => {
   if (!app.isPackaged) return { success: false, error: 'Not packaged' };
   try {
-    await autoUpdater.checkForUpdates();
+    if (isPortable()) {
+      const release = await fetchLatestRelease();
+      if (isVersionNewer(release.tagName, app.getVersion())) {
+        mainWindow?.webContents.send('update-available', {
+          version: normalizeVersion(release.tagName),
+          portable: true,
+          releaseUrl: release.htmlUrl || RELEASES_PAGE_URL,
+        });
+      } else {
+        mainWindow?.webContents.send('update-not-available');
+      }
+    } else {
+      await autoUpdater.checkForUpdates();
+    }
     return { success: true };
   } catch (error) {
     return { success: false, error: String(error) };

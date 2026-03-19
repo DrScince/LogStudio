@@ -49,8 +49,7 @@
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "publisherName": "LogStudio",
     "verifyUpdateCodeSignature": false,
-    "requestedExecutionLevel": "asInvoker",
-    "signingHashAlgorithms": ["sha256"]
+    "requestedExecutionLevel": "asInvoker"
   },
   "portable": {
     "artifactName": "${productName}-${version}-${arch}-portable.${ext}",

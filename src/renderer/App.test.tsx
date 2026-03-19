@@ -4,7 +4,14 @@ import App from './App';
 
 // Mock all child components
 vi.mock('./components/TitleBar', () => ({
-  default: () => <div data-testid="title-bar">TitleBar</div>,
+  default: ({ onSettingsClick, onAboutClick, onOpenFile, onThemeToggle }: any) => (
+    <div data-testid="title-bar">
+      <button onClick={onSettingsClick}>Settings</button>
+      <button onClick={onAboutClick}>About</button>
+      <button onClick={onOpenFile}>Open File</button>
+      <button onClick={onThemeToggle}>Toggle Theme</button>
+    </div>
+  ),
 }));
 
 const mockOnSettingsClick = vi.fn();
@@ -17,12 +24,8 @@ const mockOnLogFileSelect = vi.fn();
 const mockOnLogFilesSelect = vi.fn();
 
 vi.mock('./components/Toolbar', () => ({
-  default: ({ onSettingsClick, onAboutClick, onOpenFile, onThemeToggle, onTabSelect, onTabClose, tabs, activeTabId }: any) => (
+  default: ({ onTabSelect, onTabClose, tabs, activeTabId }: any) => (
     <div data-testid="toolbar">
-      <button onClick={onSettingsClick}>Settings</button>
-      <button onClick={onAboutClick}>About</button>
-      <button onClick={onOpenFile}>Open File</button>
-      <button onClick={onThemeToggle}>Toggle Theme</button>
       {tabs?.map((tab: any) => (
         <div key={tab.id} data-testid={`tab-${tab.id}`} onClick={() => onTabSelect(tab.id)}>
           {tab.filePath}

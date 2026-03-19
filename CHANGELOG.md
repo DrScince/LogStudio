@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-03-19
+
+### Added
+- **Check for Updates button**: A new button in the title bar lets users manually trigger an update check. A toast notification appears in the bottom-right corner when no update is available
+- **Namespace tree auto-expand on filter**: When a namespace filter is selected, all ancestor nodes in the namespace tree are automatically expanded so the filtered entry is immediately visible
+
+### Changed
+- **Action buttons moved to title bar**: All action buttons (Open File, Settings, Theme toggle, Check for Updates, About) have been moved from the toolbar into the title bar; the toolbar now shows tabs only
+- **Title bar drag region**: The entire title bar is draggable — individual buttons are excluded from the drag region
+- **Namespace filter panel: collapsed by default**: The expand/collapse state of the namespace panel is a pure user decision with no automatic triggers
+
+### Fixed
+- **Namespace filter panel state lost on collapse/reopen**: Filter state and tree expansion are now correctly preserved across panel open/close cycles
+- **"No update available" feedback**: Replaced the previous inline label with a 3-second toast notification in the bottom-right corner
+
 ## [2.1.5] - 2026-03-19
 
 ### Added

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import LogViewer from './components/LogViewer';
 import Sidebar from './components/Sidebar';
 import NamespaceToolbar from './components/NamespaceToolbar';
@@ -7,6 +7,7 @@ import { Tab } from './components/Toolbar';
 import SettingsPanel from './components/SettingsPanel';
 import AboutPanel from './components/AboutPanel';
 import TitleBar from './components/TitleBar';
+import Toast from './components/Toast';
 import { loadSettings, saveSettings, AppSettings } from './utils/settings';
 import './App.css';
 
@@ -26,6 +27,9 @@ function App() {
     | { phase: 'error'; message: string };
 
   const [updateState, setUpdateState] = useState<UpdateState | null>(null);
+  const [checkingForUpdates, setCheckingForUpdates] = useState(false);
+  const [noUpdateAvailable, setNoUpdateAvailable] = useState(false);
+  const manualCheckPending = useRef(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragError, setDragError] = useState<string | null>(null);
 
@@ -99,6 +103,8 @@ function App() {
 
   useEffect(() => {
     window.electronAPI?.onUpdateAvailable?.((info) => {
+      manualCheckPending.current = false;
+      setCheckingForUpdates(false);
       setUpdateState({ phase: 'available', version: info.version, portable: info.portable, releaseUrl: info.releaseUrl });
     });
     window.electronAPI?.onDownloadProgress?.((info) => {
@@ -108,7 +114,17 @@ function App() {
       setUpdateState({ phase: 'ready', version: info.version });
     });
     window.electronAPI?.onUpdateError?.((info) => {
+      manualCheckPending.current = false;
+      setCheckingForUpdates(false);
       setUpdateState({ phase: 'error', message: info.message });
+    });
+    window.electronAPI?.onUpdateNotAvailable?.(() => {
+      if (manualCheckPending.current) {
+        manualCheckPending.current = false;
+        setCheckingForUpdates(false);
+        setNoUpdateAvailable(true);
+        setTimeout(() => setNoUpdateAvailable(false), 3000);
+      }
     });
     return () => {
       window.electronAPI?.removeUpdateListeners?.();
@@ -118,6 +134,21 @@ function App() {
   const handleDownloadUpdate = async () => {
     setUpdateState({ phase: 'downloading', percent: 0 });
     await window.electronAPI?.downloadUpdate();
+  };
+
+  const handleCheckForUpdates = async () => {
+    if (checkingForUpdates) return;
+    setCheckingForUpdates(true);
+    setNoUpdateAvailable(false);
+    manualCheckPending.current = true;
+    const result = await window.electronAPI?.checkForUpdates();
+    if (result && !result.success) {
+      // Not packaged or immediate error
+      manualCheckPending.current = false;
+      setCheckingForUpdates(false);
+      setNoUpdateAvailable(true);
+      setTimeout(() => setNoUpdateAvailable(false), 3000);
+    }
   };
 
   const handleSettingsChange = (newSettings: AppSettings) => {
@@ -417,14 +448,17 @@ function App() {
           </button>
         </div>
       )}
-      <TitleBar />
-      <Toolbar
+      <TitleBar
+        onOpenFile={handleOpenFile}
         onSettingsClick={() => setShowSettings(!showSettings)}
         onAboutClick={() => setShowAbout(!showAbout)}
-        onOpenFile={handleOpenFile}
         onThemeToggle={handleThemeToggle}
+        onCheckForUpdates={handleCheckForUpdates}
         currentTheme={settings.theme}
-        currentFile={currentLogFile}
+        checkingForUpdates={checkingForUpdates}
+        updateAvailable={updateState !== null}
+      />
+      <Toolbar
         tabs={tabs}
         activeTabId={activeTabId}
         onTabSelect={handleTabSelect}
@@ -555,6 +589,7 @@ function App() {
       {showAbout && (
         <AboutPanel onClose={() => setShowAbout(false)} />
       )}
+      <Toast message="Kein Update verfügbar" visible={noUpdateAvailable} />
     </div>
   );
 }

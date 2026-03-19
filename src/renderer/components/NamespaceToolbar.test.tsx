@@ -94,24 +94,55 @@ describe('NamespaceToolbar', () => {
     const { container } = render(
       <NamespaceToolbar {...defaultProps} selectedNamespaces={['App.Service']} />
     );
+    // Expand first (default is collapsed)
     const header = screen.getByText('Namespaces').closest('.namespace-toolbar-header');
-    
     fireEvent.click(header!);
-    
-    // Check that App is rendered (root of the namespace tree)
     expect(screen.getByText('App')).toBeInTheDocument();
   });
 
-  it('should pass onNamespaceToggle to NamespaceTree', () => {
-    const { container } = render(<NamespaceToolbar {...defaultProps} />);
+  it('should be collapsed by default even when filters are active', () => {
+    const { container } = render(
+      <NamespaceToolbar {...defaultProps} selectedNamespaces={['App.Service']} />
+    );
+    const toolbar = container.querySelector('.namespace-toolbar');
+    expect(toolbar).toHaveClass('collapsed');
+  });
+
+  it('should show active filter count badge when collapsed with filters', () => {
+    // Badges wurden entfernt — keine Badge-Anzeige mehr im collapsed Zustand
+    const { container } = render(<NamespaceToolbar {...defaultProps} selectedNamespaces={['App.Service', 'App.UI']} />);
+    expect(container.querySelector('.namespace-active-badge')).toBeNull();
+  });
+
+  it('should not show active filter badge when no filters selected', () => {
+    const { container } = render(<NamespaceToolbar {...defaultProps} selectedNamespaces={[]} />);
+    expect(container.querySelector('.namespace-active-badge')).toBeNull();
+  });
+
+  it('should stay collapsed when selectedNamespaces is empty', () => {
+    const { container } = render(<NamespaceToolbar {...defaultProps} selectedNamespaces={[]} />);
+    const toolbar = container.querySelector('.namespace-toolbar');
+    expect(toolbar).toHaveClass('collapsed');
+  });
+
+  it('should stay collapsed after manual toggle back', () => {
+    const { container } = render(
+      <NamespaceToolbar {...defaultProps} selectedNamespaces={['App.Service']} />
+    );
+    // Collapsed by default — expand then collapse again
     const header = screen.getByText('Namespaces').closest('.namespace-toolbar-header');
-    
     fireEvent.click(header!);
-    
-    // Click on "App" which should trigger the toggle
+    fireEvent.click(header!);
+    const toolbar = container.querySelector('.namespace-toolbar');
+    expect(toolbar).toHaveClass('collapsed');
+  });
+
+  it('should pass onNamespaceToggle to NamespaceTree', () => {
+    render(<NamespaceToolbar {...defaultProps} />);
+    const header = screen.getByText('Namespaces').closest('.namespace-toolbar-header');
+    fireEvent.click(header!);
     const appElement = screen.getByText('App');
     fireEvent.click(appElement);
-    
     expect(mockOnNamespaceToggle).toHaveBeenCalled();
   });
 });

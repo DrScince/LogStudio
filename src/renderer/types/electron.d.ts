@@ -25,6 +25,7 @@ export interface ElectronAPI {
   onDownloadProgress: (callback: (info: { percent: number }) => void) => void;
   onUpdateDownloaded: (callback: (info: { version: string }) => void) => void;
   onUpdateError: (callback: (info: { message: string }) => void) => void;
+  onUpdateNotAvailable: (callback: () => void) => void;
   removeUpdateListeners: () => void;
   onFilesDropped: (callback: (paths: string[]) => void) => void;
   removeFilesDroppedListener: () => void;
