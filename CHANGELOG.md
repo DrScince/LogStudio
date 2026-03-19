@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.5] - 2026-03-19
+
+### Added
+- **"Open with LogStudio" context menu entry**: The NSIS installer now registers a context menu entry for all files in Windows Explorer — similar to "Edit with Notepad++". The entry is added to `HKCU` (no admin rights needed) and is automatically removed on uninstall.
+
 ## [2.1.4] - 2026-03-19
 
 ### Fixed

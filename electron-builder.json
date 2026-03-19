@@ -15,7 +15,8 @@
     "package.json",
     "public/LogStudio_Logo.ico",
     "LogStudio_Logo.png",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "installer.nsh"
   ],
   "fileAssociations": [
     {
@@ -64,7 +65,8 @@
     "installerIcon": "public/LogStudio_Logo.ico",
     "uninstallerIcon": "public/LogStudio_Logo.ico",
     "installerHeaderIcon": "public/LogStudio_Logo.ico",
-    "deleteAppDataOnUninstall": false
+    "deleteAppDataOnUninstall": false,
+    "include": "installer.nsh"
   },
   "mac": {
     "target": "dmg",
