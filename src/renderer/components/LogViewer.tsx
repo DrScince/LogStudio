@@ -2,6 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallba
 import { VariableSizeList } from 'react-window';
 import { LogEntry, LogLevel, LogSchema } from '../types/log';
 import { parseLogFile, filterLogEntries, extractUniqueNamespaces, extractLogLevels } from '../utils/logParser';
+import Toast from './Toast';
 import './LogViewer.css';
 
 interface LogViewerProps {
@@ -592,23 +593,107 @@ const LogViewer: React.FC<LogViewerProps> = ({
     onNamespacesChange(newNamespaces);
   };
 
+  // Gemessene tatsächliche DOM-Höhen für expandierte Zeilen
+  const expandedHeightCache = useRef<Map<number, number>>(new Map());
+
+  // Berechnet die Höhe eines expandierten Eintrags aus echten CSS-Metriken —
+  // kein DOM-Mess-Callback nötig, kein re-render-Loop durch scroll-triggered ref.
+  const getExpandHeight = useCallback((entry: LogEntry): number => {
+    const text = entry.isMultiLine ? entry.fullText : entry.message;
+    const content = analyzeAndFormatContent(text);
+    const rawText = content.isHtml ? content.formatted.replace(/<[^>]*>/g, '') : content.formatted;
+
+    // Tatsächliche Font-Größe des Root-Elements (berücksichtigt Benutzereinstellung)
+    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 14;
+    // Consolas/Monaco: durchschnittliche Zeichenbreite ≈ 60 % der Font-Größe
+    const charWidth = rootFontSize * 0.601;
+
+    // CSS line-height je Typ:
+    //   .log-content-exception → line-height: 1.8
+    //   alle anderen           → line-height: 1.6 (von .log-full-text)
+    const lineHeightPx = rootFontSize * (content.type === 'exception' ? 1.8 : 1.6);
+
+    // Nutzbare Breite: Container minus Padding (16px je Seite) und Scrollbar (~14px)
+    const listAny = listRef.current as any;
+    const outerEl: HTMLDivElement | null = listAny?._outerRef ?? null;
+    const containerW = outerEl ? Math.max(300, outerEl.clientWidth - 32 - 14) : 700;
+    const charsPerLine = Math.floor(containerW / charWidth);
+
+    const isJsonXml = content.type === 'json' || content.type === 'xml';
+    const isCode = isJsonXml || content.type === 'exception'; // alle haben padding: 12px
+    const lines = rawText.split('\n');
+    // json/xml: white-space:pre → kein Umbruch
+    // exception/text: pre-wrap → Umbruch nach charsPerLine Zeichen
+    const textLineCount = isJsonXml
+      ? lines.length
+      : lines.reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / charsPerLine)), 0);
+
+    // Vertikales Chrome des .log-entry-details:
+    //   padding: 12px 16px → 24px  +  border-top: 1px → 25 px total
+    const DETAILS_PADDING = 25;
+    // Header-Div (immer gerendert mit marginBottom: 8px):
+    //   type 'text'  → leer, nur 8 px Margin
+    //   alle anderen → Copy-Button/Badge ca. 30 px + 8 px Margin = 38 px
+    const HEADER_H = content.type === 'text' ? 8 : 38;
+    // json/xml/exception: .log-content-* hat padding: 12px → 24 px vertikal
+    const EXTRA_CODE_PADDING = isCode ? 24 : 0;
+    // .log-full-text margin: 0 0 4px 0
+    const PRE_MARGIN = 4;
+
+    const rawTextH = textLineCount * lineHeightPx;
+    // .log-content-exception hat max-height: 750px (scrollt intern darüber hinaus)
+    const cappedTextH = content.type === 'exception' ? Math.min(rawTextH, 750) : rawTextH;
+
+    const detailsH = DETAILS_PADDING + HEADER_H + cappedTextH + EXTRA_CODE_PADDING + PRE_MARGIN;
+    return Math.round(30 + detailsH);
+  }, [analyzeAndFormatContent]);
+
   const toggleExpand = useCallback((originalLineNumber: number) => {
+    const entry = filteredEntries.find(e => e.originalLineNumber === originalLineNumber);
+    const index = filteredEntries.findIndex(e => e.originalLineNumber === originalLineNumber);
+    if (index < 0) return;
+
+    const listAny = listRef.current as any;
+    const outerEl: HTMLDivElement | null = listAny?._outerRef ?? null;
+    const scrollBefore = outerEl?.scrollTop ?? 0;
+    // Pixel-Offset des Items VOR dem Reset (aus react-window internem Cache)
+    // -1 als Fallback damit die Bedingung unten nicht fälschlicherweise greift
+    const itemOffset: number = listAny?._instanceProps?.itemMetadataMap?.[index]?.offset ?? -1;
+
+    const isExpanding = !expandedLines.has(originalLineNumber);
+    const prevH = isExpanding ? 30 : (expandedHeightCache.current.get(originalLineNumber) ?? 30);
+    let delta: number;
+
+    if (isExpanding) {
+      const estimatedH = entry ? getExpandHeight(entry) : 30;
+      expandedHeightCache.current.set(originalLineNumber, estimatedH);
+      delta = estimatedH - 30;
+    } else {
+      const cachedH = expandedHeightCache.current.get(originalLineNumber) ?? 30;
+      expandedHeightCache.current.delete(originalLineNumber);
+      delta = 30 - cachedH;
+    }
+
     setExpandedLines((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(originalLineNumber)) {
-        newSet.delete(originalLineNumber);
-      } else {
-        newSet.add(originalLineNumber);
-      }
+      if (isExpanding) newSet.add(originalLineNumber);
+      else newSet.delete(originalLineNumber);
       return newSet;
     });
-    // Finde den Index in der gefilterten Liste für Cache-Reset
-    const index = filteredEntries.findIndex(e => e.originalLineNumber === originalLineNumber);
-    const listApi = listRef.current as unknown as { resetAfterIndex?: (index: number, shouldForceUpdate?: boolean) => void } | null;
-    if (listApi && index >= 0 && typeof listApi.resetAfterIndex === 'function') {
-      listApi.resetAfterIndex(index);
+
+    if (listAny?.resetAfterIndex) {
+      listAny.resetAfterIndex(index);
+      // Nur kompensieren wenn das Item vollständig oberhalb des Viewports liegt
+      // (= alle sichtbaren Einträge sind unterhalb des veränderten Items und
+      //  verschieben sich um delta Pixel → scrollTop muss mitgezogen werden).
+      // itemOffset + prevH <= scrollBefore bedeutet: Item-Ende liegt über Viewport-Oberkante.
+      if (itemOffset >= 0 && itemOffset + prevH <= scrollBefore) {
+        requestAnimationFrame(() => {
+          if (outerEl) outerEl.scrollTop = scrollBefore + delta;
+        });
+      }
     }
-  }, [filteredEntries]);
+  }, [filteredEntries, expandedLines, getExpandHeight]);
 
   const scrollToEnd = useCallback(() => {
     const listApi = listRef.current as unknown as {
@@ -724,29 +809,32 @@ const LogViewer: React.FC<LogViewerProps> = ({
     const entry = filteredEntries[index];
     if (!entry) return 30;
 
-    const isExpanded = expandedLines.has(entry.originalLineNumber);
-    const baseHeight = 30; // Min-Höhe für eine Zeile
-    
-    if (isExpanded && entry.isMultiLine) {
-      // Fixed height: 30px base + 400px for expanded content area
-      return 430;
-    }
-    
-    // Für sehr lange einzelne Nachrichten - zeige nur bei expansion
-    if (isExpanded && entry.message.length > 150) {
-      return 430;
-    }
-    
-    return baseHeight;
+    if (!expandedLines.has(entry.originalLineNumber)) return 30;
+
+    // Cache enthält die Schätzung (direkt bei toggleExpand gesetzt) oder die gemessene Höhe
+    return expandedHeightCache.current.get(entry.originalLineNumber) ?? 30;
   }, [filteredEntries, expandedLines]);
+
+  const [copyToastVisible, setCopyToastVisible] = useState(false);
+  const copyToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showCopyToast = useCallback(() => {
+    if (copyToastTimer.current) clearTimeout(copyToastTimer.current);
+    setCopyToastVisible(false);
+    // Kurzer Tick damit React den Toast neu mountet und die Animation neu startet
+    requestAnimationFrame(() => {
+      setCopyToastVisible(true);
+      copyToastTimer.current = setTimeout(() => setCopyToastVisible(false), 3000);
+    });
+  }, []);
 
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text).then(() => {
-      console.log('Content copied to clipboard');
+      showCopyToast();
     }).catch(err => {
       console.error('Failed to copy to clipboard:', err);
     });
-  }, []);
+  }, [showCopyToast]);
 
   const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
     const entry = filteredEntries[index];
@@ -774,7 +862,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
     const namespaceTooltip = entry.namespace.length > 30 ? entry.namespace : undefined;
 
     return (
-      <div style={style} className="log-entry">
+      <div style={style} className={`log-entry${isExpanded ? ' log-entry-expanded' : ''}`}>
         <div
           className={`log-entry-line ${shouldShowExpand ? 'multiline' : ''}`}
           onClick={() => shouldShowExpand && toggleExpand(entry.originalLineNumber)}
@@ -887,6 +975,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   }
 
   return (
+    <>
     <div className="log-viewer">
       <div className="log-viewer-toolbar">
         <div className="log-level-row">
@@ -1083,7 +1172,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
             onClick={() => {
               const { entry } = logContextMenu;
               const text = [entry.timestamp, entry.level, entry.namespace, entry.message].filter(Boolean).join(' | ');
-              navigator.clipboard.writeText(text);
+              navigator.clipboard.writeText(text).then(() => showCopyToast());
               setLogContextMenu(null);
             }}
           >
@@ -1112,6 +1201,8 @@ const LogViewer: React.FC<LogViewerProps> = ({
         </div>
       )}
     </div>
+    <Toast message="Copied to clipboard" visible={copyToastVisible} />
+  </>
   );
 };
 

@@ -581,6 +581,10 @@
   overflow: visible;
 }
 
+.log-entry.log-entry-expanded {
+  background: var(--bg-tertiary);
+}
+
 .log-entry:hover {
   background: var(--bg-secondary);
 }
@@ -818,6 +822,7 @@
   box-sizing: border-box;
   position: relative;
   width: 100%;
+  overflow: hidden;
 }
 
 @media (max-width: 1024px) {
@@ -874,7 +879,7 @@
 }
 
 .log-full-text {
-  margin: 0;
+  margin: 0 0 4px 0;
   color: var(--text-primary);
   font-size: 1rem;
   white-space: pre-wrap;
@@ -889,8 +894,8 @@
 .log-full-text.log-content-xml,
 .log-full-text.log-content-exception {
   overflow-x: auto;
-  overflow-y: auto;
-  max-height: 350px;
+  overflow-y: visible;
+  max-height: none;
 }
 
 .log-content-json,
@@ -952,15 +957,11 @@
 @keyframes slideDown {
   from {
     opacity: 0;
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
+    transform: translateY(-6px);
   }
   to {
     opacity: 1;
-    max-height: 1000px;
-    padding-top: 12px;
-    padding-bottom: 12px;
+    transform: translateY(0);
   }
 }
 

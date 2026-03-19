@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [2.2.0] - 2026-03-19
+## [2.2.1] - 2026-03-19
+
+### Added
+- **"Copied to clipboard" toast**: A brief toast notification now appears when a log entry is copied via the Copy button or the right-click context menu
+- **Drag overlay dismiss**: The drag-and-drop overlay can now be dismissed by pressing ESC or clicking anywhere on it — prevents it from getting stuck when a drag is canceled outside the window
+
+### Fixed
+- **Expanded row height on open**: The expand animation no longer uses `max-height` animation which caused the DOM measurement to capture an intermediate (too small) height. Height is now computed purely from CSS metrics at expand time — no scroll jump, no second resize after opening
+- **Scroll jump when expanding rows**: Expanding a row that is above the visible viewport no longer shifts the view; scroll position is compensated by the exact delta
+- **Log entries with empty message merged into previous**: Log lines whose message field is blank (e.g. `namespace |  `) were not matched by the parser regex and were incorrectly appended as continuations of the previous entry. Fixed by allowing empty message capture (`.*` instead of `.+`)
+- **Blank line between entries treated as multi-line content**: A blank line between two normal log entries is now ignored instead of marking the first entry as multi-line
+- **Drag overlay stuck on screen**: Overlay remaining visible after canceling a drag can now be closed with ESC or a click
 
 ### Added
 - **Check for Updates button**: A new button in the title bar lets users manually trigger an update check. A toast notification appears in the bottom-right corner when no update is available
@@ -210,8 +221,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Settings panel
 - Cross-platform support (Windows, Linux)
 
-[Unreleased]: https://github.com/DrScince/LogStudio/compare/v1.3.1...HEAD
-[1.3.1]: https://github.com/DrScince/LogStudio/compare/v1.3.0...v1.3.1
+[Unreleased]: https://github.com/DrScince/LogStudio/compare/v2.2.1...HEAD
+[2.2.1]: https://github.com/DrScince/LogStudio/compare/v2.2.0...v2.2.1
+[2.2.0]: https://github.com/DrScince/LogStudio/compare/v2.1.5...v2.2.0
 [1.3.0]: https://github.com/DrScince/LogStudio/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/yourusername/LogStudio/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/yourusername/LogStudio/compare/v1.0.2...v1.1.0

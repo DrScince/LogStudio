@@ -420,6 +420,16 @@ function App() {
     return () => { window.electronAPI?.removeOpenFileFromCliListener?.(); };
   }, [openFileInTab]);
 
+  // ESC schließt das Drag-Overlay wenn es hängen bleibt
+  useEffect(() => {
+    if (!isDragOver) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsDragOver(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDragOver]);
+
   return (
     <div
       className={`app${isDragOver ? ' drag-over' : ''}`}
@@ -428,11 +438,12 @@ function App() {
       onDragLeave={handleDragLeave}
     >
       {isDragOver && (
-        <div className="drag-overlay">
+        <div className="drag-overlay" onClick={() => setIsDragOver(false)}>
           <div className="drag-overlay-content">
             <span className="drag-overlay-icon">📂</span>
             <span className="drag-overlay-text">Dateien hier ablegen</span>
             <span className="drag-overlay-hint">{ALLOWED_EXTENSIONS.join(', ')}</span>
+            <span className="drag-overlay-esc">ESC oder Klick zum Abbrechen</span>
           </div>
         </div>
       )}

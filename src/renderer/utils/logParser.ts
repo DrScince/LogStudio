@@ -3,7 +3,7 @@ import { LogEntry, LogLevel, LogSchema } from '../types/log';
 const DEFAULT_SCHEMA: LogSchema = {
   // Pattern: Timestamp | Level | Namespace | Message
   // Erlaubt Leerzeichen um die Pipe-Trenner
-  pattern: '^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+)\\s*\\|\\s*([A-Z]+)\\s*\\|\\s*([^|]+)\\s*\\|\\s*(.+)$',
+  pattern: '^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+)\\s*\\|\\s*([A-Z]+)\\s*\\|\\s*([^|]+)\\s*\\|\\s*(.*)$',
   timestampFormat: 'YYYY-MM-DD HH:mm:ss.SSS',
   fields: {
     timestamp: 1,
@@ -61,17 +61,23 @@ export function parseLogFile(content: string, schema: LogSchema = DEFAULT_SCHEMA
         lineCount: 1,
       };
     } else if (currentEntry) {
-      // Fortsetzung einer mehrzeiligen Log-Nachricht
-      // Füge die Zeile hinzu, auch wenn sie leer ist (für Stack Traces wichtig)
-      currentEntry.fullText += '\n' + line;
-      if (line.trim()) {
-        currentEntry.message += '\n' + line;
+      // Leere Zeilen nur als Continuation behandeln wenn der Eintrag bereits multiline ist
+      // (z.B. Leerzeile mitten in einem Stack Trace). Steht eine Leerzeile zwischen zwei
+      // normalen Einträgen, wird sie ignoriert damit kein spurioses isMultiLine entsteht.
+      if (!line.trim() && !currentEntry.isMultiLine) {
+        // Leerzeile direkt nach normalem Eintrag → ignorieren
       } else {
-        // Leere Zeile in mehrzeiligen Einträgen beibehalten
-        currentEntry.message += '\n';
+        // Fortsetzung einer mehrzeiligen Log-Nachricht (Stack Trace etc.)
+        currentEntry.fullText += '\n' + line;
+        if (line.trim()) {
+          currentEntry.message += '\n' + line;
+        } else {
+          // Leerzeile innerhalb eines Stack Traces beibehalten
+          currentEntry.message += '\n';
+        }
+        currentEntry.isMultiLine = true;
+        currentEntry.lineCount++;
       }
-      currentEntry.isMultiLine = true;
-      currentEntry.lineCount++;
     } else if (trimmedLine) {
       // Zeile ohne Pattern und ohne vorherigen Eintrag - erstelle Fallback-Eintrag
       entries.push({
