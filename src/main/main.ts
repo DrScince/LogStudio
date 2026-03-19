@@ -324,6 +324,10 @@ ipcMain.handle('get-app-path', () => {
   return { success: true, path: app.getAppPath() };
 });
 
+ipcMain.handle('get-app-version', () => {
+  return { success: true, version: app.getVersion() };
+});
+
 ipcMain.handle('get-default-log-directory', () => {
   const logDir = path.join(app.getAppPath(), '..', 'Log');
   return { success: true, path: logDir };

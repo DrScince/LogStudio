@@ -8,6 +8,7 @@ export interface ElectronAPI {
   onLogFileChanged: (callback: (filePath: string) => void) => void;
   removeLogFileChangedListener: () => void;
   getAppPath: () => Promise<{ success: boolean; path?: string; error?: string }>;
+  getAppVersion: () => Promise<{ success: boolean; version?: string }>;
   getDefaultLogDirectory: () => Promise<{ success: boolean; path?: string; error?: string }>;
   showOpenDialog: () => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
   showOpenDirectoryDialog: () => Promise<{ success: boolean; directoryPath?: string; canceled?: boolean; error?: string }>;

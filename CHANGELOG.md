@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.4] - 2026-03-19
+
+### Fixed
+- **Version number in About panel**: Version is now read at runtime via `app.getVersion()` (Electron IPC) instead of being injected at build time. This means the correct version is always shown, even in installed/portable builds. No more manual version updates needed — changing `package.json` is the single source of truth.
+
 ## [2.1.3] - 2026-03-18
 
 ### Fixed

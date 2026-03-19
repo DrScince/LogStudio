@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('log-file-changed');
   },
   getAppPath: () => ipcRenderer.invoke('get-app-path'),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getDefaultLogDirectory: () => ipcRenderer.invoke('get-default-log-directory'),
   showOpenDialog: () => ipcRenderer.invoke('show-open-dialog'),
   showOpenDirectoryDialog: () => ipcRenderer.invoke('show-open-directory-dialog'),

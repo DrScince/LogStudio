@@ -12,6 +12,10 @@ describe('AboutPanel', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    (window as any).electronAPI = {
+      getAppVersion: vi.fn().mockResolvedValue({ success: true, version: '1.2.3' }),
+      readChangelog: vi.fn().mockResolvedValue({ success: false }),
+    };
   });
 
   it('should render about panel', async () => {
@@ -39,13 +43,17 @@ describe('AboutPanel', () => {
   });
 
   it('should display version information', async () => {
+    (window as any).electronAPI = {
+      getAppVersion: vi.fn().mockResolvedValue({ success: true, version: '1.2.3' }),
+      readChangelog: vi.fn().mockResolvedValue({ success: false }),
+    };
+
     await act(async () => {
       render(<AboutPanel {...defaultProps} />);
     });
-    
-    const { version } = await import('../../../package.json');
+
     await waitFor(() => {
-      expect(screen.getByText(new RegExp(`Version\\s+${version.replace(/\./g, '\\.')}`, 'i'))).toBeInTheDocument();
+      expect(screen.getByText(/Version\s+1\.2\.3/i)).toBeInTheDocument();
     });
   });
 
@@ -59,6 +67,7 @@ describe('AboutPanel', () => {
 - New feature`;
 
     (window as any).electronAPI = {
+      getAppVersion: vi.fn().mockResolvedValue({ success: true, version: '1.2.3' }),
       readChangelog: vi.fn().mockResolvedValue({
         success: true,
         content: mockChangelog,

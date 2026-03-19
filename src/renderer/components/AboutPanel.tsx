@@ -6,13 +6,17 @@ interface AboutPanelProps {
   onClose: () => void;
 }
 
-declare const __APP_VERSION__: string;
-const APP_VERSION = (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0');
-
 const AboutPanel: React.FC<AboutPanelProps> = ({ onClose }) => {
   const [showChangelog, setShowChangelog] = useState(false);
   const [releaseNotes, setReleaseNotes] = useState<ReleaseNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [appVersion, setAppVersion] = useState('...');
+
+  useEffect(() => {
+    window.electronAPI?.getAppVersion().then((result) => {
+      if (result.success && result.version) setAppVersion(result.version);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const loadChangelog = async () => {
@@ -64,7 +68,7 @@ const AboutPanel: React.FC<AboutPanelProps> = ({ onClose }) => {
           
           <div className="about-section">
             <h3>LogStudio</h3>
-            <p className="about-version">Version {APP_VERSION}</p>
+            <p className="about-version">Version {appVersion}</p>
             <p className="about-description">
               A modern, cross-platform application for viewing and monitoring log files.
               Built with Electron, React, and TypeScript.
