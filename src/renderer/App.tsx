@@ -9,10 +9,12 @@ import AboutPanel from './components/AboutPanel';
 import TitleBar from './components/TitleBar';
 import Toast from './components/Toast';
 import { loadSettings, saveSettings, AppSettings } from './utils/settings';
+import { I18nProvider, useTranslation } from './i18n';
 import './App.css';
 
 function App() {
   const [settings, setSettings] = useState<AppSettings>(loadSettings());
+  const { t } = useTranslation();
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -278,10 +280,10 @@ function App() {
     }
   }, [openFileInTab]);
 
-  const handleLogFilesSelect = useCallback((filePaths: string[]) => {
+  const handleLogFilesSelect = useCallback((filePaths: string[], ctrlKey?: boolean) => {
     if (filePaths.length > 0) {
-      // Wenn bereits ein aktiver Tab existiert, füge die Dateien zu diesem Tab hinzu
-      if (activeTabId) {
+      // Mit Strg: Dateien zum aktiven Tab hinzufügen
+      if (ctrlKey && activeTabId) {
         setTabs((prev) =>
           prev.map((tab) => {
             if (tab.id === activeTabId) {
@@ -303,7 +305,7 @@ function App() {
           })
         );
       } else {
-        // Kein aktiver Tab: Öffne alle ausgewählten Dateien in einem neuen Tab
+        // Ohne Strg: Immer neuen Tab öffnen
         openMultipleFilesInTab(filePaths);
       }
     }
@@ -441,9 +443,9 @@ function App() {
         <div className="drag-overlay" onClick={() => setIsDragOver(false)}>
           <div className="drag-overlay-content">
             <span className="drag-overlay-icon">📂</span>
-            <span className="drag-overlay-text">Dateien hier ablegen</span>
+            <span className="drag-overlay-text">{t('app.dragOverHint')}</span>
             <span className="drag-overlay-hint">{ALLOWED_EXTENSIONS.join(', ')}</span>
-            <span className="drag-overlay-esc">ESC oder Klick zum Abbrechen</span>
+            <span className="drag-overlay-esc">{t('app.dragOverCancel')}</span>
           </div>
         </div>
       )}
@@ -460,7 +462,6 @@ function App() {
         </div>
       )}
       <TitleBar
-        onOpenFile={handleOpenFile}
         onSettingsClick={() => setShowSettings(!showSettings)}
         onAboutClick={() => setShowAbout(!showAbout)}
         onThemeToggle={handleThemeToggle}
@@ -488,7 +489,7 @@ function App() {
           {updateState.phase === 'available' && (
             <>
               <span className="update-banner-text">
-                Neue Version verfügbar: v{updateState.version}
+                {t('app.updateAvailable', { version: updateState.version })}
               </span>
               {updateState.portable ? (
                 <button
@@ -499,7 +500,7 @@ function App() {
                 </button>
               ) : (
                 <button className="update-banner-link" onClick={handleDownloadUpdate}>
-                  Herunterladen
+                  {t('app.downloadUpdate')}
                 </button>
               )}
               <button
@@ -514,7 +515,7 @@ function App() {
           {updateState.phase === 'downloading' && (
             <>
               <span className="update-banner-text">
-                Wird heruntergeladen… {Math.round(updateState.percent)}%
+                {t('app.updateDownloading')} {Math.round(updateState.percent)}%
               </span>
               <div className="update-progress-track">
                 <div
@@ -527,13 +528,13 @@ function App() {
           {updateState.phase === 'ready' && (
             <>
               <span className="update-banner-text">
-                Update bereit: v{updateState.version}
+                {t('app.updateReady')}
               </span>
               <button
                 className="update-banner-link"
                 onClick={() => window.electronAPI?.installUpdate()}
               >
-                Jetzt installieren
+                {t('app.restartNow')}
               </button>
               <button
                 className="update-banner-dismiss"
@@ -547,7 +548,7 @@ function App() {
           {updateState.phase === 'error' && (
             <>
               <span className="update-banner-text">
-                Update fehlgeschlagen
+                {t('app.updateError')}
               </span>
               <button
                 className="update-banner-dismiss"
@@ -565,6 +566,8 @@ function App() {
           logDirectory={settings.logDirectory}
           onLogFileSelect={handleLogFileSelect}
           onLogFilesSelect={handleLogFilesSelect}
+          onDirectoryChange={(newPath) => setSettings((prev) => ({ ...prev, logDirectory: newPath }))}
+          onOpenFile={handleOpenFile}
           currentFile={currentLogFile}
           selectedFiles={[]}
           activeTabFiles={activeTabFiles}
@@ -587,7 +590,7 @@ function App() {
           namespaces={namespaces}
           selectedNamespaces={selectedNamespaces}
           onNamespaceToggle={handleNamespaceToggle}
-          isVisible={!!currentLogFile || (currentLogFiles && currentLogFiles.length > 0)}
+          isVisible={!!currentLogFile || !!(currentLogFiles && currentLogFiles.length > 0)}
         />
       </div>
       {showSettings && (
@@ -600,9 +603,23 @@ function App() {
       {showAbout && (
         <AboutPanel onClose={() => setShowAbout(false)} />
       )}
-      <Toast message="Kein Update verfügbar" visible={noUpdateAvailable} />
+      <Toast message={t('app.noUpdateAvailable')} visible={noUpdateAvailable} />
     </div>
   );
 }
 
-export default App;
+function AppWithI18n() {
+  const [settings, setSettings] = useState<AppSettings>(loadSettings());
+  return (
+    <I18nProvider
+      initialLanguage={settings.language}
+      onLanguageChange={(lang) =>
+        setSettings((prev) => { const s = { ...prev, language: lang }; saveSettings(s); return s; })
+      }
+    >
+      <App />
+    </I18nProvider>
+  );
+}
+
+export default AppWithI18n;

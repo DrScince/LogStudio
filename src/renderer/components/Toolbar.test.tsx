@@ -38,7 +38,7 @@ describe('Toolbar', () => {
       },
     ];
     render(<Toolbar {...defaultProps} tabs={tabs} />);
-    expect(screen.getByText('2 Dateien')).toBeInTheDocument();
+    expect(screen.getByText('2 Files')).toBeInTheDocument();
   });
 
   it('should call onTabSelect when tab is clicked', () => {

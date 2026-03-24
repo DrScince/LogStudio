@@ -4,11 +4,10 @@ import App from './App';
 
 // Mock all child components
 vi.mock('./components/TitleBar', () => ({
-  default: ({ onSettingsClick, onAboutClick, onOpenFile, onThemeToggle }: any) => (
+  default: ({ onSettingsClick, onAboutClick, onThemeToggle }: any) => (
     <div data-testid="title-bar">
       <button onClick={onSettingsClick}>Settings</button>
       <button onClick={onAboutClick}>About</button>
-      <button onClick={onOpenFile}>Open File</button>
       <button onClick={onThemeToggle}>Toggle Theme</button>
     </div>
   ),
@@ -36,8 +35,9 @@ vi.mock('./components/Toolbar', () => ({
 }));
 
 vi.mock('./components/Sidebar', () => ({
-  default: ({ onLogFileSelect, onLogFilesSelect }: any) => (
+  default: ({ onLogFileSelect, onLogFilesSelect, onOpenFile }: any) => (
     <div data-testid="sidebar">
+      <button onClick={onOpenFile}>Open File</button>
       <button onClick={() => onLogFileSelect('/test/file.log')}>Select File</button>
       <button onClick={() => onLogFilesSelect(['/test/file1.log', '/test/file2.log'])}>Select Files</button>
     </div>

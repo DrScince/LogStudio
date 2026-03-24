@@ -1,12 +1,12 @@
 {
   "name": "logstudio",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "Modern log file viewer and monitor",
   "main": "dist/main.js",
   "scripts": {
     "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:main\"",
     "dev:renderer": "vite",
-    "dev:main": "tsc -p tsconfig.main.json && electron .",
+    "dev:main": "tsc -p tsconfig.main.json && electron . --dev",
     "build": "npm run build:main && npm run build:renderer",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
@@ -54,8 +54,11 @@
   "dependencies": {
     "chokidar": "^3.5.3",
     "electron-updater": "^6.8.3",
+    "i18next": "^23.10.0",
+    "i18next-browser-languagedetector": "^7.2.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-i18next": "^14.1.0",
     "react-window": "^1.8.10"
   }
 }

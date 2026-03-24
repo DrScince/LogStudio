@@ -1,4 +1,7 @@
 import { LogSchema } from '../types/log';
+import { Language, detectLanguage } from '../i18n';
+
+export type { LogSchema };
 
 const SETTINGS_KEY = 'logstudio-settings';
 const DEFAULT_SCHEMA: LogSchema = {
@@ -22,6 +25,7 @@ export interface AppSettings {
   fontSize: number;
   theme: 'dark' | 'light';
   editorOrder: EditorId[];
+  language: Language;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -32,6 +36,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   fontSize: 12,
   theme: 'dark',
   editorOrder: ['vscode', 'notepadplusplus', 'notepad'],
+  language: detectLanguage(),
 };
 
 export function loadSettings(): AppSettings {

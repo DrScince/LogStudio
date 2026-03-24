@@ -2,6 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallba
 import { VariableSizeList } from 'react-window';
 import { LogEntry, LogLevel, LogSchema } from '../types/log';
 import { parseLogFile, filterLogEntries, extractUniqueNamespaces, extractLogLevels } from '../utils/logParser';
+import { useTranslation } from '../i18n';
 import Toast from './Toast';
 import './LogViewer.css';
 
@@ -36,12 +37,12 @@ const LogViewer: React.FC<LogViewerProps> = ({
   filePaths,
   schema,
   autoRefresh,
-  refreshInterval,
   selectedNamespaces,
   onNamespacesChange,
   onResetFilters,
   editorOrder,
 }) => {
+  const { t } = useTranslation();
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<LogEntry[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<LogLevel[]>([]);
@@ -586,13 +587,6 @@ const LogViewer: React.FC<LogViewerProps> = ({
     );
   };
 
-  const toggleNamespace = (namespace: string) => {
-    const newNamespaces = selectedNamespaces.includes(namespace)
-      ? selectedNamespaces.filter((n) => n !== namespace)
-      : [...selectedNamespaces, namespace];
-    onNamespacesChange(newNamespaces);
-  };
-
   // Gemessene tatsächliche DOM-Höhen für expandierte Zeilen
   const expandedHeightCache = useRef<Map<number, number>>(new Map());
 
@@ -871,7 +865,17 @@ const LogViewer: React.FC<LogViewerProps> = ({
             setLogContextMenu({ x: e.clientX, y: e.clientY, entry });
           }}
         >
-          <span className="log-line-number">{entry.originalLineNumber}</span>
+          <div className="log-line-number-group">
+            {filePaths && filePaths.length > 1 && entry.sourceLineNumber != null && (
+              <span
+                className="log-source-line"
+                title={entry.sourceFile ? `${entry.sourceFile}:${entry.sourceLineNumber}` : String(entry.sourceLineNumber)}
+              >
+                {entry.sourceLineNumber}
+              </span>
+            )}
+            <span className="log-line-number">{entry.originalLineNumber}</span>
+          </div>
           <span 
             className="log-timestamp" 
             style={getResizableColumnStyle('timestamp')}
@@ -918,13 +922,13 @@ const LogViewer: React.FC<LogViewerProps> = ({
                     e.stopPropagation();
                     copyToClipboard(expandedContent.formatted);
                   }}
-                  title="Copy to clipboard"
+                  title={t('app.copy')}
                 >
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M4 4V2C4 1.44772 4.44772 1 5 1H13C13.5523 1 14 1.44772 14 2V10C14 10.5523 13.5523 11 13 11H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                     <rect x="2" y="5" width="9" height="10" rx="1" stroke="currentColor" strokeWidth="1.5"/>
                   </svg>
-                  Copy
+                  {t('app.copy')}
                 </button>
               )}
             </div>
@@ -942,7 +946,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
         )}
       </div>
     );
-  }, [filteredEntries, expandedLines, toggleExpand, analyzeAndFormatContent, getResizableColumnStyle]);
+  }, [filteredEntries, expandedLines, toggleExpand, analyzeAndFormatContent, getResizableColumnStyle, filePaths]);
 
   // Check if we have any files to display (single or multiple)
   const hasFiles = filePath || (filePaths && filePaths.length > 0);
@@ -1035,7 +1039,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
                       ref={searchInputRef}
                       type="text"
                       className="search-input"
-                      placeholder="Enter search text..."
+                      placeholder={t('logviewer.searchPlaceholder')}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={(e) => {
@@ -1050,33 +1054,33 @@ const LogViewer: React.FC<LogViewerProps> = ({
             </div>
           </div>
           <div className={`log-viewer-stats ${hasActiveFilters ? 'has-filters' : ''}`}>
-          <span className="stats-count">{filteredEntries.length} / {logEntries.length} Entries</span>
+          <span className="stats-count">{t('logviewer.entries', { filtered: filteredEntries.length, total: logEntries.length })}</span>
           {selectedLevels.length > 0 && (
-            <span className="filter-badge filter-badge-level" title={`Level: ${selectedLevels.join(', ')}`}>
-              Level: {selectedLevelsBadge}
+            <span className="filter-badge filter-badge-level" title={`${t('logviewer.levelBadge', { levels: selectedLevels.join(', ') })}`}>
+              {t('logviewer.levelBadge', { levels: selectedLevelsBadge })}
             </span>
           )}
           {selectedNamespaces.length > 0 && (
-            <span className="filter-badge" title={`Namespace: ${selectedNamespaces.length}`}>
-              Namespace: {selectedNamespaces.length}
+            <span className="filter-badge" title={`${t('logviewer.namespaceBadge', { count: selectedNamespaces.length })}`}>
+              {t('logviewer.namespaceBadge', { count: selectedNamespaces.length })}
             </span>
           )}
           {searchQuery && (
-            <span className="filter-badge filter-badge-search" title={`Search: "${searchQuery}"`}>
-              Search: "{searchBadge}"
+            <span className="filter-badge filter-badge-search" title={`${t('logviewer.searchBadge', { query: searchQuery })}`}>
+              {t('logviewer.searchBadge', { query: searchBadge })}
             </span>
           )}
           {hasActiveFilters && onResetFilters && (
             <button 
               onClick={onResetFilters} 
               className="reset-filters-button"
-              title="Reset All Filters"
+              title={t('logviewer.resetFilters')}
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M14 8C14 11.3137 11.3137 14 8 14C4.68629 14 2 11.3137 2 8C2 4.68629 4.68629 2 8 2C9.84871 2 11.5051 2.84285 12.6 4.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M12.5 2V4.5H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Reset
+              {t('logviewer.reset')}
             </button>
           )}
           {filteredEntries.length > 0 && (
@@ -1084,20 +1088,20 @@ const LogViewer: React.FC<LogViewerProps> = ({
               <button 
                 onClick={() => setAutoScroll(!autoScroll)} 
                 className={`auto-scroll-button ${autoScroll ? 'active' : ''}`}
-                title={autoScroll ? "Disable auto-tracking" : "Enable auto-tracking"}
+                title={autoScroll ? t('logviewer.disableTracking') : t('logviewer.enableTracking')}
               >
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M8 2V14M8 14L12 10M8 14L4 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
                 </svg>
-                {autoScroll ? 'Tracking ON' : 'Tracking OFF'}
+                {autoScroll ? t('logviewer.trackingOn') : t('logviewer.trackingOff')}
               </button>
-              <button onClick={scrollToEnd} className="scroll-to-end-button" title="Jump to end">
+              <button onClick={scrollToEnd} className="scroll-to-end-button" title={t('logviewer.jumpToEnd')}>
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M8 12L8 4M8 12L4 8M8 12L12 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M3 14L13 14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
-                End
+                {t('logviewer.end')}
               </button>
             </>
           )}
@@ -1108,9 +1112,9 @@ const LogViewer: React.FC<LogViewerProps> = ({
         {filteredEntries.length > 0 && (
           <div className="log-column-header" role="presentation" ref={headerRef}>
             <div className="log-column-header-line">
-              <span className="log-column-header-cell log-column-header-line-number">Line</span>
+              <span className="log-column-header-cell log-column-header-line-number">{t('logviewer.colLine')}</span>
               <span className="log-column-header-cell log-column-header-resizable" style={getResizableColumnStyle('timestamp')}>
-                Timestamp
+                {t('logviewer.colTimestamp')}
                 <button
                   type="button"
                   className="log-column-resize-handle"
@@ -1119,7 +1123,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
                 />
               </span>
               <span className="log-column-header-cell log-column-header-resizable" style={getResizableColumnStyle('level')}>
-                Level
+                {t('logviewer.colLevel')}
                 <button
                   type="button"
                   className="log-column-resize-handle"
@@ -1128,7 +1132,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
                 />
               </span>
               <span className="log-column-header-cell log-column-header-resizable" style={getResizableColumnStyle('namespace')}>
-                Namespace
+                {t('logviewer.colNamespace')}
                 <button
                   type="button"
                   className="log-column-resize-handle"
@@ -1136,14 +1140,14 @@ const LogViewer: React.FC<LogViewerProps> = ({
                   onMouseDown={(event) => startColumnResize('namespace', event)}
                 />
               </span>
-              <span className="log-column-header-cell log-column-header-message">Message</span>
+              <span className="log-column-header-cell log-column-header-message">{t('logviewer.colMessage')}</span>
             </div>
           </div>
         )}
         {loading ? (
-          <div className="log-viewer-loading">Loading log file...</div>
+          <div className="log-viewer-loading">{t('logviewer.loading')}</div>
         ) : filteredEntries.length === 0 ? (
-          <div className="log-viewer-empty">No entries found</div>
+          <div className="log-viewer-empty">{t('logviewer.noEntries')}</div>
         ) : (
           <VariableSizeList
             ref={listRef}
@@ -1176,7 +1180,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
               setLogContextMenu(null);
             }}
           >
-            Eintrag kopieren
+            {t('app.copyEntry')}
           </button>
           <button
             className="log-context-menu-item"
@@ -1190,18 +1194,18 @@ const LogViewer: React.FC<LogViewerProps> = ({
               setLogContextMenu(null);
             }}
           >
-            In Editor öffnen
+            {t('app.openInEditor')}
           </button>
           {filePaths && filePaths.length > 1 && logContextMenu.entry.sourceFile && (
             <div className="log-context-menu-info">
               📄 {logContextMenu.entry.sourceFile.split(/[/\\]/).pop()}
-              {logContextMenu.entry.sourceLineNumber && ` · Zeile ${logContextMenu.entry.sourceLineNumber}`}
+              {logContextMenu.entry.sourceLineNumber && ` · ${t('app.line', { line: logContextMenu.entry.sourceLineNumber })}`}
             </div>
           )}
         </div>
       )}
     </div>
-    <Toast message="Copied to clipboard" visible={copyToastVisible} />
+    <Toast message={t('logviewer.copiedToClipboard')} visible={copyToastVisible} />
   </>
   );
 };

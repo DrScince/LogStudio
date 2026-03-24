@@ -156,9 +156,9 @@ function createWindow() {
     },
   });
 
-  if (process.env.NODE_ENV === 'development') {
+  const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
+  if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
   }
@@ -168,7 +168,7 @@ function createWindow() {
 
   // Keyboard shortcut to toggle DevTools (F12 or Ctrl+Shift+I) - always available in dev mode
   mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (process.env.NODE_ENV === 'development') {
+    if (isDev) {
       if (input.key === 'F12' || (input.control && input.shift && input.key === 'I')) {
         if (mainWindow && mainWindow.webContents.isDevToolsOpened()) {
           mainWindow.webContents.closeDevTools();

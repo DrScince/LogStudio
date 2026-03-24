@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AppSettings, LogSchema, EditorId } from '../utils/settings';
+import { useTranslation, LANGUAGE_LABELS, Language } from '../i18n';
 import './SettingsPanel.css';
 
 const EDITOR_LABELS: Record<EditorId, string> = {
@@ -15,9 +16,12 @@ interface SettingsPanelProps {
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChange, onClose }) => {
+  const { t, setLanguage } = useTranslation();
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
   const [patternError, setPatternError] = useState<string | null>(null);
   const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
+
+  const REGEX_EXAMPLE = '^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+)\\s*\\|\\s*([A-Z]+)\\s*\\|\\s*([^|]+)\\s*\\|\\s*(.+)$';
 
   const validatePattern = (pattern: string): boolean => {
     try {
@@ -93,14 +97,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
     <div className="settings-overlay" onClick={handleCancel}>
       <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
         <div className="settings-header">
-          <h2>Settings</h2>
+          <h2>{t('settings.title')}</h2>
           <button className="settings-close" onClick={handleCancel}>
             ✕
           </button>
         </div>
         <div className="settings-content">
           <div className="settings-section">
-            <h3>Log Directory</h3>
+            <h3>{t('settings.logDirectory')}</h3>
             <div className="settings-directory-row">
               <input
                 type="text"
@@ -109,7 +113,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                 onChange={(e) =>
                   setLocalSettings({ ...localSettings, logDirectory: e.target.value })
                 }
-                placeholder="Path to log directory"
+                placeholder={t('settings.logDirectoryPlaceholder')}
               />
               <button
                 type="button"
@@ -117,13 +121,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                 onClick={handleSelectDirectory}
                 disabled={isSelectingDirectory}
               >
-                {isSelectingDirectory ? 'Wird geöffnet…' : 'Ordner wählen'}
+                {isSelectingDirectory ? t('settings.selectingFolder') : t('settings.selectFolder')}
               </button>
             </div>
           </div>
 
           <div className="settings-section">
-            <h3>Auto-Update</h3>
+            <h3>{t('settings.autoUpdate')}</h3>
             <label className="settings-checkbox">
               <input
                 type="checkbox"
@@ -132,10 +136,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                   setLocalSettings({ ...localSettings, autoRefresh: e.target.checked })
                 }
               />
-              Auto-refresh
+              {t('settings.autoRefresh')}
             </label>
             <div className="settings-input-group">
-              <label>Refresh interval (ms):</label>
+              <label>{t('settings.refreshInterval')}</label>
               <input
                 type="number"
                 className="settings-input"
@@ -153,33 +157,30 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
           </div>
 
           <div className="settings-section">
-            <h3>Log Schema</h3>
-            <p className="settings-help-text">
-              Konfigurieren Sie das Regex-Pattern zum Parsen Ihrer Log-Dateien. 
-              Änderungen werden beim Speichern sofort wirksam und die geöffneten Dateien werden neu geladen.
-            </p>
+            <h3>{t('settings.logSchema')}</h3>
+            <p className="settings-help-text">{t('settings.logSchemaHelp')}</p>
             <div className="settings-input-group">
-              <label>Regex Pattern:</label>
+              <label>{t('settings.regexPattern')}</label>
               <textarea
                 className={`settings-textarea ${patternError ? 'settings-input-error' : ''}`}
                 value={localSettings.logSchema.pattern}
                 onChange={(e) => handleSchemaChange('pattern', e.target.value)}
                 rows={4}
-                placeholder="z.B.: ^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+)\\s*\\|\\s*([A-Z]+)\\s*\\|\\s*([^|]+)\\s*\\|\\s*(.+)$"
+                placeholder={t('settings.regexPatternPlaceholder')}
               />
               {patternError && (
                 <div className="settings-error-message">
-                  Regex-Fehler: {patternError}
+                  {t('settings.regexError', { error: patternError ?? '' })}
                 </div>
               )}
               <div className="settings-help-text-small">
-                Beispiel für Standard-Format: <code>^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+)\\s*\\|\\s*([A-Z]+)\\s*\\|\\s*([^|]+)\\s*\\|\\s*(.+)$</code>
+                {t('settings.regexExample')} <code>{REGEX_EXAMPLE}</code>
                 <br />
-                Dieses Pattern erwartet: Timestamp | Level | Namespace | Message
+                {t('settings.regexExpects')}
               </div>
             </div>
             <div className="settings-input-group">
-              <label>Timestamp-Format:</label>
+              <label>{t('settings.timestampFormat')}</label>
               <input
                 type="text"
                 className="settings-input"
@@ -189,62 +190,34 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
               />
             </div>
             <div className="settings-fields">
-              <h4>Regex Groups (1-based):</h4>
+              <h4>{t('settings.regexGroups')}</h4>
               <div className="settings-input-group">
-                <label>Timestamp Group:</label>
-                <input
-                  type="number"
-                  className="settings-input"
-                  value={localSettings.logSchema.fields.timestamp}
-                  onChange={(e) =>
-                    handleFieldChange('timestamp', parseInt(e.target.value) || 1)
-                  }
-                  min="1"
-                />
+                <label>{t('settings.timestampGroup')}</label>
+                <input type="number" className="settings-input" value={localSettings.logSchema.fields.timestamp}
+                  onChange={(e) => handleFieldChange('timestamp', parseInt(e.target.value) || 1)} min="1" />
               </div>
               <div className="settings-input-group">
-                <label>Level Group:</label>
-                <input
-                  type="number"
-                  className="settings-input"
-                  value={localSettings.logSchema.fields.level}
-                  onChange={(e) =>
-                    handleFieldChange('level', parseInt(e.target.value) || 2)
-                  }
-                  min="1"
-                />
+                <label>{t('settings.levelGroup')}</label>
+                <input type="number" className="settings-input" value={localSettings.logSchema.fields.level}
+                  onChange={(e) => handleFieldChange('level', parseInt(e.target.value) || 2)} min="1" />
               </div>
               <div className="settings-input-group">
-                <label>Namespace Group:</label>
-                <input
-                  type="number"
-                  className="settings-input"
-                  value={localSettings.logSchema.fields.namespace}
-                  onChange={(e) =>
-                    handleFieldChange('namespace', parseInt(e.target.value) || 3)
-                  }
-                  min="1"
-                />
+                <label>{t('settings.namespaceGroup')}</label>
+                <input type="number" className="settings-input" value={localSettings.logSchema.fields.namespace}
+                  onChange={(e) => handleFieldChange('namespace', parseInt(e.target.value) || 3)} min="1" />
               </div>
               <div className="settings-input-group">
-                <label>Message Group:</label>
-                <input
-                  type="number"
-                  className="settings-input"
-                  value={localSettings.logSchema.fields.message}
-                  onChange={(e) =>
-                    handleFieldChange('message', parseInt(e.target.value) || 4)
-                  }
-                  min="1"
-                />
+                <label>{t('settings.messageGroup')}</label>
+                <input type="number" className="settings-input" value={localSettings.logSchema.fields.message}
+                  onChange={(e) => handleFieldChange('message', parseInt(e.target.value) || 4)} min="1" />
               </div>
             </div>
           </div>
 
           <div className="settings-section">
-            <h3>Display</h3>
+            <h3>{t('settings.display')}</h3>
             <div className="settings-input-group">
-              <label>Font Size:</label>
+              <label>{t('settings.fontSize')}</label>
               <input
                 type="number"
                 className="settings-input"
@@ -260,26 +233,39 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
               />
             </div>
             <div className="settings-input-group">
-              <label>Theme:</label>
+              <label>{t('settings.theme')}</label>
               <select
                 className="settings-input"
                 value={localSettings.theme}
                 onChange={(e) =>
-                  setLocalSettings({
-                    ...localSettings,
-                    theme: e.target.value as 'dark' | 'light',
-                  })
+                  setLocalSettings({ ...localSettings, theme: e.target.value as 'dark' | 'light' })
                 }
               >
-                <option value="dark">Dark</option>
-                <option value="light">Light</option>
+                <option value="dark">{t('settings.themeDark')}</option>
+                <option value="light">{t('settings.themeLight')}</option>
+              </select>
+            </div>
+            <div className="settings-input-group">
+              <label>{t('settings.language')}</label>
+              <select
+                className="settings-input"
+                value={localSettings.language}
+                onChange={(e) => {
+                  const lang = e.target.value as Language;
+                  setLocalSettings({ ...localSettings, language: lang });
+                  setLanguage(lang);
+                }}
+              >
+                {(Object.entries(LANGUAGE_LABELS) as [Language, string][]).map(([code, label]) => (
+                  <option key={code} value={code}>{label}</option>
+                ))}
               </select>
             </div>
           </div>
         </div>
         <div className="settings-section">
-          <h3 className="settings-section-title">Editor-Reihenfolge</h3>
-          <p className="settings-help-text">Reihenfolge der Editoren, die beim "In Editor öffnen" versucht werden.</p>
+          <h3 className="settings-section-title">{t('settings.editorOrder')}</h3>
+          <p className="settings-help-text">{t('settings.editorOrderHelp')}</p>
           <div className="editor-order-list">
             {(localSettings.editorOrder ?? ['vscode', 'notepadplusplus', 'notepad']).map((editorId, index) => {
               const order = localSettings.editorOrder ?? ['vscode', 'notepadplusplus', 'notepad'];
@@ -296,7 +282,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                         [newOrder[index - 1], newOrder[index]] = [newOrder[index], newOrder[index - 1]];
                         setLocalSettings({ ...localSettings, editorOrder: newOrder });
                       }}
-                      title="Nach oben"
+                      title={t('settings.moveUp')}
                     >▲</button>
                     <button
                       className="editor-order-btn"
@@ -306,7 +292,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                         [newOrder[index + 1], newOrder[index]] = [newOrder[index], newOrder[index + 1]];
                         setLocalSettings({ ...localSettings, editorOrder: newOrder });
                       }}
-                      title="Nach unten"
+                      title={t('settings.moveDown')}
                     >▼</button>
                   </div>
                 </div>
@@ -316,10 +302,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
         </div>
         <div className="settings-footer">
           <button className="settings-button settings-button-primary" onClick={handleSave}>
-            Save
+            {t('settings.save')}
           </button>
           <button className="settings-button" onClick={handleCancel}>
-            Cancel
+            {t('settings.cancel')}
           </button>
         </div>
       </div>

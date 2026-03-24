@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from '../i18n';
 import './Sidebar.css';
 
 interface SidebarProps {
   logDirectory: string;
   onLogFileSelect: (filePath: string | null) => void;
-  onLogFilesSelect: (filePaths: string[]) => void;
+  onLogFilesSelect: (filePaths: string[], ctrlKey?: boolean) => void;
+  onDirectoryChange?: (newPath: string) => void;
+  onOpenFile?: () => void;
   currentFile: string | null;
   selectedFiles: string[];
-  activeTabFiles?: string[]; // Dateien aus dem aktiven Tab (für Highlighting)
+  activeTabFiles?: string[];
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
@@ -23,15 +26,18 @@ const Sidebar: React.FC<SidebarProps> = ({
   logDirectory,
   onLogFileSelect,
   onLogFilesSelect,
+  onDirectoryChange,
+  onOpenFile,
   currentFile,
-  selectedFiles,
   activeTabFiles = [],
   isCollapsed = false,
   onToggleCollapse,
 }) => {
-  const [logFiles, setLogFiles] = useState<Array<{ name: string; path: string }>>([]);
+  const { t } = useTranslation();
+  const [logFiles, setLogFiles] = useState<{ name: string; path: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
 
   // Extract date from filename (e.g. "2025-11-12.log" -> "2025-11-12")
   const extractDateFromFileName = (fileName: string): Date | null => {
@@ -187,16 +193,51 @@ const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
+  const handleSelectDirectory = async () => {
+    if (!window.electronAPI?.showOpenDirectoryDialog) return;
+    setIsSelectingDirectory(true);
+    try {
+      const result = await window.electronAPI.showOpenDirectoryDialog();
+      if (result.success && result.directoryPath) {
+        onDirectoryChange?.(result.directoryPath as string);
+      }
+    } finally {
+      setIsSelectingDirectory(false);
+    }
+  };
+
   return (
     <div className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
-        {!isCollapsed && <div className="sidebar-title">Files</div>}
+        {!isCollapsed && <div className="sidebar-title">{t('sidebar.files')}</div>}
         <div className="sidebar-header-buttons">
+          {!isCollapsed && (
+            <button
+              onClick={onOpenFile}
+              className="open-file-button"
+              title={t('sidebar.openFile')}
+            >
+              <img src="open-file.png" width="20" height="20" alt="" />
+            </button>
+          )}
+          {!isCollapsed && (
+            <button
+              onClick={handleSelectDirectory}
+              disabled={isSelectingDirectory}
+              className="open-folder-button"
+              title={t('sidebar.openFolder')}
+            >
+              <img src="open-folder.png" width="20" height="20" alt="" />
+            </button>
+          )}
+          {!isCollapsed && groupedFiles.length > 0 && (
+            <div className="sidebar-header-sep" />
+          )}
           {!isCollapsed && groupedFiles.length > 0 && (
             <button 
               onClick={toggleAllGroups} 
               className="expand-all-button" 
-              title={collapsedGroups.size === groupedFiles.length ? "Alle aufklappen" : "Alle zusammenklappen"}
+              title={collapsedGroups.size === groupedFiles.length ? t('sidebar.expandAll') : t('sidebar.collapseAll')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 {collapsedGroups.size === groupedFiles.length ? (
@@ -207,7 +248,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               </svg>
             </button>
           )}
-          {!isCollapsed && <button onClick={loadLogFiles} className="refresh-button" title="Aktualisieren">
+          {!isCollapsed && <button onClick={loadLogFiles} className="refresh-button" title={t('sidebar.refresh')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M23 4v6h-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -216,8 +257,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onToggleCollapse}
             className="collapse-sidebar-button"
-            title={isCollapsed ? 'Dateileiste ausklappen' : 'Dateileiste einklappen'}
-            aria-label={isCollapsed ? 'Expand file sidebar' : 'Collapse file sidebar'}
+            title={isCollapsed ? t('sidebar.expandSidebar') : t('sidebar.collapseSidebar')}
+            aria-label={isCollapsed ? t('sidebar.expandSidebar') : t('sidebar.collapseSidebar')}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
               {isCollapsed ? (
@@ -233,12 +274,12 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="sidebar-content">
           {!logDirectory ? (
             <div className="sidebar-empty">
-              <p>Please select a log directory in the settings.</p>
+              <p>{t('sidebar.noDirectory')}</p>
             </div>
           ) : loading ? (
-            <div className="sidebar-loading">Lade...</div>
+            <div className="sidebar-loading">{t('sidebar.loading')}</div>
           ) : logFiles.length === 0 ? (
-            <div className="sidebar-empty">No log files found</div>
+            <div className="sidebar-empty">{t('sidebar.noFiles')}</div>
           ) : (
             <div className="log-file-groups">
               {groupedFiles.map(([dateStr, files]) => {
@@ -255,6 +296,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                       <span className="log-file-group-title">
                         {formatDate(dateStr)}
                       </span>
+                      {files.length > 1 && (
+                        <button
+                          className="log-file-group-open-all"
+                          title={t('sidebar.openAll', { count: files.length })}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onLogFilesSelect(files.map(f => f.path), e.ctrlKey);
+                          }}
+                        >
+                          <img src="open-files-from-day.png" width="18" height="18" alt="" />
+                        </button>
+                      )}
                       <span className="log-file-group-count">({files.length})</span>
                     </div>
                     {!isGroupCollapsed && (

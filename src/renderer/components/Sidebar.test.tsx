@@ -38,7 +38,7 @@ describe('Sidebar', () => {
     
     // Should show loading initially
     await waitFor(() => {
-      expect(screen.getByText(/Lade/i)).toBeInTheDocument();
+      expect(screen.getByText(/Loading/i)).toBeInTheDocument();
     });
   });
 

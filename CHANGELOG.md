@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-03-24
+
+### Added
+- **Multilingual UI (i18n)**: Full internationalization support with five languages — English, German, Polish, Romanian, and Spanish. The application language is automatically detected from the system locale and can be overridden in the Settings panel.
+- **Language selector in Settings**: A new Language dropdown in the Settings panel lets users choose their preferred language at any time.
+- **Open File / Open Folder buttons in Sidebar**: The file-open and folder-open actions are now accessible directly in the sidebar header, alongside the existing directory files list. An icon-only "Open all files of the day" button is also shown per day group.
+- **PNG icon set for open actions**: Sidebar action buttons use PNG icons (Open File, Open Folder, Open All from Day) styled to match the application theme.
+- **Visual separator between button groups**: A subtle vertical separator divides the open-action buttons from navigation controls in the sidebar header.
+
+### Changed
+- **All UI strings localized**: Every user-visible string in the application — including log viewer toolbar labels (Entries, Reset, Tracking, End, column headers), copy button, context menu items (Copy entry, Open in editor), settings labels, about panel text, and sidebar messages — is now served through the i18n system.
+- **DevTools no longer open automatically**: The Chromium DevTools are no longer opened on application start in development mode. F12 and Ctrl+Shift+I still work for manual access.
+
+### Fixed
+- **TypeScript `ToolbarProps` interface cleanup**: Removed leftover TitleBar-related props (`onSettingsClick`, `onAboutClick`, `onOpenFile`, `onThemeToggle`, etc.) from the Toolbar component interface, which were never actually used by the Toolbar.
+- **`boolean | null` type mismatch on `isVisible` prop**: The `NamespaceToolbar` visibility expression now correctly evaluates to a strict `boolean`.
+- **`TranslationKeys` type incompatibility**: The exported `TranslationKeys` type now uses a recursive `DeepString<T>` utility type, allowing translation files for non-English languages to satisfy the structural contract without requiring identical literal string values.
+
 ## [2.2.1] - 2026-03-19
 
 ### Added

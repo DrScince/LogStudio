@@ -649,34 +649,63 @@
   background: var(--bg-tertiary);
 }
 
+.log-line-number-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  min-width: 70px;
+  justify-content: flex-end;
+}
+
 .log-line-number {
   color: var(--text-muted);
-  min-width: 70px;
-  max-width: 70px;
-  width: 70px;
+  min-width: 0;
   text-align: right;
   font-size: 1rem;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
   overflow: hidden;
+  white-space: nowrap;
+}
+
+.log-source-line {
+  color: var(--text-muted);
+  opacity: 0.5;
+  text-align: right;
+  font-size: 0.78rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  margin-right: 3px;
+  padding-right: 3px;
+  border-right: 1px solid var(--border-color);
 }
 
 @media (max-width: 1024px) {
-  .log-line-number {
+  .log-line-number-group {
     min-width: 50px;
-    max-width: 50px;
-    width: 50px;
+  }
+  .log-line-number {
     font-size: 0.917rem;
+  }
+  .log-source-line {
+    font-size: 0.72rem;
   }
 }
 
 @media (max-width: 768px) {
-  .log-line-number {
+  .log-line-number-group {
     min-width: 40px;
-    max-width: 40px;
-    width: 40px;
+  }
+  .log-line-number {
     font-size: 0.833rem;
+  }
+  .log-source-line {
+    font-size: 0.67rem;
   }
 }
 

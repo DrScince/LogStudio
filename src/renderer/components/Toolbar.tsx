@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from '../i18n';
 import './Toolbar.css';
 
 export interface Tab {
@@ -10,15 +11,6 @@ export interface Tab {
 }
 
 interface ToolbarProps {
-  onSettingsClick: () => void;
-  onAboutClick: () => void;
-  onOpenFile: () => void;
-  onThemeToggle: () => void;
-  onCheckForUpdates: () => void;
-  checkingForUpdates: boolean;
-  updateAvailable: boolean;
-  currentTheme: 'dark' | 'light';
-  currentFile: string | null;
   tabs: Tab[];
   activeTabId: string | null;
   onTabSelect: (tabId: string) => void;
@@ -27,16 +19,7 @@ interface ToolbarProps {
   onCloseOthers: (tabId: string) => void;
 }
 
-const Toolbar: React.FC<ToolbarProps> = ({ 
-  onSettingsClick, 
-  onAboutClick, 
-  onOpenFile, 
-  onThemeToggle,
-  onCheckForUpdates,
-  checkingForUpdates,
-  updateAvailable,
-  currentTheme, 
-  currentFile,
+const Toolbar: React.FC<ToolbarProps> = ({
   tabs,
   activeTabId,
   onTabSelect,
@@ -44,6 +27,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onCloseAll,
   onCloseOthers,
 }) => {
+  const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; tabId: string } | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
@@ -60,7 +44,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
   const getTabLabel = (tab: Tab): string => {
     if (tab.filePaths && tab.filePaths.length > 1) {
-      return `${tab.filePaths.length} Dateien`;
+      return t('toolbar.files', { count: tab.filePaths.length });
     }
     return getFileName(tab.filePath);
   };
@@ -73,8 +57,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         <div className="toolbar-tabs">
             {tabs.map((tab) => {
               const isActive = tab.id === activeTabId;
-              const hasMultipleFiles = tab.filePaths && tab.filePaths.length > 1;
-              const tooltipText = hasMultipleFiles 
+              const tooltipText = tab.filePaths && tab.filePaths.length > 1
                 ? tab.filePaths.map(path => path.split(/[/\\]/).pop() || path).join('\n')
                 : getTabLabel(tab);
               
@@ -99,7 +82,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   <button
                     className="toolbar-tab-close"
                     onClick={(e) => onTabClose(tab.id, e)}
-                    title="Close Tab"
+                    title={t('toolbar.closeTab')}
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M9 3L3 9M3 3L9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -121,13 +104,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
             className="tab-context-menu-item"
             onClick={() => { onCloseOthers(contextMenu.tabId); setContextMenu(null); }}
           >
-            Alle anderen schließen
+            {t('toolbar.closeOthers')}
           </button>
           <button
             className="tab-context-menu-item"
             onClick={() => { onCloseAll(); setContextMenu(null); }}
           >
-            Alle schließen
+            {t('toolbar.closeAll')}
           </button>
         </div>
       )}

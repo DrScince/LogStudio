@@ -88,7 +88,7 @@ describe('SettingsPanel', () => {
     const onSave = vi.fn();
     render(<SettingsPanel {...defaultProps} onSettingsChange={onSave} />);
     
-    const saveButton = screen.getByText(/Save/i);
+    const saveButton = screen.getByRole('button', { name: /^Save$/i });
     fireEvent.click(saveButton);
     
     await waitFor(() => {
@@ -109,7 +109,7 @@ describe('SettingsPanel', () => {
   it('should update regex pattern', async () => {
     render(<SettingsPanel {...defaultProps} />);
     
-    const patternInput = screen.getByPlaceholderText(/z\.B\.:/i);
+    const patternInput = screen.getByPlaceholderText(/e\.g\.:/i);
     fireEvent.change(patternInput, { target: { value: 'new-pattern' } });
     
     expect(patternInput).toHaveValue('new-pattern');
@@ -118,7 +118,7 @@ describe('SettingsPanel', () => {
   it('should pick directory via dialog button', async () => {
     render(<SettingsPanel {...defaultProps} />);
 
-    const selectButton = screen.getByRole('button', { name: /Ordner wählen/i });
+    const selectButton = screen.getByRole('button', { name: /Select folder/i });
     fireEvent.click(selectButton);
 
     await waitFor(() => {

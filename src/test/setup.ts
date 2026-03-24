@@ -1,6 +1,34 @@
 import '@testing-library/jest-dom';
-import { expect, afterEach } from 'vitest';
+import { expect, afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
+
+// Global i18n mock — makes useTranslation() return real English translations in all tests
+vi.mock('../renderer/i18n', async () => {
+  const { default: en } = await import('../renderer/i18n/en');
+
+  function resolvePath(obj: any, path: string): any {
+    return path.split('.').reduce((acc: any, part: string) => acc?.[part], obj);
+  }
+
+  function interpolate(str: string, vars?: Record<string, any>): string {
+    if (!vars || typeof str !== 'string') return str;
+    return str.replace(/\{\{(\w+)\}\}/g, (_, key) => String(vars[key] ?? ''));
+  }
+
+  return {
+    useTranslation: () => ({
+      t: (key: string, vars?: Record<string, any>) => {
+        const value = resolvePath(en, key);
+        return typeof value === 'string' ? interpolate(value, vars) : key;
+      },
+      language: 'en' as const,
+      setLanguage: vi.fn(),
+    }),
+    I18nProvider: ({ children }: { children: any }) => children,
+    detectLanguage: () => 'en' as const,
+    LANGUAGE_LABELS: { en: 'English', de: 'Deutsch', pl: 'Polski', ro: 'Română', es: 'Español' },
+  };
+});
 
 // Cleanup after each test
 afterEach(() => {

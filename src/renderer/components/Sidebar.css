@@ -73,6 +73,69 @@
 }
 
 
+.sidebar-header-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--text-secondary);
+  opacity: 0.35;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.open-file-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-primary);
+  border: 1px solid var(--accent-primary);
+  color: #fff;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.open-file-button:hover {
+  opacity: 1;
+  background: var(--accent-hover, #2563eb);
+  border-color: var(--accent-hover, #2563eb);
+  transform: scale(1.07);
+}
+
+.open-folder-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-primary);
+  border: 1px solid var(--accent-primary);
+  color: #fff;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.open-folder-button:hover {
+  opacity: 1;
+  background: var(--accent-hover, #2563eb);
+  border-color: var(--accent-hover, #2563eb);
+  transform: scale(1.07);
+}
+
+.open-folder-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+
 .refresh-button {
   display: flex;
   align-items: center;
@@ -190,6 +253,39 @@
   color: var(--accent-primary);
   font-weight: 600;
   font-size: 0.833rem;
+  margin-left: 4px;
+}
+
+.log-file-group-open-all {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  width: 28px;
+  height: 28px;
+  background: var(--accent-primary);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  opacity: 0.85;
+  margin-right: 2px;
+}
+
+.log-file-group-open-all:hover {
+  opacity: 1;
+  background: var(--accent-hover, #2563eb);
+  border-color: var(--accent-hover, #2563eb);
+  transform: scale(1.1);
+}
+
+.open-file-button img,
+.open-folder-button img,
+.log-file-group-open-all img {
+  object-fit: contain;
+  display: block;
+  filter: brightness(0) invert(1);
 }
 
 .log-file-list {
