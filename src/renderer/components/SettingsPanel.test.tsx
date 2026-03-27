@@ -20,6 +20,11 @@ describe('SettingsPanel', () => {
     refreshInterval: 1000,
     fontSize: 12,
     theme: 'dark',
+    editorOrder: ['vscode', 'notepadplusplus', 'notepad'],
+    language: 'en',
+    autoDetect: true,
+    enabledFormats: ['pipe', 'log4j', 'json', 'logfmt', 'syslog', 'apache', 'german'],
+    includeSubdirectories: false,
   };
 
   const defaultProps = {
@@ -47,12 +52,19 @@ describe('SettingsPanel', () => {
   it('should display current settings values', () => {
     render(<SettingsPanel {...defaultProps} />);
     
+    // Log directory is on the Log Source tab (default)
     expect(screen.getByDisplayValue('/test/logs')).toBeInTheDocument();
+
+    // Font size is on the General tab
+    fireEvent.click(screen.getByText('General'));
     expect(screen.getByDisplayValue('12')).toBeInTheDocument();
   });
 
   it('should update log directory when input changes', async () => {
     render(<SettingsPanel {...defaultProps} />);
+
+    // Navigate to Log Source tab
+    fireEvent.click(screen.getByText('Log Source'));
     
     const directoryInput = screen.getByPlaceholderText(/Path to log directory/i);
     fireEvent.change(directoryInput, { target: { value: '/new/path' } });
@@ -62,6 +74,9 @@ describe('SettingsPanel', () => {
 
   it('should update font size when input changes', async () => {
     render(<SettingsPanel {...defaultProps} />);
+
+    // Navigate to General tab
+    fireEvent.click(screen.getByText('General'));
     
     // Find by role and value
     const fontSizeInputs = screen.getAllByRole('spinbutton');
@@ -76,6 +91,9 @@ describe('SettingsPanel', () => {
 
   it('should toggle auto refresh checkbox', async () => {
     render(<SettingsPanel {...defaultProps} />);
+
+    // Navigate to General tab
+    fireEvent.click(screen.getByText('General'));
     
     const checkbox = screen.getByLabelText(/Auto-refresh/i);
     expect(checkbox).toBeChecked();
@@ -108,6 +126,9 @@ describe('SettingsPanel', () => {
 
   it('should update regex pattern', async () => {
     render(<SettingsPanel {...defaultProps} />);
+
+    // Navigate to Parsing & Schema tab
+    fireEvent.click(screen.getByText('Parsing & Schema'));
     
     const patternInput = screen.getByPlaceholderText(/e\.g\.:/i);
     fireEvent.change(patternInput, { target: { value: 'new-pattern' } });
@@ -117,6 +138,9 @@ describe('SettingsPanel', () => {
 
   it('should pick directory via dialog button', async () => {
     render(<SettingsPanel {...defaultProps} />);
+
+    // Navigate to Log Source tab
+    fireEvent.click(screen.getByText('Log Source'));
 
     const selectButton = screen.getByRole('button', { name: /Select folder/i });
     fireEvent.click(selectButton);

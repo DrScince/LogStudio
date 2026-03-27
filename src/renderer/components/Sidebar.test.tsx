@@ -5,6 +5,10 @@ import Sidebar from './Sidebar';
 // Mock electronAPI
 const mockElectronAPI = {
   listLogFiles: vi.fn(),
+  watchDirectory: vi.fn(),
+  unwatchDirectory: vi.fn(),
+  onDirectoryChanged: vi.fn().mockReturnValue(vi.fn()),
+  removeDirectoryChangedListener: vi.fn(),
 };
 
 beforeEach(() => {
