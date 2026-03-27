@@ -22,7 +22,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readLogFile: (filePath: string) => ipcRenderer.invoke('read-log-file', filePath),
   watchLogFile: (filePath: string) => ipcRenderer.invoke('watch-log-file', filePath),
   unwatchLogFile: (filePath: string) => ipcRenderer.invoke('unwatch-log-file', filePath),
-  listLogFiles: (directory: string) => ipcRenderer.invoke('list-log-files', directory),
+  listLogFiles: (directory: string, includeSubdirectories?: boolean) => ipcRenderer.invoke('list-log-files', directory, includeSubdirectories),
+  watchDirectory: (directory: string) => ipcRenderer.invoke('watch-directory', directory),
+  unwatchDirectory: (directory: string) => ipcRenderer.invoke('unwatch-directory', directory),
+  onDirectoryChanged: (callback: (directory: string) => void) => {
+    ipcRenderer.on('directory-changed', (_event, dir) => callback(dir));
+  },
+  removeDirectoryChangedListener: () => {
+    ipcRenderer.removeAllListeners('directory-changed');
+  },
   getFileStats: (filePath: string) => ipcRenderer.invoke('get-file-stats', filePath),
   readLogChunk: (filePath: string, startByte: number, endByte: number) =>
     ipcRenderer.invoke('read-log-chunk', filePath, startByte, endByte),

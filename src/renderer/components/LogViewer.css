@@ -507,6 +507,53 @@ mark.search-highlight-active {
   display: inline-block;
 }
 
+.format-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  font-size: 0.833rem;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0.85;
+  cursor: default;
+  transition: opacity 0.15s;
+}
+
+.format-badge:hover {
+  opacity: 1;
+}
+
+/* High confidence – keep neutral */
+.format-badge.format-badge-high {
+  color: var(--text-secondary);
+  border-color: var(--border-color);
+}
+
+/* Medium confidence – amber / yellow tint */
+.format-badge.format-badge-medium {
+  color: #d4a01a;
+  border-color: #d4a01a55;
+  background: #d4a01a12;
+}
+
+/* Low confidence – orange warning */
+.format-badge.format-badge-low {
+  color: var(--level-warn, #e8a838);
+  border-color: #e8a83855;
+  background: #e8a83812;
+}
+
+.format-badge-conf {
+  font-size: 0.75rem;
+  opacity: 0.75;
+  margin-left: 1px;
+}
+
 .filter-badge-level {
   max-width: 180px;
 }

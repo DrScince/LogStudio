@@ -13,6 +13,7 @@ interface SidebarProps {
   activeTabFiles?: string[];
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  includeSubdirectories?: boolean;
 }
 
 interface FileWithDate {
@@ -32,6 +33,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   activeTabFiles = [],
   isCollapsed = false,
   onToggleCollapse,
+  includeSubdirectories = false,
 }) => {
   const { t } = useTranslation();
   const [logFiles, setLogFiles] = useState<{ name: string; path: string }[]>([]);
@@ -134,17 +136,28 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   useEffect(() => {
-    if (logDirectory) {
+    if (!logDirectory || !window.electronAPI) return;
+
+    loadLogFiles();
+
+    // Start watching for new / removed files in the directory
+    window.electronAPI.watchDirectory(logDirectory);
+    window.electronAPI.onDirectoryChanged(() => {
       loadLogFiles();
-    }
-  }, [logDirectory]);
+    });
+
+    return () => {
+      window.electronAPI.unwatchDirectory(logDirectory);
+      window.electronAPI.removeDirectoryChangedListener();
+    };
+  }, [logDirectory, includeSubdirectories]);
 
   const loadLogFiles = async () => {
     if (!window.electronAPI) return;
     
     setLoading(true);
     try {
-      const result = await window.electronAPI.listLogFiles(logDirectory);
+      const result = await window.electronAPI.listLogFiles(logDirectory, includeSubdirectories);
       if (result.success && result.files) {
         setLogFiles(result.files);
       }

@@ -26,6 +26,9 @@ export interface AppSettings {
   theme: 'dark' | 'light';
   editorOrder: EditorId[];
   language: Language;
+  autoDetect: boolean;
+  enabledFormats: string[];
+  includeSubdirectories: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -37,6 +40,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
   editorOrder: ['vscode', 'notepadplusplus', 'notepad'],
   language: detectLanguage(),
+  autoDetect: true,
+  enabledFormats: ['pipe', 'log4j', 'json', 'logfmt', 'syslog', 'apache', 'german'],
+  includeSubdirectories: false,
 };
 
 export function loadSettings(): AppSettings {

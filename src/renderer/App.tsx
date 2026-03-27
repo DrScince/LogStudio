@@ -573,6 +573,7 @@ function App() {
           activeTabFiles={activeTabFiles}
           isCollapsed={isFileSidebarCollapsed}
           onToggleCollapse={() => setIsFileSidebarCollapsed((prev) => !prev)}
+          includeSubdirectories={settings.includeSubdirectories}
         />
         <LogViewer
           filePath={currentLogFile}
@@ -584,6 +585,8 @@ function App() {
           onNamespacesChange={handleNamespacesChange}
           onResetFilters={handleResetFilters}
           editorOrder={settings.editorOrder}
+          autoDetect={settings.autoDetect}
+          enabledFormats={settings.enabledFormats}
           key={`${activeTabId}-${resetFilterTrigger}`}
         />
         <NamespaceToolbar

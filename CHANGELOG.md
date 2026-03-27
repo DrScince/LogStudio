@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-03-27
+
+### Added
+- **Redesigned Settings panel with tabbed navigation**: The settings panel has been reorganised into four clearly separated sections — *General* (theme, language, font size, auto-refresh), *Log Source* (directory, subdirectory scanning, new-file watcher, enabled format check-boxes), *Parsing & Schema* (custom regex pattern), and *Tools & Editors* (editor order). The new layout uses a left navigation rail matching the mockup and eliminates the long, hard-to-navigate single-column scroll.
+- **Log-Source tab – "Automatically include subdirectories"**: New checkbox to recursively scan subdirectories of the configured log folder so files nested in date- or service-subdirectories appear in the sidebar automatically.
+- **Log-Source tab – "Detected Formats" checkboxes**: Individual format groups (Pattern / Application Logs, Log4j / Logback, JSON Logs, Key Value (logfmt), Syslog, Apache Access Logs, Custom DD.MM.YYYY) can be enabled or disabled. The Schema Detection panel on the right shows which formats are currently active.
+- **Auto-detection of new log files in the directory**: The sidebar now automatically refreshes when files are added or removed in the configured log directory — no manual refresh needed. A directory watcher (chokidar) runs in the main process and notifies the renderer via IPC.
+- **Intelligent log format auto-detection**: LogStudio now automatically detects the format of any opened log file without requiring manual regex configuration. Supported formats: Pipe-Separated (LogStudio default), Log4j / Logback, ISO Timestamp, JSON / ECS (Elasticsearch), Logfmt (Go / cloud-native), Syslog RFC 5424, Syslog RFC 3164, Apache / Nginx Combined Log, and custom German date format (`DD.MM.YYYY`). The detected format is shown as a badge in the stats bar (📋 Log4j / Logback). Low-confidence detections are highlighted in amber/orange. Auto-detection can be toggled off in Settings to fall back to the custom regex schema. Multi-line entries (stack traces, indented continuations) are grouped correctly for all formats.
+- **Search: highlight & navigate instead of filter-first**: Typing in the search field now highlights all matches inline (message and namespace columns) and jumps to the first occurrence instead of immediately filtering the list. A match counter (`2 of 47`) is shown next to the input. Arrow buttons (↑ / ↓) and Shift+Enter / Enter navigate between matches. The active match gets a distinct orange highlight; all other matches are subtly highlighted in yellow. An **"Apply as filter"** button toggles the previous filter behaviour — when active the list is filtered and the badge in the stats bar appears as before.
+
 ## [2.3.0] - 2026-03-24
 
 ### Added

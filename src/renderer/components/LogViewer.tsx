@@ -2,6 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallba
 import { VariableSizeList } from 'react-window';
 import { LogEntry, LogLevel, LogSchema } from '../types/log';
 import { parseLogFile, filterLogEntries, extractUniqueNamespaces, extractLogLevels } from '../utils/logParser';
+import { detectLogFormat, parseWithFormat, DetectedFormat } from '../utils/logFormatDetector';
 import { useTranslation } from '../i18n';
 import Toast from './Toast';
 import './LogViewer.css';
@@ -16,6 +17,8 @@ interface LogViewerProps {
   onNamespacesChange: (namespaces: string[]) => void;
   onResetFilters?: () => void;
   editorOrder?: string[];
+  autoDetect?: boolean;
+  enabledFormats?: string[];
 }
 
 type ResizableColumn = 'timestamp' | 'level' | 'namespace';
@@ -41,6 +44,8 @@ const LogViewer: React.FC<LogViewerProps> = ({
   onNamespacesChange,
   onResetFilters,
   editorOrder,
+  autoDetect = true,
+  enabledFormats,
 }) => {
   const { t } = useTranslation();
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
@@ -53,6 +58,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const [isCompactSearchOpen, setIsCompactSearchOpen] = useState(false);
   const [isCompactSearchMode, setIsCompactSearchMode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [detectedFormat, setDetectedFormat] = useState<DetectedFormat | null>(null);
   const [expandedLines, setExpandedLines] = useState<Set<number>>(new Set());
   const [viewerHeight, setViewerHeight] = useState(600);
 
@@ -91,6 +97,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const scrollPositionRef = useRef<{ scrollOffset: number; scrollUpdateWasRequested: boolean }>({ scrollOffset: 0, scrollUpdateWasRequested: false });
   const pendingScrollRestoreRef = useRef<number | null>(null);
   const hasLoadedRef = useRef(false);
+  const detectedFormatRef = useRef<DetectedFormat | null>(null);
   const previousFiltersRef = useRef<{ levels: LogLevel[]; namespaces: string[]; search: string }>({ levels: [], namespaces: [], search: '' });
 
   const updateViewerHeight = useCallback(() => {
@@ -475,7 +482,18 @@ const LogViewer: React.FC<LogViewerProps> = ({
       const filePromises = filePaths.map(async (path) => {
         const result = await window.electronAPI.readLogFile(path);
         if (result.success && result.content) {
-          const entries = parseLogFile(result.content, schema);
+          let entries;
+          if (autoDetect) {
+            const fmt = detectLogFormat(result.content, enabledFormats);
+            entries = parseWithFormat(result.content, fmt);
+            // Store format from the first file
+            if (!detectedFormatRef.current) {
+              detectedFormatRef.current = fmt;
+              setDetectedFormat(fmt);
+            }
+          } else {
+            entries = parseLogFile(result.content, schema);
+          }
           // Store full path and original line number before merging
           return entries.map(entry => ({
             ...entry,
@@ -515,7 +533,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [schema]);
+  }, [schema, autoDetect]);
 
   const loadLogFile = async () => {
     if (!filePath || !window.electronAPI) return;
@@ -537,7 +555,17 @@ const LogViewer: React.FC<LogViewerProps> = ({
         
         if (isInitialLoad) {
           // Initial load - parse everything
-          const entries = parseLogFile(result.content, schema);
+          let entries;
+          if (autoDetect) {
+            const fmt = detectLogFormat(result.content, enabledFormats);
+            detectedFormatRef.current = fmt;
+            setDetectedFormat(fmt);
+            entries = parseWithFormat(result.content, fmt);
+          } else {
+            detectedFormatRef.current = null;
+            setDetectedFormat(null);
+            entries = parseLogFile(result.content, schema);
+          }
           console.log(`LogViewer: Initial load - ${entries.length} entries parsed`);
           setLogEntries(entries);
           lastFileSizeRef.current = currentSize;
@@ -551,7 +579,12 @@ const LogViewer: React.FC<LogViewerProps> = ({
           const existingLineCount = previousContent.split('\n').length - 1;
           
           // Parse only the new content
-          const newEntries = parseLogFile(newContent, schema, existingLineCount);
+          let newEntries;
+          if (autoDetect && detectedFormatRef.current) {
+            newEntries = parseWithFormat(newContent, detectedFormatRef.current, existingLineCount);
+          } else {
+            newEntries = parseLogFile(newContent, schema, existingLineCount);
+          }
           
           if (newEntries.length > 0) {
             console.log(`LogViewer: Appending ${newEntries.length} new entries`);
@@ -570,7 +603,17 @@ const LogViewer: React.FC<LogViewerProps> = ({
         } else if (currentSize < lastFileSizeRef.current) {
           // File was truncated or replaced - reload everything
           console.log(`LogViewer: File truncated or replaced - reloading`);
-          const entries = parseLogFile(result.content, schema);
+          let entries;
+          if (autoDetect) {
+            const fmt = detectLogFormat(result.content, enabledFormats);
+            detectedFormatRef.current = fmt;
+            setDetectedFormat(fmt);
+            entries = parseWithFormat(result.content, fmt);
+          } else {
+            detectedFormatRef.current = null;
+            setDetectedFormat(null);
+            entries = parseLogFile(result.content, schema);
+          }
           setLogEntries(entries);
           lastFileSizeRef.current = currentSize;
         }
@@ -1178,6 +1221,22 @@ const LogViewer: React.FC<LogViewerProps> = ({
             </div>
           </div>
           <div className={`log-viewer-stats ${hasActiveFilters ? 'has-filters' : ''}`}>
+          {autoDetect && detectedFormat && (() => {
+            const conf = detectedFormat.confidence;
+            const confClass = conf >= 0.7 ? 'high' : conf >= 0.4 ? 'medium' : 'low';
+            const pct = Math.round(conf * 100);
+            const tip = `${t('logviewer.detectedFormat', { format: detectedFormat.displayName })} (${pct}% confidence)`;
+            return (
+              <span className={`format-badge format-badge-${confClass}`} title={tip}>
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                  <rect x="2" y="1" width="12" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M5 6h6M5 9h6M5 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                {detectedFormat.displayName}
+                {conf < 0.7 && <span className="format-badge-conf">{pct}%</span>}
+              </span>
+            );
+          })()}
           <span className="stats-count">{t('logviewer.entries', { filtered: filteredEntries.length, total: logEntries.length })}</span>
           {selectedLevels.length > 0 && (
             <span className="filter-badge filter-badge-level" title={`${t('logviewer.levelBadge', { levels: selectedLevels.join(', ') })}`}>

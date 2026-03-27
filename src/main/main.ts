@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 
 let mainWindow: BrowserWindow | null = null;
 let logWatchers: Map<string, chokidar.FSWatcher> = new Map();
+let dirWatchers: Map<string, chokidar.FSWatcher> = new Map();
 
 // Datei die per Kontext-Menü / Kommandozeile übergeben wurde
 const getFileArgument = (argv: string[]): string | null => {
@@ -284,19 +285,73 @@ ipcMain.handle('unwatch-log-file', (event, filePath: string) => {
   return { success: false, error: 'Watcher not found' };
 });
 
-ipcMain.handle('list-log-files', async (event, directory: string) => {
+ipcMain.handle('list-log-files', async (event, directory: string, includeSubdirectories: boolean = false) => {
+  const ALLOWED_EXTENSIONS = ['.log', '.txt'];
+
+  const scanDir = async (dir: string): Promise<Array<{ name: string; path: string }>> => {
+    const items = await fs.promises.readdir(dir, { withFileTypes: true });
+    const results: Array<{ name: string; path: string }> = [];
+    for (const item of items) {
+      const fullPath = path.join(dir, item.name);
+      if (item.isFile() && ALLOWED_EXTENSIONS.some((ext) => item.name.endsWith(ext))) {
+        results.push({ name: item.name, path: fullPath });
+      } else if (includeSubdirectories && item.isDirectory()) {
+        try {
+          const sub = await scanDir(fullPath);
+          results.push(...sub);
+        } catch {
+          // Skip inaccessible subdirectories
+        }
+      }
+    }
+    return results;
+  };
+
   try {
-    const files = await fs.promises.readdir(directory);
-    const logFiles = files
-      .filter((file) => file.endsWith('.log'))
-      .map((file) => ({
-        name: file,
-        path: path.join(directory, file),
-      }));
+    const logFiles = await scanDir(directory);
     return { success: true, files: logFiles };
   } catch (error) {
     return { success: false, error: String(error) };
   }
+});
+
+ipcMain.handle('watch-directory', (event, directory: string) => {
+  if (dirWatchers.has(directory)) {
+    return { success: true, alreadyWatching: true };
+  }
+  try {
+    const watcher = chokidar.watch(directory, {
+      persistent: true,
+      ignoreInitial: true,
+      depth: 0, // only top-level directory entries
+      usePolling: false,
+    });
+
+    const notify = () => {
+      if (mainWindow) {
+        mainWindow.webContents.send('directory-changed', directory);
+      }
+    };
+
+    watcher.on('add', notify);
+    watcher.on('unlink', notify);
+    watcher.on('error', (err) => console.error('Directory watcher error:', err));
+
+    dirWatchers.set(directory, watcher);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('unwatch-directory', (event, directory: string) => {
+  const watcher = dirWatchers.get(directory);
+  if (watcher) {
+    watcher.close();
+    dirWatchers.delete(directory);
+    return { success: true };
+  }
+  return { success: false, error: 'Directory watcher not found' };
 });
 
 ipcMain.handle('get-file-stats', async (event, filePath: string) => {
