@@ -124,6 +124,11 @@ const ro: TranslationKeys = {
     loading: 'Se încarcă fişierul log...',
     noEntries: 'Nu s-au găsit intrări',
     searchPlaceholder: 'Introduceți textul de căutare...',
+    searchMatch: '{{current}} din {{total}}',
+    searchNoMatch: 'Nicio potrivire',
+    searchPrev: 'Rezultat anterior (Shift+Enter)',
+    searchNext: 'Următorul rezultat (Enter)',
+    searchApplyFilter: 'Aplică ca filtru',
     copiedToClipboard: 'Copiat în clipboard',
   },
 };

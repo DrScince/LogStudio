@@ -47,6 +47,9 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const [filteredEntries, setFilteredEntries] = useState<LogEntry[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<LogLevel[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchAsFilter, setSearchAsFilter] = useState(false);
+  const [searchMatchIndices, setSearchMatchIndices] = useState<number[]>([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [isCompactSearchOpen, setIsCompactSearchOpen] = useState(false);
   const [isCompactSearchMode, setIsCompactSearchMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -404,13 +407,13 @@ const LogViewer: React.FC<LogViewerProps> = ({
       previousFiltersRef.current.levels.some((l, i) => l !== selectedLevels[i]) ||
       previousFiltersRef.current.namespaces.length !== selectedNamespaces.length ||
       previousFiltersRef.current.namespaces.some((n, i) => n !== selectedNamespaces[i]) ||
-      previousFiltersRef.current.search !== searchQuery;
+      previousFiltersRef.current.search !== (searchAsFilter ? searchQuery : '');
     
     // Update previous filters
     previousFiltersRef.current = {
       levels: [...selectedLevels],
       namespaces: [...selectedNamespaces],
-      search: searchQuery,
+      search: searchAsFilter ? searchQuery : '',
     };
     
     // Save current scroll position BEFORE any state change if tracking is off
@@ -423,7 +426,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
       }
     }
     
-    const filtered = filterLogEntries(logEntries, selectedLevels, selectedNamespaces, searchQuery);
+    const filtered = filterLogEntries(logEntries, selectedLevels, selectedNamespaces, searchAsFilter ? searchQuery : '');
     setFilteredEntries(filtered);
     console.log(`LogViewer: ${filtered.length} of ${logEntries.length} entries after filtering`);
     
@@ -459,7 +462,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
         }
       });
     }
-  }, [logEntries, selectedLevels, selectedNamespaces, searchQuery, autoScroll]);
+  }, [logEntries, selectedLevels, selectedNamespaces, searchQuery, searchAsFilter, autoScroll]);
 
   const loadMultipleLogFiles = useCallback(async (filePaths: string[]) => {
     if (!window.electronAPI || filePaths.length === 0) return;
@@ -782,6 +785,51 @@ const LogViewer: React.FC<LogViewerProps> = ({
     });
   }, [isCompactSearchMode]);
 
+  // Compute match indices whenever filteredEntries or searchQuery changes
+  useEffect(() => {
+    if (!searchQuery.trim() || searchAsFilter) {
+      setSearchMatchIndices([]);
+      setCurrentMatchIndex(0);
+      return;
+    }
+    const q = searchQuery.toLowerCase();
+    const indices: number[] = [];
+    filteredEntries.forEach((entry, idx) => {
+      const haystack = (entry.message + ' ' + entry.namespace + ' ' + entry.timestamp + ' ' + entry.level).toLowerCase();
+      if (haystack.includes(q)) indices.push(idx);
+    });
+    setSearchMatchIndices(indices);
+    setCurrentMatchIndex(0);
+  }, [filteredEntries, searchQuery, searchAsFilter]);
+
+  // Scroll to current match whenever it changes
+  useEffect(() => {
+    if (searchMatchIndices.length === 0) return;
+    const targetIdx = searchMatchIndices[currentMatchIndex];
+    if (targetIdx === undefined) return;
+    const listApi = listRef.current as unknown as { scrollToItem?: (index: number, align?: string) => void } | null;
+    listApi?.scrollToItem?.(targetIdx, 'smart');
+  }, [searchMatchIndices, currentMatchIndex]);
+
+  const goToNextMatch = useCallback(() => {
+    if (searchMatchIndices.length === 0) return;
+    setCurrentMatchIndex((prev) => (prev + 1) % searchMatchIndices.length);
+  }, [searchMatchIndices]);
+
+  const goToPrevMatch = useCallback(() => {
+    if (searchMatchIndices.length === 0) return;
+    setCurrentMatchIndex((prev) => (prev - 1 + searchMatchIndices.length) % searchMatchIndices.length);
+  }, [searchMatchIndices]);
+
+  const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.shiftKey) goToPrevMatch(); else goToNextMatch();
+    } else if (e.key === 'Escape') {
+      setIsCompactSearchOpen(false);
+    }
+  }, [goToNextMatch, goToPrevMatch]);
+
   const getLevelColor = (level: LogLevel): string => {
     switch (level) {
       case 'DEBUG':
@@ -830,6 +878,27 @@ const LogViewer: React.FC<LogViewerProps> = ({
     });
   }, [showCopyToast]);
 
+  // Highlight matching text in a string for display
+  const highlightText = useCallback((text: string, isActiveMatch: boolean): React.ReactNode => {
+    if (!searchQuery || searchAsFilter) return text;
+    const q = searchQuery.toLowerCase();
+    const parts: React.ReactNode[] = [];
+    let remaining = text;
+    let keyIdx = 0;
+    while (remaining.length > 0) {
+      const idx = remaining.toLowerCase().indexOf(q);
+      if (idx === -1) { parts.push(remaining); break; }
+      if (idx > 0) parts.push(remaining.slice(0, idx));
+      parts.push(
+        <mark key={keyIdx++} className={`search-highlight${isActiveMatch ? ' search-highlight-active' : ''}`}>
+          {remaining.slice(idx, idx + q.length)}
+        </mark>
+      );
+      remaining = remaining.slice(idx + q.length);
+    }
+    return parts.length === 1 && typeof parts[0] === 'string' ? parts[0] : <>{parts}</>;
+  }, [searchQuery, searchAsFilter]);
+
   const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
     const entry = filteredEntries[index];
     if (!entry) return null;
@@ -837,6 +906,8 @@ const LogViewer: React.FC<LogViewerProps> = ({
     const isExpanded = expandedLines.has(entry.originalLineNumber);
     const isLongMessage = entry.message.length > 150;
     const shouldShowExpand = entry.isMultiLine || isLongMessage;
+    const isSearchMatch = !searchAsFilter && searchMatchIndices.includes(index);
+    const isActiveMatch = isSearchMatch && searchMatchIndices[currentMatchIndex] === index;
 
     // Analysiere und formatiere den Inhalt wenn expandiert
     const expandedContent = isExpanded ? analyzeAndFormatContent(entry.isMultiLine ? entry.fullText : entry.message) : null;
@@ -856,7 +927,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
     const namespaceTooltip = entry.namespace.length > 30 ? entry.namespace : undefined;
 
     return (
-      <div style={style} className={`log-entry${isExpanded ? ' log-entry-expanded' : ''}`}>
+      <div style={style} className={`log-entry${isExpanded ? ' log-entry-expanded' : ''}${isActiveMatch ? ' log-entry-active-match' : isSearchMatch ? ' log-entry-search-match' : ''}`}>
         <div
           className={`log-entry-line ${shouldShowExpand ? 'multiline' : ''}`}
           onClick={() => shouldShowExpand && toggleExpand(entry.originalLineNumber)}
@@ -895,13 +966,13 @@ const LogViewer: React.FC<LogViewerProps> = ({
             style={getResizableColumnStyle('namespace')}
             title={namespaceTooltip}
           >
-            {entry.namespace}
+            {highlightText(entry.namespace, isActiveMatch)}
           </span>
           <span 
             className="log-message"
             title={messageTooltip}
           >
-            {displayedMessage}
+            {highlightText(displayedMessage, isActiveMatch)}
           </span>
           {shouldShowExpand && (
             <span className="log-expand-icon">{isExpanded ? '▼' : '▶'}</span>
@@ -946,11 +1017,11 @@ const LogViewer: React.FC<LogViewerProps> = ({
         )}
       </div>
     );
-  }, [filteredEntries, expandedLines, toggleExpand, analyzeAndFormatContent, getResizableColumnStyle, filePaths]);
+  }, [filteredEntries, expandedLines, toggleExpand, analyzeAndFormatContent, getResizableColumnStyle, filePaths, highlightText, searchMatchIndices, currentMatchIndex, searchAsFilter]);
 
   // Check if we have any files to display (single or multiple)
   const hasFiles = filePath || (filePaths && filePaths.length > 0);
-  const hasActiveFilters = selectedLevels.length > 0 || selectedNamespaces.length > 0 || Boolean(searchQuery);
+  const hasActiveFilters = selectedLevels.length > 0 || selectedNamespaces.length > 0 || Boolean(searchAsFilter && searchQuery);
   const visibleLevelCount = 3;
   const selectedLevelsBadge = selectedLevels.length > visibleLevelCount
     ? `${selectedLevels.slice(0, visibleLevelCount).join(', ')}, ...`
@@ -1017,10 +1088,39 @@ const LogViewer: React.FC<LogViewerProps> = ({
                     ref={searchInputRef}
                     type="text"
                     className="search-input"
-                    placeholder="Enter search text..."
+                    placeholder={t('logviewer.searchPlaceholder')}
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => { setSearchQuery(e.target.value); if (searchAsFilter) setSearchAsFilter(false); }}
+                    onKeyDown={handleSearchKeyDown}
                   />
+                )}
+                {!isCompactSearchMode && searchQuery && !searchAsFilter && (
+                  <span className={`search-match-counter ${searchMatchIndices.length === 0 ? 'no-match' : ''}`}>
+                    {searchMatchIndices.length === 0
+                      ? t('logviewer.searchNoMatch')
+                      : t('logviewer.searchMatch', { current: currentMatchIndex + 1, total: searchMatchIndices.length })}
+                  </span>
+                )}
+                {!isCompactSearchMode && searchQuery && !searchAsFilter && searchMatchIndices.length > 0 && (
+                  <>
+                    <button type="button" className="search-nav-button" title={t('logviewer.searchPrev')} onClick={goToPrevMatch}>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 8L6 5L3 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    <button type="button" className="search-nav-button" title={t('logviewer.searchNext')} onClick={goToNextMatch}>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4L6 7L9 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                  </>
+                )}
+                {!isCompactSearchMode && searchQuery && (
+                  <button
+                    type="button"
+                    className={`search-as-filter-button ${searchAsFilter ? 'active' : ''}`}
+                    title={t('logviewer.searchApplyFilter')}
+                    onClick={() => setSearchAsFilter((prev) => !prev)}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4H14M4 8H12M6 12H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                    {t('logviewer.searchApplyFilter')}
+                  </button>
                 )}
                 <button
                   type="button"
@@ -1041,13 +1141,37 @@ const LogViewer: React.FC<LogViewerProps> = ({
                       className="search-input"
                       placeholder={t('logviewer.searchPlaceholder')}
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                          setIsCompactSearchOpen(false);
-                        }
-                      }}
+                      onChange={(e) => { setSearchQuery(e.target.value); if (searchAsFilter) setSearchAsFilter(false); }}
+                      onKeyDown={handleSearchKeyDown}
                     />
+                    {searchQuery && !searchAsFilter && (
+                      <div className="search-dropdown-controls">
+                        <span className={`search-match-counter ${searchMatchIndices.length === 0 ? 'no-match' : ''}`}>
+                          {searchMatchIndices.length === 0
+                            ? t('logviewer.searchNoMatch')
+                            : t('logviewer.searchMatch', { current: currentMatchIndex + 1, total: searchMatchIndices.length })}
+                        </span>
+                        {searchMatchIndices.length > 0 && (
+                          <>
+                            <button type="button" className="search-nav-button" title={t('logviewer.searchPrev')} onClick={goToPrevMatch}>
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 8L6 5L3 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </button>
+                            <button type="button" className="search-nav-button" title={t('logviewer.searchNext')} onClick={goToNextMatch}>
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4L6 7L9 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          className={`search-as-filter-button ${searchAsFilter ? 'active' : ''}`}
+                          title={t('logviewer.searchApplyFilter')}
+                          onClick={() => setSearchAsFilter((prev) => !prev)}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4H14M4 8H12M6 12H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                          {t('logviewer.searchApplyFilter')}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1065,7 +1189,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
               {t('logviewer.namespaceBadge', { count: selectedNamespaces.length })}
             </span>
           )}
-          {searchQuery && (
+          {searchAsFilter && searchQuery && (
             <span className="filter-badge filter-badge-search" title={`${t('logviewer.searchBadge', { query: searchQuery })}`}>
               {t('logviewer.searchBadge', { query: searchBadge })}
             </span>

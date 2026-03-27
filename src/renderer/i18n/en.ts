@@ -128,6 +128,11 @@ const en = {
     loading: 'Loading log file...',
     noEntries: 'No entries found',
     searchPlaceholder: 'Enter search text...',
+    searchMatch: '{{current}} of {{total}}',
+    searchNoMatch: 'No matches',
+    searchPrev: 'Previous match (Shift+Enter)',
+    searchNext: 'Next match (Enter)',
+    searchApplyFilter: 'Apply as filter',
     copiedToClipboard: 'Copied to clipboard',
   },
 } as const;

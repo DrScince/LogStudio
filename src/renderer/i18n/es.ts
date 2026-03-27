@@ -124,6 +124,11 @@ const es: TranslationKeys = {
     loading: 'Cargando archivo de log...',
     noEntries: 'No se encontraron entradas',
     searchPlaceholder: 'Escriba el texto de búsqueda...',
+    searchMatch: '{{current}} de {{total}}',
+    searchNoMatch: 'Sin coincidencias',
+    searchPrev: 'Resultado anterior (Shift+Enter)',
+    searchNext: 'Siguiente resultado (Enter)',
+    searchApplyFilter: 'Aplicar como filtro',
     copiedToClipboard: 'Copiado al portapapeles',
   },
 };

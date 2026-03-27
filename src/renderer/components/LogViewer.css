@@ -296,6 +296,96 @@
   color: var(--text-muted);
 }
 
+/* ── Search match counter ─────────────────────────────────── */
+.search-match-counter {
+  font-size: 0.833rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.search-match-counter.no-match {
+  color: var(--error, #f48771);
+}
+
+/* ── Search nav buttons (prev / next) ─────────────────────── */
+.search-nav-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.search-nav-button:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+/* ── Apply as filter button ───────────────────────────────── */
+.search-as-filter-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.833rem;
+  white-space: nowrap;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.search-as-filter-button:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+.search-as-filter-button.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+
+/* ── Search dropdown extras ───────────────────────────────── */
+.search-dropdown-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+/* ── Search highlight in log rows ─────────────────────────── */
+mark.search-highlight {
+  background: rgba(255, 200, 0, 0.35);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+mark.search-highlight-active {
+  background: rgba(255, 160, 0, 0.65);
+  outline: 1px solid rgba(255, 160, 0, 0.8);
+}
+
+/* ── Row highlight for search matches ────────────────────── */
+.log-entry.log-entry-search-match > .log-entry-line {
+  background: rgba(255, 200, 0, 0.06);
+}
+.log-entry.log-entry-active-match > .log-entry-line {
+  background: rgba(255, 160, 0, 0.14);
+  outline: 1px solid rgba(255, 160, 0, 0.4);
+  outline-offset: -1px;
+}
+
 .log-viewer-stats {
   font-size: 1rem;
   color: var(--text-muted);
