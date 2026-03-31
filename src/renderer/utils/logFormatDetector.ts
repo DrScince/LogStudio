@@ -23,6 +23,7 @@ export type FormatName =
   | 'log4j'
   | 'iso-simple'
   | 'json-ecs'
+  | 'json-multiline'
   | 'logfmt'
   | 'syslog-rfc5424'
   | 'syslog-rfc3164'
@@ -86,7 +87,7 @@ const RE = {
   pipeSep: /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[.,]\d+)\s*\|\s*([A-Z]+)\s*\|\s*([^|]+?)\s*\|\s*(.*)/,
   log4j:   /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[.,]\d*)\s+(DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|TRACE)\s+\[([^\]]+)\]\s+([\w.$/#-]+)\s+-\s+(.*)/,
   isoSim:  /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z))\s+(DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|TRACE|WARNING)\s+(\S+)\s+(.*)/,
-  jsonLine:/^\s*\{.*"(?:@timestamp|timestamp|time)"\s*:/,
+  jsonLine:/^[^{]*\{.*"(?:@timestamp|timestamp|time|msg|level)"\s*:/,
   logfmt:  /^(?:ts|time)=(\S+)\s+level=(\S+)/,
   sys5424: /^<(\d+)>1\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\S+(?:\s+\[.*?\])?\s*(.*)/s,
   sys3164: /^<(\d+)>(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+(\S+?)(?:\[(\d+)\])?\s*:\s*(.*)/,
@@ -101,7 +102,7 @@ const RE = {
 const FORMAT_GROUP_MAP: Record<string, FormatName[]> = {
   pipe:   ['pipe-separated', 'iso-simple', 'generic'],
   log4j:  ['log4j'],
-  json:   ['json-ecs'],
+  json:   ['json-ecs', 'json-multiline'],
   logfmt: ['logfmt'],
   syslog: ['syslog-rfc5424', 'syslog-rfc3164'],
   apache: ['apache-combined'],
@@ -115,12 +116,37 @@ function scoreLines(lines: string[], re: RegExp): number {
 }
 
 /**
+ * Returns true if the content looks like a file containing multi-line JSON objects
+ * (i.e. each log entry is a JSON object spanning several lines).
+ */
+function isMultilineJson(content: string): boolean {
+  const lines = content.split('\n');
+  const firstNonEmpty = lines.find((l) => l.trim());
+  if (!firstNonEmpty) return false;
+  const t = firstNonEmpty.trim();
+  // Must begin with a JSON structure opener
+  if (t !== '{' && t !== '[' && !t.startsWith('[{')) return false;
+  // Confirm JSON field names appear in the first 15 lines
+  const sample = lines.slice(0, 15).join('\n');
+  return /"(?:timestamp|time|@timestamp|level|message|msg|LoggerName)"\s*:/.test(sample);
+}
+
+/**
  * Analyse the first 100 lines and return the best matching format.
  * @param enabledFormatGroups Optional list of format group keys (from settings).
  *   When omitted all formats are tried.
  */
 export function detectLogFormat(content: string, enabledFormatGroups?: string[]): DetectedFormat {
   const sampleLines = content.split('\n').slice(0, 100);
+
+  // Check for multi-line JSON before line-by-line regex detection
+  const jsonAllowed =
+    !enabledFormatGroups ||
+    enabledFormatGroups.length === 0 ||
+    enabledFormatGroups.includes('json');
+  if (jsonAllowed && isMultilineJson(content)) {
+    return { name: 'json-multiline', displayName: 'JSON (Multi-line)', confidence: 1.0 };
+  }
 
   const allCandidates: [RegExp, FormatName, string][] = [
     [RE.pipeSep,  'pipe-separated',  'Pipe-Separated'     ],
@@ -172,6 +198,8 @@ interface RawEntry {
   level: LogLevel;
   namespace: string;
   message: string;
+  /** If set, used verbatim as the LogEntry.fullText (overrides message). */
+  fullText?: string;
 }
 
 /**
@@ -197,8 +225,8 @@ function buildLogEntries(
       namespace: cur.raw.namespace,
       message: cur.raw.message,
       fullText: isMultiLine
-        ? [cur.raw.message, ...cur.continuations].join('\n')
-        : cur.raw.message,
+        ? [(cur.raw.fullText ?? cur.raw.message), ...cur.continuations].join('\n')
+        : (cur.raw.fullText ?? cur.raw.message),
       isMultiLine,
       lineCount: 1 + cur.continuations.length,
     });
@@ -264,9 +292,20 @@ function parseIsoSimple(lines: string[], lo: number): LogEntry[] {
 function parseJsonEcs(lines: string[], lo: number): LogEntry[] {
   return buildLogEntries(lines, (line) => {
     const trimmed = line.trim();
-    if (!trimmed.startsWith('{')) return null;
+
+    // Support both pure JSON lines and lines with a text prefix before the JSON
+    // e.g. "with prefix | {\"level\":\"info\",...}"
+    let jsonStr: string;
+    if (trimmed.startsWith('{')) {
+      jsonStr = trimmed;
+    } else {
+      const braceIdx = trimmed.indexOf('{');
+      if (braceIdx === -1) return null;
+      jsonStr = trimmed.slice(braceIdx);
+    }
+
     try {
-      const obj = JSON.parse(trimmed) as Record<string, unknown>;
+      const obj = JSON.parse(jsonStr) as Record<string, unknown>;
       const timestamp = String(
         obj['@timestamp'] ?? obj['timestamp'] ?? obj['time'] ?? '',
       );
@@ -275,10 +314,21 @@ function parseJsonEcs(lines: string[], lo: number): LogEntry[] {
       );
       const namespace = String(
         obj['log.logger'] ?? obj['logger'] ?? obj['service.name'] ??
-        obj['service'] ?? obj['source'] ?? '',
+        obj['service'] ?? obj['source'] ?? obj['process'] ?? obj['HOSTNAME'] ?? '',
       );
-      const message = String(obj['message'] ?? obj['msg'] ?? '');
-      return { timestamp, level: normalizeLevel(rawLevel), namespace, message };
+      // GELF uses short_message instead of message/msg
+      const message = String(obj['message'] ?? obj['msg'] ?? obj['short_message'] ?? '');
+
+      // Preserve the full JSON as fullText so the expanded view shows all fields
+      // (package, process, version, uri, method, etc.)
+      let fullText: string;
+      try {
+        fullText = JSON.stringify(obj, null, 2);
+      } catch {
+        fullText = jsonStr;
+      }
+
+      return { timestamp, level: normalizeLevel(rawLevel), namespace, message, fullText };
     } catch {
       return null;
     }
@@ -389,6 +439,97 @@ function parseGeneric(lines: string[], lo: number): LogEntry[] {
   }, lo);
 }
 
+// ─── Multi-line JSON parser ────────────────────────────────────────────────────
+
+/**
+ * Scans `content` and extracts all top-level JSON objects by matching braces.
+ * Handles escaped characters and strings correctly.
+ */
+function extractJsonObjects(content: string): Record<string, unknown>[] {
+  const objects: Record<string, unknown>[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+
+    if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        try {
+          const obj = JSON.parse(content.slice(start, i + 1));
+          objects.push(obj);
+        } catch {
+          // Skip malformed object
+        }
+        start = -1;
+      }
+    }
+  }
+
+  return objects;
+}
+
+function parseJsonMultiline(content: string, lo: number): LogEntry[] {
+  let objects: Record<string, unknown>[] = [];
+
+  // Try as a valid JSON array or single object first
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (Array.isArray(parsed)) {
+      objects = parsed as Record<string, unknown>[];
+    } else if (parsed && typeof parsed === 'object') {
+      objects = [parsed as Record<string, unknown>];
+    }
+  } catch {
+    // Fall back to brace-matching extractor
+    objects = extractJsonObjects(content);
+  }
+
+  return objects.map((obj, index) => {
+    const timestamp = String(
+      obj['timestamp'] ?? obj['@timestamp'] ?? obj['time'] ?? obj['TimeStamp'] ?? '',
+    );
+    const rawLevel = String(
+      obj['level'] ?? obj['log.level'] ?? obj['Level'] ?? obj['severity'] ?? 'INFO',
+    );
+    const namespace = String(
+      obj['source'] ?? obj['LoggerName'] ?? obj['log.logger'] ?? obj['logger'] ??
+      obj['service.name'] ?? obj['service'] ?? obj['process'] ?? obj['HOSTNAME'] ?? '',
+    );
+    const message = String(
+      obj['message'] ?? obj['msg'] ?? obj['Message'] ?? obj['short_message'] ?? '',
+    );
+
+    let fullText: string;
+    try {
+      fullText = JSON.stringify(obj, null, 2);
+    } catch {
+      fullText = String(obj);
+    }
+
+    return {
+      originalLineNumber: index + 1 + lo,
+      timestamp,
+      level: normalizeLevel(rawLevel),
+      namespace,
+      message,
+      fullText,
+      isMultiLine: false,
+      lineCount: 1,
+    };
+  });
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /** Parse `content` using the given pre-detected format. */
@@ -403,6 +544,7 @@ export function parseWithFormat(
     case 'log4j':           return parseLog4j(lines, lineOffset);
     case 'iso-simple':      return parseIsoSimple(lines, lineOffset);
     case 'json-ecs':        return parseJsonEcs(lines, lineOffset);
+    case 'json-multiline':  return parseJsonMultiline(content, lineOffset);
     case 'logfmt':          return parseLogfmt(lines, lineOffset);
     case 'syslog-rfc5424':  return parseSyslog5424(lines, lineOffset);
     case 'syslog-rfc3164':  return parseSyslog3164(lines, lineOffset);

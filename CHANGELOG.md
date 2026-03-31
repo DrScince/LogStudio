@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-03-31
+
+### Added
+- **Multi-line JSON log format (`json-multiline`)**: LogStudio now recognises log files where each entry is a JSON object formatted across multiple lines (e.g. NLog JSON output). A bracket-matching extractor handles files that are not valid JSON arrays and recovers all objects individually. Supported field names cover both lower-case variants (`timestamp`, `level`, `source`, `message`) and NLog PascalCase variants (`TimeStamp`, `Level`, `LoggerName`, `Message`). The new format is auto-detected and listed as *JSON (Multi-line)* in the stats bar.
+
+### Fixed
+- **Expanded-row height uses `fullText`**: The height calculation for expanded log entries now always uses `fullText` (which includes all JSON fields) instead of the short `message`, so expanded rows are never clipped when extra fields are present.
+- **Expand button shown for JSON entries with extra fields**: Entries whose `fullText` differs from `message` (e.g. JSON entries carrying `package`, `process`, `uri`, etc.) now correctly show the expand button even when the message alone is short.
+- **Search covers all JSON fields**: The search index now includes `fullText` instead of just `message`, so searches find matches in any JSON field (e.g. namespace, URI, process name).
+- **`json-ecs` parser improvements**: Handles single-line JSON lines that are preceded by a text prefix (e.g. `prefix | {...}`); recognises GELF's `short_message` field; falls back to `process`/`HOSTNAME` for the namespace when no logger field is set; preserves the complete pretty-printed JSON as `fullText` for the expanded view.
+
 ## [2.4.0] - 2026-03-27
 
 ### Added

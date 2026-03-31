@@ -639,7 +639,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   // Berechnet die Höhe eines expandierten Eintrags aus echten CSS-Metriken —
   // kein DOM-Mess-Callback nötig, kein re-render-Loop durch scroll-triggered ref.
   const getExpandHeight = useCallback((entry: LogEntry): number => {
-    const text = entry.isMultiLine ? entry.fullText : entry.message;
+    const text = entry.fullText;
     const content = analyzeAndFormatContent(text);
     const rawText = content.isHtml ? content.formatted.replace(/<[^>]*>/g, '') : content.formatted;
 
@@ -838,7 +838,8 @@ const LogViewer: React.FC<LogViewerProps> = ({
     const q = searchQuery.toLowerCase();
     const indices: number[] = [];
     filteredEntries.forEach((entry, idx) => {
-      const haystack = (entry.message + ' ' + entry.namespace + ' ' + entry.timestamp + ' ' + entry.level).toLowerCase();
+      // Use fullText so search also finds matches in extra JSON fields (package, process, uri, etc.)
+      const haystack = (entry.fullText + ' ' + entry.namespace + ' ' + entry.timestamp + ' ' + entry.level).toLowerCase();
       if (haystack.includes(q)) indices.push(idx);
     });
     setSearchMatchIndices(indices);
@@ -948,12 +949,14 @@ const LogViewer: React.FC<LogViewerProps> = ({
 
     const isExpanded = expandedLines.has(entry.originalLineNumber);
     const isLongMessage = entry.message.length > 150;
-    const shouldShowExpand = entry.isMultiLine || isLongMessage;
+    // Also expand when fullText differs from message (e.g. JSON entries with extra fields)
+    const hasExtraFields = entry.fullText !== entry.message;
+    const shouldShowExpand = entry.isMultiLine || isLongMessage || hasExtraFields;
     const isSearchMatch = !searchAsFilter && searchMatchIndices.includes(index);
     const isActiveMatch = isSearchMatch && searchMatchIndices[currentMatchIndex] === index;
 
-    // Analysiere und formatiere den Inhalt wenn expandiert
-    const expandedContent = isExpanded ? analyzeAndFormatContent(entry.isMultiLine ? entry.fullText : entry.message) : null;
+    // Analysiere und formatiere den Inhalt wenn expandiert (fullText enthält bei JSON-Einträgen das komplette JSON)
+    const expandedContent = isExpanded ? analyzeAndFormatContent(entry.fullText) : null;
 
     // Bereite Tooltips vor für abgeschnittenen Text
     const displayedMessage = isExpanded
