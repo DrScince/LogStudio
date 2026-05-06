@@ -152,6 +152,20 @@ const pl: TranslationKeys = {
     detectedFormat: 'Format: {{format}}',
     copiedToClipboard: 'Skopiowano do schowka',
   },
+  xml: {
+    viewRaw: 'Raw',
+    viewTree: 'Drzewo',
+    save: 'Zapisz',
+    revert: 'Cofnij zmiany',
+    unsavedChanges: 'Niezapisane zmiany',
+    saved: 'Zapisano',
+    saveError: 'Błąd zapisu pliku',
+    parseError: 'Nieprawidłowy XML — widok drzewa niedostępny.',
+    expandAll: 'Rozwiń wszystkie',
+    collapseAll: 'Zwiń wszystkie',
+    fileChangedExternally: 'Plik został zmieniony zewnętrznie.',
+    reload: 'Odśwież',
+  },
 };
 
 export default pl;

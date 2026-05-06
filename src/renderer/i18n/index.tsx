@@ -4,25 +4,11 @@ import de from './de';
 import pl from './pl';
 import ro from './ro';
 import es from './es';
+import { Language, detectLanguage } from './constants';
 
-export type Language = 'en' | 'de' | 'pl' | 'ro' | 'es';
-
-export const LANGUAGE_LABELS: Record<Language, string> = {
-  en: 'English',
-  de: 'Deutsch',
-  pl: 'Polski',
-  ro: 'Română',
-  es: 'Español',
-};
+export type { Language };
 
 const translations: Record<Language, TranslationKeys> = { en, de, pl, ro, es };
-
-/** Detect system language, fallback to 'en' */
-function detectLanguage(): Language {
-  const lang = (navigator.language || '').toLowerCase().slice(0, 2);
-  if (lang in translations) return lang as Language;
-  return 'en';
-}
 
 /** Simple template interpolation: replace {{key}} placeholders */
 function interpolate(str: string, vars?: Record<string, string | number>): string {
@@ -98,4 +84,4 @@ export function useTranslation() {
   return useContext(I18nContext);
 }
 
-export { detectLanguage };
+

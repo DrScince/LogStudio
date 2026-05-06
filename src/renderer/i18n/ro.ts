@@ -152,6 +152,20 @@ const ro: TranslationKeys = {
     detectedFormat: 'Format: {{format}}',
     copiedToClipboard: 'Copiat în clipboard',
   },
+  xml: {
+    viewRaw: 'Raw',
+    viewTree: 'Arbore',
+    save: 'Salvează',
+    revert: 'Anulează modificările',
+    unsavedChanges: 'Modificări nesalvate',
+    saved: 'Salvat',
+    saveError: 'Eroare la salvare',
+    parseError: 'XML invalid — vizualizarea arbore nu este posibilă.',
+    expandAll: 'Extinde toate',
+    collapseAll: 'Restrânge toate',
+    fileChangedExternally: 'Fișierul a fost modificat extern.',
+    reload: 'Reîncarcă',
+  },
 };
 
 export default ro;

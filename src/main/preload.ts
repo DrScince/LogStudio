@@ -20,6 +20,7 @@ window.addEventListener('drop', (e: DragEvent) => {
 
 contextBridge.exposeInMainWorld('electronAPI', {
   readLogFile: (filePath: string) => ipcRenderer.invoke('read-log-file', filePath),
+  writeXmlFile: (filePath: string, content: string) => ipcRenderer.invoke('write-xml-file', filePath, content),
   watchLogFile: (filePath: string) => ipcRenderer.invoke('watch-log-file', filePath),
   unwatchLogFile: (filePath: string) => ipcRenderer.invoke('unwatch-log-file', filePath),
   listLogFiles: (directory: string, includeSubdirectories?: boolean) => ipcRenderer.invoke('list-log-files', directory, includeSubdirectories),
@@ -35,7 +36,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readLogChunk: (filePath: string, startByte: number, endByte: number) =>
     ipcRenderer.invoke('read-log-chunk', filePath, startByte, endByte),
   onLogFileChanged: (callback: (filePath: string) => void) => {
-    ipcRenderer.on('log-file-changed', (event, filePath) => callback(filePath));
+    const listener = (_event: any, filePath: string) => callback(filePath);
+    ipcRenderer.on('log-file-changed', listener);
+    return () => ipcRenderer.removeListener('log-file-changed', listener);
   },
   removeLogFileChangedListener: () => {
     ipcRenderer.removeAllListeners('log-file-changed');

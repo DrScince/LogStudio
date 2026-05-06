@@ -15,7 +15,7 @@ const getFileArgument = (argv: string[]): string | null => {
   // In dev: argv = ['electron', '.', 'path/to/file']
   const args = app.isPackaged ? argv.slice(1) : argv.slice(2);
   const filePath = args.find(
-    (a) => !a.startsWith('-') && (a.endsWith('.log') || a.endsWith('.txt'))
+    (a) => !a.startsWith('-') && (a.endsWith('.log') || a.endsWith('.txt') || a.endsWith('.xml'))
   );
   return filePath ?? null;
 };
@@ -237,6 +237,15 @@ ipcMain.handle('read-log-file', async (event, filePath: string) => {
   }
 });
 
+ipcMain.handle('write-xml-file', async (event, filePath: string, content: string) => {
+  try {
+    await fs.promises.writeFile(filePath, content, 'utf-8');
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
+
 ipcMain.handle('watch-log-file', (event, filePath: string) => {
   if (logWatchers.has(filePath)) {
     console.log('Already watching:', filePath);
@@ -403,7 +412,9 @@ ipcMain.handle('show-open-dialog', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: 'Log-Datei öffnen',
       filters: [
-        { name: 'Log-Dateien', extensions: ['log', 'txt'] },
+        { name: 'Log & Config Files', extensions: ['log', 'txt', 'xml'] },
+        { name: 'Log Files', extensions: ['log', 'txt'] },
+        { name: 'XML Files', extensions: ['xml'] },
         { name: 'Alle Dateien', extensions: ['*'] },
       ],
       properties: ['openFile'],

@@ -1,5 +1,5 @@
 import { LogSchema } from '../types/log';
-import { Language, detectLanguage } from '../i18n';
+import { Language, detectLanguage } from '../i18n/constants';
 
 export type { LogSchema };
 

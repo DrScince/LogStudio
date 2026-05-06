@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **XML Viewer with Raw and Tree view**: LogStudio now opens `.xml` files (e.g. config files) directly. Each XML file opens in its own tab with an `XML` badge. The **Raw view** shows syntax-highlighted XML (tag names in green, attributes in orange/blue, comments in gray) with a full code editor: Tab key inserts 2 spaces, Enter auto-indents to the current line's level, and typing `>` after an opening tag automatically inserts the matching closing tag. The **Tree view** renders the XML as a modern collapsible node tree — element names, attribute pills, and inline text values are all shown. *Expand all / Collapse all* buttons control the entire tree at once. Changes can be saved with Ctrl+S or the Save button; unsaved changes are indicated by a `●` dot in the toolbar. Revert discards all edits.
+- **XML file support in Open dialog and drag & drop**: The file open dialog now includes an *XML Files* filter. Dragging and dropping `.xml` files onto the window opens them directly.
+
+### Fixed
+- **Localization keys showing as raw strings**: Separated non-component exports (`LANGUAGE_LABELS`, `detectLanguage`) from `i18n/index.tsx` into a new `i18n/constants.ts` file. This resolves a Vite Fast Refresh incompatibility that caused the i18n context to reset to its default (identity) function, making translation keys like `sidebar.files`, `xml.viewRaw`, and `xml.viewTree` appear as literal strings instead of translated text.
+
 ## [2.4.1] - 2026-03-31
 
 ### Added

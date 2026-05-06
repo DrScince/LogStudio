@@ -152,6 +152,20 @@ const de: TranslationKeys = {
     detectedFormat: 'Format: {{format}}',
     copiedToClipboard: 'In Zwischenablage kopiert',
   },
+  xml: {
+    viewRaw: 'Raw',
+    viewTree: 'Baumansicht',
+    save: 'Speichern',
+    revert: 'Zurücksetzen',
+    unsavedChanges: 'Ungespeicherte Änderungen',
+    saved: 'Gespeichert',
+    saveError: 'Fehler beim Speichern',
+    parseError: 'Ungültiges XML — Baumansicht nicht möglich.',
+    expandAll: 'Alle aufklappen',
+    collapseAll: 'Alle zuklappen',
+    fileChangedExternally: 'Die Datei wurde extern geändert.',
+    reload: 'Neu laden',
+  },
 };
 
 export default de;

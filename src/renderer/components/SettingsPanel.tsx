@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { AppSettings, LogSchema, EditorId } from '../utils/settings';
-import { useTranslation, LANGUAGE_LABELS, Language } from '../i18n';
+import { useTranslation } from '../i18n';
+import { LANGUAGE_LABELS, Language } from '../i18n/constants';
 import './SettingsPanel.css';
 
 const EDITOR_LABELS: Record<EditorId, string> = {

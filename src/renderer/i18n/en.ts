@@ -156,6 +156,21 @@ const en = {
     detectedFormat: 'Format: {{format}}',
     copiedToClipboard: 'Copied to clipboard',
   },
+  // XML Viewer
+  xml: {
+    viewRaw: 'Raw',
+    viewTree: 'Tree',
+    save: 'Save',
+    revert: 'Revert',
+    unsavedChanges: 'Unsaved changes',
+    saved: 'Saved',
+    saveError: 'Error saving file',
+    parseError: 'Invalid XML — cannot display tree view.',
+    expandAll: 'Expand all',
+    collapseAll: 'Collapse all',
+    fileChangedExternally: 'The file was changed externally.',
+    reload: 'Reload',
+  },
 } as const;
 
 type DeepString<T> = {

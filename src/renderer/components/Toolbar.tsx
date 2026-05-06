@@ -8,6 +8,7 @@ export interface Tab {
   filePaths?: string[]; // Für mehrere Dateien
   selectedNamespaces: string[];
   namespaces: string[];
+  isXml?: boolean;
 }
 
 interface ToolbarProps {
@@ -79,6 +80,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   title={tooltipText}
                 >
                   <span className="toolbar-tab-label">{getTabLabel(tab)}</span>
+                  {tab.isXml && <span className="toolbar-tab-badge">XML</span>}
                   <button
                     className="toolbar-tab-close"
                     onClick={(e) => onTabClose(tab.id, e)}

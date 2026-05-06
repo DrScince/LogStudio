@@ -1,0 +1,457 @@
+.xml-viewer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+  min-width: 0;
+}
+
+/* ── External change banner ───────────────────────────── */
+.xml-external-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-secondary));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  font-size: 12px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.xml-external-banner svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.xml-external-banner span {
+  flex: 1;
+}
+
+.xml-btn-sm {
+  padding: 2px 10px;
+  font-size: 11px;
+}
+
+/* ── Toolbar ──────────────────────────────────────────── */
+.xml-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  min-height: 40px;
+  flex-wrap: wrap;
+}
+
+.xml-toolbar-filename {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.833rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.xml-toolbar-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.xml-dirty-dot {
+  color: var(--warning);
+  font-size: 1rem;
+  line-height: 1;
+  margin-left: -2px;
+}
+
+.xml-toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border-color);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.xml-toolbar-spacer {
+  flex: 1;
+}
+
+/* ── View toggle ──────────────────────────────────────── */
+.xml-view-toggle {
+  display: flex;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.xml-view-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.xml-view-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.xml-view-btn.active {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+:root.light .xml-view-btn.active {
+  color: #fff;
+}
+
+/* ── Generic toolbar buttons ──────────────────────────── */
+.xml-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.xml-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.xml-btn-ghost {
+  border-color: transparent;
+}
+
+.xml-btn-primary {
+  background: var(--accent-primary);
+  color: #fff;
+  border-color: transparent;
+}
+
+.xml-btn-primary:hover {
+  background: var(--accent-hover);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ── Save status ──────────────────────────────────────── */
+.xml-status {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.xml-status-ok {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+
+.xml-status-err {
+  color: var(--error);
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+}
+
+/* ── Loading ──────────────────────────────────────────── */
+.xml-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.917rem;
+}
+
+/* ─────────────────────────────────────────────────────── */
+/* RAW VIEW                                                */
+/* ─────────────────────────────────────────────────────── */
+
+.xml-raw-scroller {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg-primary);
+}
+
+.xml-raw-content {
+  display: grid;
+  grid-template-areas: "editor";
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.xml-highlight-pre,
+.xml-textarea {
+  grid-area: editor;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.917rem;
+  line-height: 1.7;
+  padding: 14px 20px;
+  margin: 0;
+  white-space: pre;
+  tab-size: 2;
+  word-break: normal;
+  overflow-wrap: normal;
+  min-width: 100%;
+}
+
+.xml-highlight-pre {
+  pointer-events: none;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  /* The pre must be rendered below the textarea */
+  z-index: 0;
+}
+
+.xml-textarea {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text-primary);
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Syntax highlight colours – dark ─────────────────── */
+.xh-comment { color: #6e7681; font-style: italic; }
+.xh-pi      { color: #a5d6ff; }
+.xh-doctype { color: #ff7b72; }
+.xh-cdata   { color: #6e7681; }
+.xh-bracket { color: #79c0ff; }
+.xh-tag-name{ color: #7ee787; }
+.xh-attr-name{ color: #ffa657; }
+.xh-op      { color: #8b949e; }
+.xh-attr-val{ color: #a5d6ff; }
+.xh-text    { color: #c9d1d9; }
+
+/* ── Syntax highlight colours – light ────────────────── */
+:root.light .xh-comment  { color: #6e7681; font-style: italic; }
+:root.light .xh-pi       { color: #0550ae; }
+:root.light .xh-doctype  { color: #cf222e; }
+:root.light .xh-cdata    { color: #6e7681; }
+:root.light .xh-bracket  { color: #0969da; }
+:root.light .xh-tag-name { color: #116329; }
+:root.light .xh-attr-name{ color: #953800; }
+:root.light .xh-op       { color: #656d76; }
+:root.light .xh-attr-val { color: #0550ae; }
+:root.light .xh-text     { color: #1f2328; }
+
+/* ─────────────────────────────────────────────────────── */
+/* TREE VIEW                                               */
+/* ─────────────────────────────────────────────────────── */
+
+.xml-tree-scroller {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 8px;
+  background: var(--bg-primary);
+}
+
+.xml-tree-root {
+  font-size: 0.875rem;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.xml-tree-decl {
+  padding: 4px 8px 8px 8px;
+  color: #a5d6ff;
+  font-size: 0.833rem;
+  opacity: 0.7;
+}
+
+:root.light .xml-tree-decl {
+  color: #0550ae;
+}
+
+.xml-tree-node {
+  /* No additional padding – handled via paddingLeft on rows */
+}
+
+.xml-tree-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  padding-right: 12px;
+  border-radius: var(--radius-sm);
+  cursor: default;
+  min-height: 28px;
+  transition: background 0.1s;
+}
+
+.xml-tree-row:hover {
+  background: var(--bg-hover);
+}
+
+.xml-tree-chevron {
+  width: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color 0.15s;
+}
+
+.xml-tree-row:hover .xml-tree-chevron {
+  color: var(--text-secondary);
+}
+
+.xml-tree-tag-name {
+  color: #7ee787;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+:root.light .xml-tree-tag-name {
+  color: #116329;
+}
+
+/* Attribute pill */
+.xml-tree-attr {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 7px;
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, var(--border-color));
+  border-radius: 10px;
+  font-size: 0.78rem;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.xml-tree-attr-name {
+  color: #ffa657;
+  font-weight: 500;
+}
+
+:root.light .xml-tree-attr-name {
+  color: #953800;
+}
+
+.xml-tree-attr-eq {
+  color: var(--text-muted);
+}
+
+.xml-tree-attr-val {
+  color: #a5d6ff;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root.light .xml-tree-attr-val {
+  color: #0550ae;
+}
+
+/* Inline text (for leaf elements) */
+.xml-tree-text-inline {
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-left: 6px;
+  max-width: 480px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+.xml-tree-editable {
+  cursor: text;
+  transition: background 0.12s, outline 0.12s;
+}
+
+.xml-tree-editable:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  outline: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.xml-tree-edit-input {
+  margin-left: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-style: normal;
+  padding: 1px 5px;
+  outline: none;
+  min-width: 80px;
+  max-width: 480px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.xml-tree-empty {
+  color: var(--text-muted, var(--text-secondary));
+  opacity: 0.4;
+  margin-left: 4px;
+  font-size: 11px;
+}
+
+/* Multi-line text block (when element has only text children) */
+.xml-tree-text-block {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Comment node */
+.xml-tree-comment {
+  color: #6e7681;
+  font-style: italic;
+  font-size: 0.833rem;
+}
+
+/* Children indent line */
+.xml-tree-children {
+  border-left: 1px solid var(--border-color);
+  margin-left: 18px;
+}
+
+/* Parse error */
+.xml-parse-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--error);
+  font-size: 0.875rem;
+  padding: 20px;
+}

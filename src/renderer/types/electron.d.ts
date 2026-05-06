@@ -1,5 +1,6 @@
 export interface ElectronAPI {
   readLogFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>;
+  writeXmlFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>;
   watchLogFile: (filePath: string) => Promise<{ success: boolean; alreadyWatching?: boolean; error?: string }>;
   unwatchLogFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   listLogFiles: (directory: string, includeSubdirectories?: boolean) => Promise<{ success: boolean; files?: Array<{ name: string; path: string }>; error?: string }>;
@@ -9,7 +10,7 @@ export interface ElectronAPI {
   removeDirectoryChangedListener: () => void;
   getFileStats: (filePath: string) => Promise<{ success: boolean; stats?: { size: number; mtime: string }; error?: string }>;
   readLogChunk: (filePath: string, startByte: number, endByte: number) => Promise<{ success: boolean; content?: string; error?: string }>;
-  onLogFileChanged: (callback: (filePath: string) => void) => void;
+  onLogFileChanged: (callback: (filePath: string) => void) => (() => void) | void;
   removeLogFileChangedListener: () => void;
   getAppPath: () => Promise<{ success: boolean; path?: string; error?: string }>;
   getAppVersion: () => Promise<{ success: boolean; version?: string }>;

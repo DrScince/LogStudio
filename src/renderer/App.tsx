@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import LogViewer from './components/LogViewer';
+import XmlViewer from './components/XmlViewer';
 import Sidebar from './components/Sidebar';
 import NamespaceToolbar from './components/NamespaceToolbar';
 import Toolbar from './components/Toolbar';
@@ -35,7 +36,7 @@ function App() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragError, setDragError] = useState<string | null>(null);
 
-  const ALLOWED_EXTENSIONS = ['.log', '.txt'];
+  const ALLOWED_EXTENSIONS = ['.log', '.txt', '.xml'];
 
   // Apply theme to root element
   useEffect(() => {
@@ -202,9 +203,11 @@ function App() {
     } else {
       // Create a new tab
       const newTabId = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const isXml = filePath.toLowerCase().endsWith('.xml');
       const newTab: Tab = {
         id: newTabId,
         filePath,
+        isXml,
         selectedNamespaces: [],
         namespaces: [],
       };
@@ -575,26 +578,35 @@ function App() {
           onToggleCollapse={() => setIsFileSidebarCollapsed((prev) => !prev)}
           includeSubdirectories={settings.includeSubdirectories}
         />
-        <LogViewer
-          filePath={currentLogFile}
-          filePaths={currentLogFiles}
-          schema={settings.logSchema}
-          autoRefresh={settings.autoRefresh}
-          refreshInterval={settings.refreshInterval}
-          selectedNamespaces={selectedNamespaces}
-          onNamespacesChange={handleNamespacesChange}
-          onResetFilters={handleResetFilters}
-          editorOrder={settings.editorOrder}
-          autoDetect={settings.autoDetect}
-          enabledFormats={settings.enabledFormats}
-          key={`${activeTabId}-${resetFilterTrigger}`}
-        />
-        <NamespaceToolbar
-          namespaces={namespaces}
-          selectedNamespaces={selectedNamespaces}
-          onNamespaceToggle={handleNamespaceToggle}
-          isVisible={!!currentLogFile || !!(currentLogFiles && currentLogFiles.length > 0)}
-        />
+        {activeTab?.isXml ? (
+          <XmlViewer
+            filePath={activeTab.filePath}
+            key={activeTabId ?? ''}
+          />
+        ) : (
+          <>
+            <LogViewer
+              filePath={currentLogFile}
+              filePaths={currentLogFiles}
+              schema={settings.logSchema}
+              autoRefresh={settings.autoRefresh}
+              refreshInterval={settings.refreshInterval}
+              selectedNamespaces={selectedNamespaces}
+              onNamespacesChange={handleNamespacesChange}
+              onResetFilters={handleResetFilters}
+              editorOrder={settings.editorOrder}
+              autoDetect={settings.autoDetect}
+              enabledFormats={settings.enabledFormats}
+              key={`${activeTabId}-${resetFilterTrigger}`}
+            />
+            <NamespaceToolbar
+              namespaces={namespaces}
+              selectedNamespaces={selectedNamespaces}
+              onNamespaceToggle={handleNamespaceToggle}
+              isVisible={!!currentLogFile || !!(currentLogFiles && currentLogFiles.length > 0)}
+            />
+          </>
+        )}
       </div>
       {showSettings && (
         <SettingsPanel
