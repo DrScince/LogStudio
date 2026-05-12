@@ -1,6 +1,7 @@
 export interface ElectronAPI {
   readLogFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>;
   writeXmlFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>;
+  writeJsonFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>;
   watchLogFile: (filePath: string) => Promise<{ success: boolean; alreadyWatching?: boolean; error?: string }>;
   unwatchLogFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   listLogFiles: (directory: string, includeSubdirectories?: boolean) => Promise<{ success: boolean; files?: Array<{ name: string; path: string }>; error?: string }>;

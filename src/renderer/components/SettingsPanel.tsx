@@ -26,9 +26,11 @@ interface SettingsPanelProps {
   settings: AppSettings;
   onSettingsChange: (settings: AppSettings) => void;
   onClose: () => void;
+  dirLabels?: Record<string, string>;
+  onDirLabelsChange?: (labels: Record<string, string>) => void;
 }
 
-const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChange, onClose }) => {
+const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChange, onClose, dirLabels = {}, onDirLabelsChange }) => {
   const { t, setLanguage } = useTranslation();
   const [activeTab, setActiveTab] = useState<SettingsTab>('source');
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
@@ -72,7 +74,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
     try {
       const result = await window.electronAPI.showOpenDirectoryDialog();
       if (result.success && result.directoryPath) {
-        setLocalSettings((prev) => ({ ...prev, logDirectory: result.directoryPath as string }));
+        const newDir = result.directoryPath as string;
+        setLocalSettings((prev) => {
+          const dirs = prev.logDirectories ?? [];
+          if (dirs.includes(newDir)) return prev;
+          return { ...prev, logDirectories: [...dirs, newDir] };
+        });
       }
     } finally {
       setIsSelectingDirectory(false);
@@ -200,24 +207,50 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                 {/* Left column */}
                 <div className="settings-source-left">
                   <section className="settings-section">
-                    <h3>{t('settings.logDirectory')}</h3>
-                    <div className="settings-directory-row">
-                      <input
-                        type="text"
-                        className="settings-input"
-                        value={localSettings.logDirectory}
-                        onChange={(e) => setLocalSettings({ ...localSettings, logDirectory: e.target.value })}
-                        placeholder={t('settings.logDirectoryPlaceholder')}
-                      />
-                      <button
-                        type="button"
-                        className="settings-button settings-directory-button"
-                        onClick={handleSelectDirectory}
-                        disabled={isSelectingDirectory}
-                      >
-                        {isSelectingDirectory ? t('settings.selectingFolder') : t('settings.selectFolder')}
-                      </button>
+                    <h3>{t('settings.logDirectories')}</h3>
+                    <div className="settings-dir-list">
+                      {(localSettings.logDirectories ?? []).length === 0 ? (
+                        <div className="settings-dir-empty">{t('settings.noDirectories')}</div>
+                      ) : (
+                        (localSettings.logDirectories ?? []).map((dir) => {
+                          const basename = dir.split(/[\\/]/).filter(Boolean).pop() || dir;
+                          const label = dirLabels[dir] ?? '';
+                          return (
+                          <div key={dir} className="settings-dir-item">
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, opacity: 0.6 }}>
+                              <path d="M1 4a1 1 0 011-1h4.586a1 1 0 01.707.293L8.707 4.707A1 1 0 009.414 5H14a1 1 0 011 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1V4z" fill="currentColor"/>
+                            </svg>
+                            <div className="settings-dir-info">
+                              <span className="settings-dir-path" title={dir}>{dir}</span>
+                              <input
+                                className="settings-dir-label-input"
+                                placeholder={basename}
+                                value={label}
+                                onChange={(e) => onDirLabelsChange?.({ ...dirLabels, [dir]: e.target.value })}
+                              />
+                            </div>
+                            <button
+                              className="settings-dir-remove"
+                              title={t('settings.removeDirectory')}
+                              onClick={() => setLocalSettings((prev) => ({
+                                ...prev,
+                                logDirectories: prev.logDirectories.filter((d) => d !== dir),
+                              }))}
+                            >×</button>
+                          </div>
+                          );
+                        })
+                      )}
                     </div>
+                    <button
+                      type="button"
+                      className="settings-button settings-directory-button"
+                      onClick={handleSelectDirectory}
+                      disabled={isSelectingDirectory}
+                      style={{ marginTop: 8 }}
+                    >
+                      {isSelectingDirectory ? t('settings.selectingFolder') : t('settings.addDirectory')}
+                    </button>
 
                     <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <label className="settings-checkbox">

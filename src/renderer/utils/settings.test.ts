@@ -13,6 +13,7 @@ describe('settings', () => {
 
       expect(settings).toMatchObject({
         logDirectory: '',
+        logDirectories: [],
         autoRefresh: true,
         refreshInterval: 1000,
         fontSize: 12,
@@ -35,6 +36,7 @@ describe('settings', () => {
           },
         },
         logDirectory: '/test/path',
+        logDirectories: ['/test/path'],
         autoRefresh: false,
         refreshInterval: 2000,
         fontSize: 14,
@@ -86,6 +88,7 @@ describe('settings', () => {
           },
         },
         logDirectory: '/test/path',
+        logDirectories: [],
         autoRefresh: false,
         refreshInterval: 2000,
         fontSize: 14,
@@ -119,6 +122,7 @@ describe('settings', () => {
           },
         },
         logDirectory: '',
+        logDirectories: [],
         autoRefresh: true,
         refreshInterval: 1000,
         fontSize: 12,

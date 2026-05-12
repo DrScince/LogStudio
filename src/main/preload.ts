@@ -21,6 +21,7 @@ window.addEventListener('drop', (e: DragEvent) => {
 contextBridge.exposeInMainWorld('electronAPI', {
   readLogFile: (filePath: string) => ipcRenderer.invoke('read-log-file', filePath),
   writeXmlFile: (filePath: string, content: string) => ipcRenderer.invoke('write-xml-file', filePath, content),
+  writeJsonFile: (filePath: string, content: string) => ipcRenderer.invoke('write-xml-file', filePath, content),
   watchLogFile: (filePath: string) => ipcRenderer.invoke('watch-log-file', filePath),
   unwatchLogFile: (filePath: string) => ipcRenderer.invoke('unwatch-log-file', filePath),
   listLogFiles: (directory: string, includeSubdirectories?: boolean) => ipcRenderer.invoke('list-log-files', directory, includeSubdirectories),

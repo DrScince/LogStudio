@@ -295,14 +295,26 @@ ipcMain.handle('unwatch-log-file', (event, filePath: string) => {
 });
 
 ipcMain.handle('list-log-files', async (event, directory: string, includeSubdirectories: boolean = false) => {
-  const ALLOWED_EXTENSIONS = ['.log', '.txt'];
+  // Detect text files by checking for null bytes in the first 512 bytes
+  const isTextFile = async (filePath: string): Promise<boolean> => {
+    try {
+      const buffer = Buffer.alloc(512);
+      const fd = await fs.promises.open(filePath, 'r');
+      const { bytesRead } = await fd.read(buffer, 0, 512, 0);
+      await fd.close();
+      if (bytesRead === 0) return true; // empty file counts as text
+      return !buffer.subarray(0, bytesRead).includes(0); // null byte = binary
+    } catch {
+      return false;
+    }
+  };
 
   const scanDir = async (dir: string): Promise<Array<{ name: string; path: string }>> => {
     const items = await fs.promises.readdir(dir, { withFileTypes: true });
     const results: Array<{ name: string; path: string }> = [];
     for (const item of items) {
       const fullPath = path.join(dir, item.name);
-      if (item.isFile() && ALLOWED_EXTENSIONS.some((ext) => item.name.endsWith(ext))) {
+      if (item.isFile() && await isTextFile(fullPath)) {
         results.push({ name: item.name, path: fullPath });
       } else if (includeSubdirectories && item.isDirectory()) {
         try {

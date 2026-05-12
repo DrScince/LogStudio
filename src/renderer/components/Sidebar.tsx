@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import { useTranslation } from '../i18n';
 import './Sidebar.css';
 
 interface SidebarProps {
-  logDirectory: string;
+  logDirectories: string[];
+  activeDirectory: string;
+  dirLabels?: Record<string, string>;
+  onDirectorySelect: (dir: string) => void;
+  onAddDirectory: (dir: string) => void;
+  onRemoveDirectory: (dir: string) => void;
+  onRenameDirectory?: (dir: string, label: string) => void;
+  onReorderDirectories?: (dirs: string[]) => void;
   onLogFileSelect: (filePath: string | null) => void;
   onLogFilesSelect: (filePaths: string[], ctrlKey?: boolean) => void;
-  onDirectoryChange?: (newPath: string) => void;
   onOpenFile?: () => void;
   currentFile: string | null;
   selectedFiles: string[];
@@ -24,10 +31,16 @@ interface FileWithDate {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
-  logDirectory,
+  logDirectories,
+  activeDirectory,
+  dirLabels = {},
+  onDirectorySelect,
+  onAddDirectory,
+  onRemoveDirectory,
+  onRenameDirectory,
+  onReorderDirectories,
   onLogFileSelect,
   onLogFilesSelect,
-  onDirectoryChange,
   onOpenFile,
   currentFile,
   activeTabFiles = [],
@@ -35,11 +48,90 @@ const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   includeSubdirectories = false,
 }) => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [logFiles, setLogFiles] = useState<{ name: string; path: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
+
+  // Context menu for directory tabs
+  const [dirContextMenu, setDirContextMenu] = useState<{ x: number; y: number; dir: string } | null>(null);
+  const [renamingDir, setRenamingDir] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [dragOverDir, setDragOverDir] = useState<string | null>(null);
+  const dragSrcDir = React.useRef<string | null>(null);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!dirContextMenu) return;
+    const close = () => setDirContextMenu(null);
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [dirContextMenu]);
+
+  const handleDirContextMenu = (e: React.MouseEvent, dir: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const menuHeight = 80;
+    // Place menu to the right of the tab strip; Y at cursor minus top padding so first item is under cursor
+    const x = rect.right + 4;
+    const rawY = e.clientY - 8;
+    const y = Math.min(rawY, window.innerHeight - menuHeight - 8);
+    setDirContextMenu({ x, y, dir });
+  };
+
+  const startRename = (dir: string) => {
+    setDirContextMenu(null);
+    setRenamingDir(dir);
+    setRenameValue(dirLabels[dir] ?? dirBasename(dir));
+  };
+
+  const commitRename = () => {
+    if (renamingDir && onRenameDirectory) {
+      onRenameDirectory(renamingDir, renameValue.trim());
+    }
+    setRenamingDir(null);
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') commitRename();
+    if (e.key === 'Escape') setRenamingDir(null);
+  };
+
+  const handleDragStart = (e: React.DragEvent, dir: string) => {
+    dragSrcDir.current = dir;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('application/x-dir-tab', dir);
+    e.stopPropagation();
+  };
+
+  const handleDragOver = (e: React.DragEvent, dir: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    if (dir !== dragSrcDir.current) setDragOverDir(dir);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetDir: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverDir(null);
+    const src = dragSrcDir.current;
+    if (!src || src === targetDir || !onReorderDirectories) return;
+    const dirs = [...logDirectories];
+    const srcIdx = dirs.indexOf(src);
+    const tgtIdx = dirs.indexOf(targetDir);
+    dirs.splice(srcIdx, 1);
+    dirs.splice(tgtIdx, 0, src);
+    onReorderDirectories(dirs);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    e.stopPropagation();
+    dragSrcDir.current = null;
+    setDragOverDir(null);
+  };
 
   // Extract date from filename (e.g. "2025-11-12.log" -> "2025-11-12")
   const extractDateFromFileName = (fileName: string): Date | null => {
@@ -70,18 +162,23 @@ const Sidebar: React.FC<SidebarProps> = ({
   const groupedFiles = useMemo(() => {
     const filesWithDates: FileWithDate[] = logFiles.map((file) => {
       const dateFromName = extractDateFromFileName(file.name);
-      const date = dateFromName || new Date(); // Fallback to current date
-      
-      // Use local timezone instead of UTC
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`; // YYYY-MM-DD in local time
-      
+      // Use current date only for sorting purposes, but mark as 'no-date' for grouping
+      const dateObj = dateFromName || new Date();
+
+      let dateStr: string;
+      if (dateFromName) {
+        const year = dateFromName.getFullYear();
+        const month = String(dateFromName.getMonth() + 1).padStart(2, '0');
+        const day = String(dateFromName.getDate()).padStart(2, '0');
+        dateStr = `${year}-${month}-${day}`; // YYYY-MM-DD in local time
+      } else {
+        dateStr = 'no-date';
+      }
+
       return {
         ...file,
         date: dateStr,
-        dateObj: date,
+        dateObj,
       };
     });
 
@@ -122,12 +219,11 @@ const Sidebar: React.FC<SidebarProps> = ({
     const yesterdayOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
 
     if (dateOnly.getTime() === todayOnly.getTime()) {
-      return 'Today';
+      return t('sidebar.today');
     } else if (dateOnly.getTime() === yesterdayOnly.getTime()) {
-      return 'Yesterday';
+      return t('sidebar.yesterday');
     } else {
-      // Format as "DD.MM.YYYY"
-      return date.toLocaleDateString('de-DE', {
+      return date.toLocaleDateString(language, {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
@@ -136,28 +232,28 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   useEffect(() => {
-    if (!logDirectory || !window.electronAPI) return;
+    if (!activeDirectory || !window.electronAPI) return;
 
     loadLogFiles();
 
     // Start watching for new / removed files in the directory
-    window.electronAPI.watchDirectory(logDirectory);
+    window.electronAPI.watchDirectory(activeDirectory);
     window.electronAPI.onDirectoryChanged(() => {
       loadLogFiles();
     });
 
     return () => {
-      window.electronAPI.unwatchDirectory(logDirectory);
+      window.electronAPI.unwatchDirectory(activeDirectory);
       window.electronAPI.removeDirectoryChangedListener();
     };
-  }, [logDirectory, includeSubdirectories]);
+  }, [activeDirectory, includeSubdirectories]);
 
   const loadLogFiles = async () => {
-    if (!window.electronAPI) return;
+    if (!window.electronAPI || !activeDirectory) return;
     
     setLoading(true);
     try {
-      const result = await window.electronAPI.listLogFiles(logDirectory, includeSubdirectories);
+      const result = await window.electronAPI.listLogFiles(activeDirectory, includeSubdirectories);
       if (result.success && result.files) {
         setLogFiles(result.files);
       }
@@ -199,7 +295,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       const newSelection = currentSelection.includes(filePath)
         ? currentSelection.filter(f => f !== filePath)
         : [...currentSelection, filePath];
-      onLogFilesSelect(newSelection);
+      onLogFilesSelect(newSelection, true);
     } else {
       // Einfacher Klick: Einzelauswahl
       onLogFileSelect(filePath);
@@ -212,142 +308,235 @@ const Sidebar: React.FC<SidebarProps> = ({
     try {
       const result = await window.electronAPI.showOpenDirectoryDialog();
       if (result.success && result.directoryPath) {
-        onDirectoryChange?.(result.directoryPath as string);
+        onAddDirectory(result.directoryPath as string);
       }
     } finally {
       setIsSelectingDirectory(false);
     }
   };
 
+  // Get folder basename for display in dir tabs
+  const dirBasename = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() || path;
+
+  // Display label: custom label if set, otherwise basename
+  const dirDisplayLabel = (dir: string) => dirLabels[dir] || dirBasename(dir);
+
   return (
+    <>
     <div className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
-      <div className="sidebar-header">
-        {!isCollapsed && <div className="sidebar-title">{t('sidebar.files')}</div>}
-        <div className="sidebar-header-buttons">
-          {!isCollapsed && (
-            <button
-              onClick={onOpenFile}
-              className="open-file-button"
-              title={t('sidebar.openFile')}
-            >
-              <img src="open-file.png" width="20" height="20" alt="" />
-            </button>
-          )}
-          {!isCollapsed && (
-            <button
-              onClick={handleSelectDirectory}
-              disabled={isSelectingDirectory}
-              className="open-folder-button"
-              title={t('sidebar.openFolder')}
-            >
-              <img src="open-folder.png" width="20" height="20" alt="" />
-            </button>
-          )}
-          {!isCollapsed && groupedFiles.length > 0 && (
-            <div className="sidebar-header-sep" />
-          )}
-          {!isCollapsed && groupedFiles.length > 0 && (
-            <button 
-              onClick={toggleAllGroups} 
-              className="expand-all-button" 
-              title={collapsedGroups.size === groupedFiles.length ? t('sidebar.expandAll') : t('sidebar.collapseAll')}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                {collapsedGroups.size === groupedFiles.length ? (
-                  <path d="M8 2L8 14M8 2L4 6M8 2L12 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <div className="sidebar-inner">
+
+        {/* ── Vertical directory tab strip (full height, left side) ── */}
+        {!isCollapsed && (
+          <div className="sidebar-dir-tabs">
+            {logDirectories.map((dir) => (
+              <button
+                key={dir}
+                className={`sidebar-dir-tab ${activeDirectory === dir ? 'active' : ''} ${dragOverDir === dir ? 'drag-over' : ''}`}
+                title={dir}
+                draggable
+                onClick={() => onDirectorySelect(dir)}
+                onContextMenu={(e) => handleDirContextMenu(e, dir)}
+                onDragStart={(e) => handleDragStart(e, dir)}
+                onDragOver={(e) => handleDragOver(e, dir)}
+                onDrop={(e) => handleDrop(e, dir)}
+                onDragEnd={handleDragEnd}
+                onDragLeave={() => setDragOverDir(null)}
+              >
+                {renamingDir === dir ? (
+                  <input
+                    className="sidebar-dir-tab-rename-input"
+                    value={renameValue}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={handleRenameKeyDown}
+                  />
                 ) : (
-                  <path d="M8 14L8 2M8 14L4 10M8 14L12 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <span className="sidebar-dir-tab-label">{dirDisplayLabel(dir)}</span>
                 )}
-              </svg>
-            </button>
-          )}
-          {!isCollapsed && <button onClick={loadLogFiles} className="refresh-button" title={t('sidebar.refresh')}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M23 4v6h-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>}
-          <button
-            onClick={onToggleCollapse}
-            className="collapse-sidebar-button"
-            title={isCollapsed ? t('sidebar.expandSidebar') : t('sidebar.collapseSidebar')}
-            aria-label={isCollapsed ? t('sidebar.expandSidebar') : t('sidebar.collapseSidebar')}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {isCollapsed ? (
-                <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              ) : (
-                <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <button
+                  className="sidebar-dir-tab-close"
+                  title={t('sidebar.removeDirectory')}
+                  onClick={(e) => { e.stopPropagation(); onRemoveDirectory(dir); }}
+                >×</button>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Main area: header + file list ── */}
+        <div className="sidebar-main">
+          <div className="sidebar-header">
+            {!isCollapsed && <div className="sidebar-title">{t('sidebar.files')}</div>}
+            <div className="sidebar-header-buttons">
+              {!isCollapsed && (
+                <button
+                  onClick={handleSelectDirectory}
+                  className="open-folder-button"
+                  title={t('sidebar.addDirectory')}
+                  disabled={isSelectingDirectory}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M12 11v6M9 14h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
               )}
-            </svg>
-          </button>
-        </div>
-      </div>
-      {!isCollapsed && (
-        <div className="sidebar-content">
-          {!logDirectory ? (
-            <div className="sidebar-empty">
-              <p>{t('sidebar.noDirectory')}</p>
-            </div>
-          ) : loading ? (
-            <div className="sidebar-loading">{t('sidebar.loading')}</div>
-          ) : logFiles.length === 0 ? (
-            <div className="sidebar-empty">{t('sidebar.noFiles')}</div>
-          ) : (
-            <div className="log-file-groups">
-              {groupedFiles.map(([dateStr, files]) => {
-                const isGroupCollapsed = collapsedGroups.has(dateStr);
-                return (
-                  <div key={dateStr} className="log-file-group">
-                    <div 
-                      className="log-file-group-header"
-                      onClick={() => toggleGroup(dateStr)}
-                    >
-                      <span className="log-file-group-toggle">
-                        {isGroupCollapsed ? '▶' : '▼'}
-                      </span>
-                      <span className="log-file-group-title">
-                        {formatDate(dateStr)}
-                      </span>
-                      {files.length > 1 && (
-                        <button
-                          className="log-file-group-open-all"
-                          title={t('sidebar.openAll', { count: files.length })}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onLogFilesSelect(files.map(f => f.path), e.ctrlKey);
-                          }}
-                        >
-                          <img src="open-files-from-day.png" width="18" height="18" alt="" />
-                        </button>
-                      )}
-                      <span className="log-file-group-count">({files.length})</span>
-                    </div>
-                    {!isGroupCollapsed && (
-                      <ul className="log-file-list">
-                        {files.map((file) => {
-                          const isActive = currentFile === file.path;
-                          const isInActiveTab = activeTabFiles.includes(file.path);
-                          return (
-                            <li
-                              key={file.path}
-                              className={`log-file-item ${isActive ? 'active' : ''} ${isInActiveTab ? 'in-active-tab' : ''}`}
-                              onClick={(e) => handleFileClick(file.path, e)}
-                            >
-                              {file.name}
-                            </li>
-                          );
-                        })}
-                      </ul>
+              {!isCollapsed && (
+                <button
+                  onClick={onOpenFile}
+                  className="open-file-button"
+                  title={t('sidebar.openFile')}
+                >
+                  <img src="open-file.png" width="20" height="20" alt="" />
+                </button>
+              )}
+              {!isCollapsed && groupedFiles.length > 0 && (
+                <div className="sidebar-header-sep" />
+              )}
+              {!isCollapsed && groupedFiles.length > 0 && (
+                <button
+                  onClick={toggleAllGroups}
+                  className="expand-all-button"
+                  title={collapsedGroups.size === groupedFiles.length ? t('sidebar.expandAll') : t('sidebar.collapseAll')}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {collapsedGroups.size === groupedFiles.length ? (
+                      <path d="M8 2L8 14M8 2L4 6M8 2L12 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    ) : (
+                      <path d="M8 14L8 2M8 14L4 10M8 14L12 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     )}
-                  </div>
-                );
-              })}
+                  </svg>
+                </button>
+              )}
+              {!isCollapsed && (
+                <button onClick={loadLogFiles} className="refresh-button" title={t('sidebar.refresh')}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M23 4v6h-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              )}
+              <button
+                onClick={onToggleCollapse}
+                className="collapse-sidebar-button"
+                title={isCollapsed ? t('sidebar.expandSidebar') : t('sidebar.collapseSidebar')}
+                aria-label={isCollapsed ? t('sidebar.expandSidebar') : t('sidebar.collapseSidebar')}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {isCollapsed ? (
+                    <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  ) : (
+                    <path d="M10 3L5 8L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  )}
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {!isCollapsed && (
+            <div className="sidebar-content">
+              {!activeDirectory ? (
+                <div className="sidebar-empty">
+                  <p>{t('sidebar.noDirectory')}</p>
+                </div>
+              ) : loading ? (
+                <div className="sidebar-loading">{t('sidebar.loading')}</div>
+              ) : logFiles.length === 0 ? (
+                <div className="sidebar-empty">{t('sidebar.noFiles')}</div>
+              ) : (
+                <div className="log-file-groups">
+                  {groupedFiles.map(([dateStr, files]) => {
+                    const isGroupCollapsed = collapsedGroups.has(dateStr);
+                    const hasDate = dateStr !== 'no-date';
+                    return (
+                      <div key={dateStr} className="log-file-group">
+                        {hasDate && (
+                          <div
+                            className="log-file-group-header"
+                            onClick={() => toggleGroup(dateStr)}
+                          >
+                            <span className="log-file-group-toggle">
+                              {isGroupCollapsed ? '▶' : '▼'}
+                            </span>
+                            <span className="log-file-group-title">
+                              {formatDate(dateStr)}
+                            </span>
+                            {files.length > 1 && (
+                              <button
+                                className="log-file-group-open-all"
+                                title={t('sidebar.openAll', { count: files.length })}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onLogFilesSelect(files.map(f => f.path), e.ctrlKey);
+                                }}
+                              >
+                                <img src="open-files-from-day.png" width="18" height="18" alt="" />
+                              </button>
+                            )}
+                            <span className="log-file-group-count">({files.length})</span>
+                          </div>
+                        )}
+                        {(!hasDate || !isGroupCollapsed) && (
+                          <ul className="log-file-list">
+                            {files.map((file) => {
+                              const isActive = currentFile === file.path;
+                              const isInActiveTab = activeTabFiles.includes(file.path);
+                              return (
+                                <li
+                                  key={file.path}
+                                  className={`log-file-item ${isActive ? 'active' : ''} ${isInActiveTab ? 'in-active-tab' : ''}`}
+                                  onClick={(e) => handleFileClick(file.path, e)}
+                                >
+                                  {file.name}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
+        </div>{/* end sidebar-main */}
+
+      </div>{/* end sidebar-inner */}
     </div>
+
+    {/* ── Directory tab context menu (portal to body, avoids backdrop-filter stacking context) ── */}
+    {dirContextMenu && ReactDOM.createPortal(
+      <div
+        className="sidebar-dir-context-menu"
+        style={{ top: dirContextMenu.y, left: dirContextMenu.x }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <button
+          className="sidebar-dir-context-item"
+          onClick={() => { onRemoveDirectory(dirContextMenu.dir); setDirContextMenu(null); }}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9h8l1-9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {t('sidebar.closeFolder')}
+        </button>
+        <button
+          className="sidebar-dir-context-item"
+          onClick={() => startRename(dirContextMenu.dir)}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M11 2l3 3-8 8H3v-3L11 2z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {t('sidebar.renameFolder')}
+        </button>
+      </div>,
+      document.body
+    )}
+    </>
   );
 };
 

@@ -10,6 +10,186 @@
   will-change: width;
 }
 
+/* ── Full-height inner flex-row: [dir tabs] + [sidebar-main] ─ */
+.sidebar-inner {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  overflow: hidden;
+  width: 100%;
+}
+
+/* ── Right column: header + file list ────────────────────── */
+.sidebar-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── Vertical directory tab strip (full sidebar height, left side) ── */
+.sidebar-dir-tabs {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 30px;
+  min-width: 30px;
+  background: var(--bg-tertiary);
+  border-right: 1px solid var(--border-color);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.sidebar-dir-tabs::-webkit-scrollbar { display: none; }
+
+.sidebar-dir-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-height: 72px;
+  padding: 10px 0;
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 0;
+  color: var(--text-secondary);
+  cursor: grab;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.sidebar-dir-tab.drag-over {
+  border-top: 2px solid var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+.sidebar-dir-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.sidebar-dir-tab.active {
+  background: var(--bg-secondary);
+  border-left-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+.sidebar-dir-tab-label {
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  font-size: 0.9rem;
+  font-family: 'Consolas', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-height: 120px;
+  line-height: 1.2;
+  user-select: none;
+}
+.sidebar-dir-tab-close {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+  border-radius: 3px;
+  z-index: 1;
+}
+.sidebar-dir-tab:hover .sidebar-dir-tab-close,
+.sidebar-dir-tab.active .sidebar-dir-tab-close {
+  opacity: 0.55;
+}
+.sidebar-dir-tab-close:hover {
+  opacity: 1 !important;
+  color: var(--level-error);
+  background: color-mix(in srgb, var(--level-error) 15%, transparent);
+}
+.sidebar-dir-tab-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
+}
+.sidebar-dir-tab-add:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--accent-primary);
+}
+.sidebar-dir-tab-add:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── Directory tab rename input ─────────────────────────────── */
+.sidebar-dir-tab-rename-input {
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  width: 22px;
+  max-height: 120px;
+  background: var(--bg-primary);
+  border: 1px solid var(--accent-primary);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-family: 'Consolas', monospace;
+  padding: 2px 1px;
+  outline: none;
+}
+
+/* ── Directory tab context menu ─────────────────────────────── */
+.sidebar-dir-context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  padding: 4px 0;
+  min-width: 160px;
+}
+.sidebar-dir-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-align: left;
+}
+.sidebar-dir-context-item:hover {
+  background: var(--bg-hover);
+  color: var(--accent-primary);
+}
+
+
 .sidebar.collapsed {
   width: 52px;
 }
@@ -23,17 +203,18 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-tertiary);
-  gap: 8px;
+  gap: 4px;
   transition: padding 0.22s cubic-bezier(0.4, 0, 0.2, 1), gap 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-header-buttons {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
+  flex-shrink: 0;
   transition: gap 0.2s ease;
 }
 

@@ -29,6 +29,8 @@ export type FormatName =
   | 'syslog-rfc3164'
   | 'apache-combined'
   | 'german-date'
+  | 'xml'
+  | 'plain-text'
   | 'generic';
 
 export interface DetectedFormat {
@@ -138,6 +140,15 @@ function isMultilineJson(content: string): boolean {
  */
 export function detectLogFormat(content: string, enabledFormatGroups?: string[]): DetectedFormat {
   const sampleLines = content.split('\n').slice(0, 100);
+
+  // Detect XML before any log-format regex (XML has no timestamps)
+  const trimmedStart = content.trimStart().substring(0, 200);
+  if (
+    trimmedStart.startsWith('<?xml') ||
+    /^<[A-Za-z][A-Za-z0-9-_]*(\s|>)/.test(trimmedStart)
+  ) {
+    return { name: 'xml', displayName: 'XML', confidence: 1.0 };
+  }
 
   // Check for multi-line JSON before line-by-line regex detection
   const jsonAllowed =
@@ -425,6 +436,21 @@ function parseGermanDate(lines: string[], lo: number): LogEntry[] {
   }, lo);
 }
 
+/** Renders every non-empty line as a single LogEntry without timestamp parsing. */
+function parsePlainText(lines: string[], lo: number): LogEntry[] {
+  return lines
+    .map((line, i) => ({
+      originalLineNumber: i + 1 + lo,
+      timestamp: '',
+      level: inferLevelFromText(line) as LogLevel,
+      namespace: '',
+      message: line,
+      fullText: line,
+      isMultiLine: false,
+      lineCount: 1,
+    }));
+}
+
 function parseGeneric(lines: string[], lo: number): LogEntry[] {
   return buildLogEntries(lines, (line) => {
     const m = RE.genTs.exec(line);
@@ -550,6 +576,8 @@ export function parseWithFormat(
     case 'syslog-rfc3164':  return parseSyslog3164(lines, lineOffset);
     case 'apache-combined': return parseApache(lines, lineOffset);
     case 'german-date':     return parseGermanDate(lines, lineOffset);
+    case 'xml':             return parsePlainText(lines, lineOffset);
+    case 'plain-text':      return parsePlainText(lines, lineOffset);
     default:                return parseGeneric(lines, lineOffset);
   }
 }

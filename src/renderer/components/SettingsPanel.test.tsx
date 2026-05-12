@@ -16,6 +16,7 @@ describe('SettingsPanel', () => {
       },
     },
     logDirectory: '/test/logs',
+    logDirectories: ['/test/logs'],
     autoRefresh: true,
     refreshInterval: 1000,
     fontSize: 12,
@@ -52,24 +53,23 @@ describe('SettingsPanel', () => {
   it('should display current settings values', () => {
     render(<SettingsPanel {...defaultProps} />);
     
-    // Log directory is on the Log Source tab (default)
-    expect(screen.getByDisplayValue('/test/logs')).toBeInTheDocument();
+    // Log directory path is displayed as text in the Log Source tab (default active)
+    expect(screen.getByText('/test/logs')).toBeInTheDocument();
 
     // Font size is on the General tab
     fireEvent.click(screen.getByText('General'));
     expect(screen.getByDisplayValue('12')).toBeInTheDocument();
   });
 
-  it('should update log directory when input changes', async () => {
-    render(<SettingsPanel {...defaultProps} />);
+  it('should update directory label when label input changes', async () => {
+    const onDirLabelsChange = vi.fn();
+    render(<SettingsPanel {...defaultProps} dirLabels={{}} onDirLabelsChange={onDirLabelsChange} />);
 
-    // Navigate to Log Source tab
-    fireEvent.click(screen.getByText('Log Source'));
-    
-    const directoryInput = screen.getByPlaceholderText(/Path to log directory/i);
-    fireEvent.change(directoryInput, { target: { value: '/new/path' } });
-    
-    expect(directoryInput).toHaveValue('/new/path');
+    // Each directory has a label input with placeholder = basename
+    const labelInput = screen.getByPlaceholderText('logs');
+    fireEvent.change(labelInput, { target: { value: 'My Logs' } });
+
+    expect(onDirLabelsChange).toHaveBeenCalledWith({ '/test/logs': 'My Logs' });
   });
 
   it('should update font size when input changes', async () => {
@@ -139,14 +139,12 @@ describe('SettingsPanel', () => {
   it('should pick directory via dialog button', async () => {
     render(<SettingsPanel {...defaultProps} />);
 
-    // Navigate to Log Source tab
-    fireEvent.click(screen.getByText('Log Source'));
-
-    const selectButton = screen.getByRole('button', { name: /Select folder/i });
-    fireEvent.click(selectButton);
+    // Log Source tab is active by default
+    const addButton = screen.getByRole('button', { name: /Add directory/i });
+    fireEvent.click(addButton);
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue('/selected/logs')).toBeInTheDocument();
+      expect(screen.getByText('/selected/logs')).toBeInTheDocument();
     });
   });
 });

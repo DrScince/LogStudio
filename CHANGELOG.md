@@ -5,13 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.5.0] - 2026-05-12
 
 ### Added
+- **Multi-directory sidebar with vertical tab strip**: The sidebar now supports multiple watched log directories simultaneously. Each directory gets a vertical tab on the left edge of the sidebar. Clicking a tab switches the file list to that directory. The active tab is highlighted with an accent border.
+- **Drag-to-reorder directory tabs**: Directory tabs in the sidebar can be reordered by dragging them up or down.
+- **Right-click context menu on directory tabs**: Right-clicking a directory tab opens a context menu with *Close Folder* and *Rename* actions. Renaming gives the tab a custom display label.
+- **Directory labels in Settings**: The *Log Source* settings tab shows each watched directory with a label input field, allowing custom display names to be set or changed from within Settings.
+- **Auto-switch active directory tab**: When switching between open file tabs, the sidebar automatically activates the directory tab that contains the currently viewed file.
+- **Open Folder button in sidebar header**: A dedicated folder-open button in the sidebar header adds a new directory to the sidebar without a `+` tab in the strip.
+- **All text files shown in sidebar (binary detection)**: The sidebar now shows every text-based file in a watched directory, not just known extensions. Files are identified as text by checking for null bytes in the first 512 bytes of their content. Binary files (images, compiled files, etc.) are excluded.
+- **Content-based viewer routing for XML and JSON**: Opening an `.xml` file or a JSON config file routes it to the correct viewer automatically. XML files and non-log JSON files open in the XML / JSON viewer; JSON files that are detected as structured log output open in the Log Viewer.
+- **Ctrl+click multi-select adds to existing tab**: Ctrl-clicking files in the sidebar adds each file to the currently active tab instead of opening a new tab per click. The active tab's file set grows incrementally — only the final selection remains.
+- **Date grouping only for files with a date in the filename**: Files whose name contains no recognisable date are listed without a date group header. The *Today* / *Yesterday* group is only shown when the extracted date actually matches today or yesterday.
+- **Localized date group labels**: The *Today* and *Yesterday* group headers are translated in all five supported languages (English, German, Polish, Romanian, Spanish).
+- **Locale-aware date formatting in sidebar**: Older date group headers (e.g. `12.05.2026`) are formatted using the active application language rather than a hardcoded German locale.
 - **XML Viewer with Raw and Tree view**: LogStudio now opens `.xml` files (e.g. config files) directly. Each XML file opens in its own tab with an `XML` badge. The **Raw view** shows syntax-highlighted XML (tag names in green, attributes in orange/blue, comments in gray) with a full code editor: Tab key inserts 2 spaces, Enter auto-indents to the current line's level, and typing `>` after an opening tag automatically inserts the matching closing tag. The **Tree view** renders the XML as a modern collapsible node tree — element names, attribute pills, and inline text values are all shown. *Expand all / Collapse all* buttons control the entire tree at once. Changes can be saved with Ctrl+S or the Save button; unsaved changes are indicated by a `●` dot in the toolbar. Revert discards all edits.
 - **XML file support in Open dialog and drag & drop**: The file open dialog now includes an *XML Files* filter. Dragging and dropping `.xml` files onto the window opens them directly.
 
 ### Fixed
+- **Drag collision between tab reorder and file-drop overlay**: Dragging a directory tab no longer triggers the file-drop overlay. The app-level `dragover` handler now only activates the overlay when the dragged item is a file from the OS (checked via `dataTransfer.types.includes('Files')`).
+- **Context menu obscured by sidebar backdrop-filter**: The directory tab context menu is now rendered via `ReactDOM.createPortal` into `document.body`, escaping the sidebar's `backdrop-filter` stacking context so it always appears above all other content.
 - **Localization keys showing as raw strings**: Separated non-component exports (`LANGUAGE_LABELS`, `detectLanguage`) from `i18n/index.tsx` into a new `i18n/constants.ts` file. This resolves a Vite Fast Refresh incompatibility that caused the i18n context to reset to its default (identity) function, making translation keys like `sidebar.files`, `xml.viewRaw`, and `xml.viewTree` appear as literal strings instead of translated text.
 
 ## [2.4.1] - 2026-03-31

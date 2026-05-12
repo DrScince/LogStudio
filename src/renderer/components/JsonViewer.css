@@ -1,0 +1,312 @@
+.json-viewer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+  min-width: 0;
+}
+
+/* ── External change banner ───────────────────────────── */
+.json-external-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-secondary));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  font-size: 12px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+.json-external-banner svg { color: var(--accent); flex-shrink: 0; }
+.json-external-banner span { flex: 1; }
+
+.json-btn-sm { padding: 2px 10px; font-size: 11px; }
+
+/* ── Toolbar ──────────────────────────────────────────── */
+.json-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  min-height: 40px;
+  flex-wrap: wrap;
+}
+
+.json-toolbar-filename {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.833rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+.json-toolbar-icon { color: var(--text-muted); flex-shrink: 0; }
+
+.json-dirty-dot {
+  color: var(--warning);
+  font-size: 1rem;
+  line-height: 1;
+  margin-left: -2px;
+}
+
+.json-toolbar-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border-color);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+.json-toolbar-spacer { flex: 1; }
+
+/* ── View toggle ──────────────────────────────────────── */
+.json-view-toggle {
+  display: flex;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.json-view-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.json-view-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.json-view-btn.active { background: var(--accent-primary); color: #fff; }
+:root.light .json-view-btn.active { color: #fff; }
+
+/* ── Generic toolbar buttons ──────────────────────────── */
+.json-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.json-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--text-muted); }
+.json-btn-ghost { border-color: transparent; }
+.json-btn-primary { background: var(--accent-primary); color: #fff; border-color: transparent; }
+.json-btn-primary:hover { background: var(--accent-hover); color: #fff; border-color: transparent; }
+
+/* ── Save status ──────────────────────────────────────── */
+.json-status {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+}
+.json-status-ok  { color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }
+.json-status-err { color: var(--error);   background: color-mix(in srgb, var(--error)   12%, transparent); }
+
+/* ── Loading / parse error ────────────────────────────── */
+.json-loading, .json-parse-error {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.917rem;
+  padding: 24px;
+}
+.json-parse-error { color: var(--error); }
+
+/* ─────────────────────────────────────────────────────── */
+/* RAW VIEW                                                */
+/* ─────────────────────────────────────────────────────── */
+
+.json-raw-scroller {
+  flex: 1;
+  overflow: auto;
+  background: var(--bg-primary);
+}
+
+.json-raw-content {
+  display: grid;
+  grid-template-areas: "editor";
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.json-highlight-pre,
+.json-textarea {
+  grid-area: editor;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.917rem;
+  line-height: 1.7;
+  padding: 14px 20px;
+  margin: 0;
+  white-space: pre;
+  tab-size: 2;
+  word-break: normal;
+  overflow-wrap: normal;
+  min-width: 100%;
+}
+
+.json-highlight-pre {
+  pointer-events: none;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  z-index: 0;
+}
+
+.json-textarea {
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text-primary);
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── JSON highlight colours – dark ───────────────────── */
+.jh-key    { color: #79c0ff; }
+.jh-string { color: #7ee787; }
+.jh-number { color: #ffa657; }
+.jh-bool   { color: #ff9d6c; font-weight: 600; }
+.jh-null   { color: #8b949e; font-style: italic; }
+.jh-bracket { color: #e6edf3; }
+.jh-colon   { color: #8b949e; }
+.jh-comma   { color: #8b949e; }
+
+/* ── JSON highlight colours – light ──────────────────── */
+:root.light .jh-key    { color: #0550ae; }
+:root.light .jh-string { color: #116329; }
+:root.light .jh-number { color: #953800; }
+:root.light .jh-bool   { color: #8250df; font-weight: 600; }
+:root.light .jh-null   { color: #6e7681; font-style: italic; }
+:root.light .jh-bracket { color: #1f2328; }
+:root.light .jh-colon   { color: #656d76; }
+:root.light .jh-comma   { color: #656d76; }
+
+/* ─────────────────────────────────────────────────────── */
+/* TREE VIEW                                               */
+/* ─────────────────────────────────────────────────────── */
+
+.json-tree-scroller {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 8px;
+  background: var(--bg-primary);
+}
+
+.json-tree-root {
+  font-size: 0.875rem;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.json-tree-node {}
+
+.json-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 1px 0;
+}
+
+.json-tree-close {
+  padding-left: 28px !important;
+}
+
+.json-tree-leaf-spacer {
+  display: inline-block;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+/* ── Collapse button ─────────────────────────── */
+.json-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+}
+.json-collapse-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+/* ── Tree labels ────────────────────────────── */
+.json-tree-key {
+  color: var(--accent-primary);
+  font-weight: 500;
+}
+.json-tree-colon { color: var(--text-muted); }
+.json-tree-bracket { color: var(--text-secondary); font-weight: 600; }
+.json-tree-ellipsis { color: var(--text-muted); margin: 0 2px; }
+.json-tree-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-left: 4px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 0 6px;
+  line-height: 1.6;
+}
+
+/* ── Leaf values ────────────────────────────── */
+.json-tree-value { cursor: default; border-radius: 3px; padding: 0 2px; }
+.json-tree-editable { cursor: pointer; }
+.json-tree-editable:hover {
+  outline: 1px dashed var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.json-val-string { color: #7ee787; }
+.json-val-number { color: #ffa657; }
+.json-val-bool   { color: #ff9d6c; font-weight: 600; }
+.json-val-null   { color: #8b949e; font-style: italic; }
+
+:root.light .json-val-string { color: #116329; }
+:root.light .json-val-number { color: #953800; }
+:root.light .json-val-bool   { color: #8250df; font-weight: 600; }
+:root.light .json-val-null   { color: #6e7681; font-style: italic; }
+
+/* ── Inline edit input ───────────────────────── */
+.json-tree-edit-input {
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.875rem;
+  padding: 1px 6px;
+  border: 1px solid var(--accent-primary);
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  outline: none;
+  min-width: 80px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 25%, transparent);
+}

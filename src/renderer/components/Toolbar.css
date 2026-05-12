@@ -141,6 +141,17 @@
   letter-spacing: 0.04em;
 }
 
+.toolbar-tab-badge-json {
+  background: color-mix(in srgb, #ffa657 18%, transparent);
+  color: #ffa657;
+  border-color: color-mix(in srgb, #ffa657 35%, transparent);
+}
+:root.light .toolbar-tab-badge-json {
+  background: color-mix(in srgb, #953800 15%, transparent);
+  color: #953800;
+  border-color: color-mix(in srgb, #953800 30%, transparent);
+}
+
 .toolbar-tab-close {
   display: flex;
   align-items: center;

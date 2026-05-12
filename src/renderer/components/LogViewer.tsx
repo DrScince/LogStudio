@@ -59,6 +59,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const [isCompactSearchMode, setIsCompactSearchMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [detectedFormat, setDetectedFormat] = useState<DetectedFormat | null>(null);
+  const [rawContent, setRawContent] = useState<string | null>(null);
   const [expandedLines, setExpandedLines] = useState<Set<number>>(new Set());
   const [viewerHeight, setViewerHeight] = useState(600);
 
@@ -560,10 +561,17 @@ const LogViewer: React.FC<LogViewerProps> = ({
             const fmt = detectLogFormat(result.content, enabledFormats);
             detectedFormatRef.current = fmt;
             setDetectedFormat(fmt);
-            entries = parseWithFormat(result.content, fmt);
+            if (fmt.name === 'xml' || fmt.name === 'plain-text') {
+              setRawContent(result.content);
+              entries = [];
+            } else {
+              setRawContent(null);
+              entries = parseWithFormat(result.content, fmt);
+            }
           } else {
             detectedFormatRef.current = null;
             setDetectedFormat(null);
+            setRawContent(null);
             entries = parseLogFile(result.content, schema);
           }
           console.log(`LogViewer: Initial load - ${entries.length} entries parsed`);
@@ -608,10 +616,17 @@ const LogViewer: React.FC<LogViewerProps> = ({
             const fmt = detectLogFormat(result.content, enabledFormats);
             detectedFormatRef.current = fmt;
             setDetectedFormat(fmt);
-            entries = parseWithFormat(result.content, fmt);
+            if (fmt.name === 'xml' || fmt.name === 'plain-text') {
+              setRawContent(result.content);
+              entries = [];
+            } else {
+              setRawContent(null);
+              entries = parseWithFormat(result.content, fmt);
+            }
           } else {
             detectedFormatRef.current = null;
             setDetectedFormat(null);
+            setRawContent(null);
             entries = parseLogFile(result.content, schema);
           }
           setLogEntries(entries);

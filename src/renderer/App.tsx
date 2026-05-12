@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import LogViewer from './components/LogViewer';
 import XmlViewer from './components/XmlViewer';
+import JsonViewer from './components/JsonViewer';
+import { detectLogFormat } from './utils/logFormatDetector';
 import Sidebar from './components/Sidebar';
 import NamespaceToolbar from './components/NamespaceToolbar';
 import Toolbar from './components/Toolbar';
@@ -22,6 +24,10 @@ function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [resetFilterTrigger, setResetFilterTrigger] = useState(0);
   const [isFileSidebarCollapsed, setIsFileSidebarCollapsed] = useState(false);
+  const [activeDirectory, setActiveDirectory] = useState<string>(
+    () => settings.logDirectories[0] ?? ''
+  );
+  const [dirLabels, setDirLabels] = useState<Record<string, string>>({});
 
   type UpdateState =
     | { phase: 'available'; version: string; portable: boolean; releaseUrl?: string }
@@ -36,7 +42,7 @@ function App() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragError, setDragError] = useState<string | null>(null);
 
-  const ALLOWED_EXTENSIONS = ['.log', '.txt', '.xml'];
+  const ALLOWED_EXTENSIONS = ['.log', '.txt', '.xml', '.json'];
 
   // Apply theme to root element
   useEffect(() => {
@@ -91,14 +97,44 @@ function App() {
 
   useEffect(() => {
     // Set default log directory if not set
-    if (!settings.logDirectory && window.electronAPI) {
+    if (settings.logDirectories.length === 0 && window.electronAPI) {
       window.electronAPI.getDefaultLogDirectory().then((result) => {
         if (result.success && result.path) {
-          setSettings((prev) => ({ ...prev, logDirectory: result.path || '' }));
+          const defaultPath = result.path || '';
+          setSettings((prev) => ({
+            ...prev,
+            logDirectory: defaultPath,
+            logDirectories: [defaultPath],
+          }));
+          setActiveDirectory(defaultPath);
         }
       });
     }
   }, []);
+
+  // Keep activeDirectory valid when logDirectories changes
+  useEffect(() => {
+    if (settings.logDirectories.length === 0) {
+      setActiveDirectory('');
+    } else if (!settings.logDirectories.includes(activeDirectory)) {
+      setActiveDirectory(settings.logDirectories[0]);
+    }
+  }, [settings.logDirectories]);
+
+  // Track active file: switch folder tab to the directory containing the active file
+  useEffect(() => {
+    const filePath = currentLogFile ?? (currentLogFiles && currentLogFiles[0]);
+    if (!filePath) return;
+    // Normalize separators
+    const normalized = filePath.replace(/\\/g, '/');
+    const match = settings.logDirectories.find((dir) => {
+      const normDir = dir.replace(/\\/g, '/').replace(/\/$/, '');
+      return normalized.startsWith(normDir + '/');
+    });
+    if (match && match !== activeDirectory) {
+      setActiveDirectory(match);
+    }
+  }, [currentLogFile, currentLogFiles]);
 
   useEffect(() => {
     saveSettings(settings);
@@ -158,6 +194,34 @@ function App() {
     setSettings(newSettings);
   };
 
+  const handleAddDirectory = (newPath: string) => {
+    setSettings((prev) => {
+      const dirs = prev.logDirectories ?? [];
+      if (dirs.includes(newPath)) {
+        setActiveDirectory(newPath);
+        return prev;
+      }
+      return { ...prev, logDirectories: [...dirs, newPath] };
+    });
+    setActiveDirectory(newPath);
+  };
+
+  const handleRemoveDirectory = (dir: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      logDirectories: prev.logDirectories.filter((d) => d !== dir),
+    }));
+    setDirLabels((prev) => {
+      const next = { ...prev };
+      delete next[dir];
+      return next;
+    });
+  };
+
+  const handleRenameDirectory = (dir: string, label: string) => {
+    setDirLabels((prev) => ({ ...prev, [dir]: label }));
+  };
+
   const handleThemeToggle = () => {
     const newTheme = settings.theme === 'dark' ? 'light' : 'dark';
     setSettings((prev) => ({ ...prev, theme: newTheme }));
@@ -190,7 +254,7 @@ function App() {
     }
   };
 
-  const openFileInTab = useCallback((filePath: string) => {
+  const openFileInTab = useCallback(async (filePath: string) => {
     // Check if file is already open in a single-file tab (not a group tab)
     const existingTab = tabs.find((tab) => 
       tab.filePath === filePath && 
@@ -201,13 +265,38 @@ function App() {
       // Switch to existing tab
       setActiveTabId(existingTab.id);
     } else {
-      // Create a new tab
+      // Create a new tab — detect type by extension first, then by content
       const newTabId = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const isXml = filePath.toLowerCase().endsWith('.xml');
+      const lp = filePath.toLowerCase();
+      let isXml = lp.endsWith('.xml');
+      let isJson = false;
+
+      // For JSON files and unknown extensions: peek at content to decide viewer
+      const needsContentCheck = lp.endsWith('.json') || (!isXml && !lp.endsWith('.log') && !lp.endsWith('.txt'));
+      if (needsContentCheck && window.electronAPI) {
+        try {
+          const result = await window.electronAPI.readLogFile(filePath);
+          if (result.success && result.content) {
+            const trimmed = result.content.trimStart();
+            if (!isXml && (trimmed.startsWith('<?xml') || /^<[A-Za-z][A-Za-z0-9\-_]*[\s>]/.test(trimmed))) {
+              isXml = true;
+            } else if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+              // JSON: check if it looks like a log (has timestamp/level/message keys)
+              const fmt = detectLogFormat(result.content);
+              const isJsonLog = fmt.name === 'json-ecs' || fmt.name === 'json-multiline';
+              isJson = !isJsonLog;
+            }
+          }
+        } catch {
+          // ignore — fall through to log viewer
+        }
+      }
+
       const newTab: Tab = {
         id: newTabId,
         filePath,
         isXml,
+        isJson,
         selectedNamespaces: [],
         namespaces: [],
       };
@@ -378,6 +467,8 @@ function App() {
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    // Only react to actual file drags, not internal tab reordering
+    if (!e.dataTransfer.types.includes('Files')) return;
     setIsDragOver(true);
   }, []);
 
@@ -566,10 +657,16 @@ function App() {
       )}
       <div className="app-content">
         <Sidebar
-          logDirectory={settings.logDirectory}
+          logDirectories={settings.logDirectories}
+          activeDirectory={activeDirectory}
+          dirLabels={dirLabels}
+          onDirectorySelect={setActiveDirectory}
+          onAddDirectory={handleAddDirectory}
+          onRemoveDirectory={handleRemoveDirectory}
+          onRenameDirectory={handleRenameDirectory}
+          onReorderDirectories={(dirs) => setSettings((prev) => ({ ...prev, logDirectories: dirs }))}
           onLogFileSelect={handleLogFileSelect}
           onLogFilesSelect={handleLogFilesSelect}
-          onDirectoryChange={(newPath) => setSettings((prev) => ({ ...prev, logDirectory: newPath }))}
           onOpenFile={handleOpenFile}
           currentFile={currentLogFile}
           selectedFiles={[]}
@@ -581,6 +678,12 @@ function App() {
         {activeTab?.isXml ? (
           <XmlViewer
             filePath={activeTab.filePath}
+            key={activeTabId ?? ''}
+          />
+        ) : activeTab?.isJson ? (
+          <JsonViewer
+            filePath={activeTab.filePath}
+            hotkeys={settings.hotkeys}
             key={activeTabId ?? ''}
           />
         ) : (
@@ -613,6 +716,8 @@ function App() {
           settings={settings}
           onSettingsChange={handleSettingsChange}
           onClose={() => setShowSettings(false)}
+          dirLabels={dirLabels}
+          onDirLabelsChange={setDirLabels}
         />
       )}
       {showAbout && (

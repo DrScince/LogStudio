@@ -13,6 +13,13 @@ const en = {
     collapseSidebar: 'Collapse file sidebar',
     expandSidebar: 'Expand file sidebar',
     openAll: 'Open all {{count}} files from this day (Ctrl = add to active tab)',
+    addDirectory: 'Add directory',
+    removeDirectory: 'Remove directory',
+    noDirectories: 'No directories configured.',
+    closeFolder: 'Close Folder',
+    renameFolder: 'Rename',
+    today: 'Today',
+    yesterday: 'Yesterday',
   },
   // TitleBar
   titlebar: {
@@ -88,6 +95,10 @@ const en = {
     moveDown: 'Move down',
     save: 'Save',
     cancel: 'Cancel',
+    logDirectories: 'Log Directories',
+    addDirectory: 'Add directory',
+    removeDirectory: 'Remove',
+    noDirectories: 'No directories added yet.',
   },
   // About
   about: {
@@ -166,6 +177,21 @@ const en = {
     saved: 'Saved',
     saveError: 'Error saving file',
     parseError: 'Invalid XML — cannot display tree view.',
+    expandAll: 'Expand all',
+    collapseAll: 'Collapse all',
+    fileChangedExternally: 'The file was changed externally.',
+    reload: 'Reload',
+  },
+  // JSON Viewer
+  json: {
+    viewRaw: 'Raw',
+    viewTree: 'Tree',
+    save: 'Save',
+    revert: 'Revert',
+    unsavedChanges: 'Unsaved changes',
+    saved: 'Saved',
+    saveError: 'Error saving file',
+    parseError: 'Invalid JSON — cannot display tree view.',
     expandAll: 'Expand all',
     collapseAll: 'Collapse all',
     fileChangedExternally: 'The file was changed externally.',

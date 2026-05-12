@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from '../i18n';
 import { highlightXml } from '../utils/xmlHighlighter';
 import { formatXml } from '../utils/xmlFormatter';
+import { HotkeyMap, DEFAULT_HOTKEYS } from '../utils/settings';
 import './XmlViewer.css';
 
 interface XmlViewerProps {
   filePath: string;
+  hotkeys?: HotkeyMap;
 }
 
 type ViewMode = 'raw' | 'tree';
@@ -180,7 +182,7 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
 // Main XmlViewer component
 // ─────────────────────────────────────────────
 
-const XmlViewer: React.FC<XmlViewerProps> = ({ filePath }) => {
+const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
   const { t } = useTranslation();
   const [content, setContent] = useState('');
   const [savedContent, setSavedContent] = useState('');
@@ -288,6 +290,54 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath }) => {
   // ── Textarea key handler ───────────────────
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
+
+    // ── Alt+Up: move line up ─────────────────
+    if (e.altKey && !e.ctrlKey && e.key === 'ArrowUp') {
+      e.preventDefault();
+      const lines = content.split('\n');
+      const pos = ta.selectionStart;
+      let charCount = 0;
+      let lineIdx = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const lineEnd = charCount + lines[i].length;
+        if (pos <= lineEnd) { lineIdx = i; break; }
+        charCount += lines[i].length + 1;
+      }
+      if (lineIdx > 0) {
+        const newLines = [...lines];
+        [newLines[lineIdx], newLines[lineIdx - 1]] = [newLines[lineIdx - 1], newLines[lineIdx]];
+        const newContent = newLines.join('\n');
+        setContent(newContent);
+        let newCharCount = 0;
+        for (let i = 0; i < lineIdx - 1; i++) newCharCount += newLines[i].length + 1;
+        pendingCursorRef.current = Math.min(newCharCount + (pos - charCount), newCharCount + newLines[lineIdx - 1].length);
+      }
+      return;
+    }
+
+    // ── Alt+Down: move line down ─────────────
+    if (e.altKey && !e.ctrlKey && e.key === 'ArrowDown') {
+      e.preventDefault();
+      const lines = content.split('\n');
+      const pos = ta.selectionStart;
+      let charCount = 0;
+      let lineIdx = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const lineEnd = charCount + lines[i].length;
+        if (pos <= lineEnd) { lineIdx = i; break; }
+        charCount += lines[i].length + 1;
+      }
+      if (lineIdx < lines.length - 1) {
+        const newLines = [...lines];
+        [newLines[lineIdx], newLines[lineIdx + 1]] = [newLines[lineIdx + 1], newLines[lineIdx]];
+        const newContent = newLines.join('\n');
+        setContent(newContent);
+        let newCharCount = 0;
+        for (let i = 0; i < lineIdx + 1; i++) newCharCount += newLines[i].length + 1;
+        pendingCursorRef.current = Math.min(newCharCount + (pos - charCount), newCharCount + newLines[lineIdx + 1].length);
+      }
+      return;
+    }
 
     // ── Ctrl+K chord handling ────────────────
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {

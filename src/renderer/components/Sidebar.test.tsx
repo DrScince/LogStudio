@@ -18,7 +18,11 @@ beforeEach(() => {
 
 describe('Sidebar', () => {
   const defaultProps = {
-    logDirectory: '/test/logs',
+    logDirectories: ['/test/logs'],
+    activeDirectory: '/test/logs',
+    onDirectorySelect: vi.fn(),
+    onAddDirectory: vi.fn(),
+    onRemoveDirectory: vi.fn(),
     onLogFileSelect: vi.fn(),
     onLogFilesSelect: vi.fn(),
     currentFile: null,
@@ -27,7 +31,7 @@ describe('Sidebar', () => {
   };
 
   it('should render empty state when no log directory is set', () => {
-    render(<Sidebar {...defaultProps} logDirectory="" />);
+    render(<Sidebar {...defaultProps} logDirectories={[]} activeDirectory="" />);
     
     expect(screen.getByText(/Please select a log directory/i)).toBeInTheDocument();
   });
