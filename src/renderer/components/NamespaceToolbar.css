@@ -87,10 +87,14 @@
 }
 
 .namespace-toolbar-content::-webkit-scrollbar-thumb {
-  background: var(--text-secondary);
+  background: var(--text-muted);
   border-radius: 4px;
 }
 
 .namespace-toolbar-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+.namespace-toolbar-content::-webkit-scrollbar-thumb:active {
   background: var(--text-primary);
 }

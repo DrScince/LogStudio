@@ -212,11 +212,15 @@
 }
 
 .about-content::-webkit-scrollbar-thumb {
-  background: var(--text-secondary);
+  background: var(--text-muted);
   border-radius: 4px;
 }
 
 .about-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+.about-content::-webkit-scrollbar-thumb:active {
   background: var(--text-primary);
 }
 

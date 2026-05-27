@@ -89,22 +89,22 @@ code {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-tertiary);
+  background: var(--text-muted);
   border-radius: 8px;
   border: 3px solid var(--bg-secondary);
   transition: background 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--border-color);
+  background: var(--text-secondary);
 }
 
 ::-webkit-scrollbar-thumb:active {
-  background: var(--text-muted);
+  background: var(--text-primary);
 }
 
 /* Scrollbar für Firefox */
 * {
   scrollbar-width: auto;
-  scrollbar-color: var(--bg-tertiary) var(--bg-secondary);
+  scrollbar-color: var(--text-muted) var(--bg-secondary);
 }

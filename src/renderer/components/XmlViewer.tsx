@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from '../i18n';
 import { highlightXml } from '../utils/xmlHighlighter';
 import { formatXml } from '../utils/xmlFormatter';
@@ -11,6 +11,16 @@ interface XmlViewerProps {
 }
 
 type ViewMode = 'raw' | 'tree';
+
+type XmlValueKind = 'text' | 'bool' | 'number' | 'path';
+
+function getXmlValueKind(value: string): XmlValueKind {
+  const v = value.trim();
+  if (/^(true|false)$/i.test(v)) return 'bool';
+  if (/^-?\d+(?:[.,]\d+)?$/.test(v)) return 'number';
+  if (/^[a-zA-Z]:\\|\\|\/|\.[a-zA-Z0-9]+$/.test(v) || /[\\/]/.test(v)) return 'path';
+  return 'text';
+}
 
 // ─────────────────────────────────────────────
 // XML Tree Node (recursive)
@@ -80,8 +90,10 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
     !hasChildren && textDomNodes.length > 0
       ? textDomNodes.map((n) => n.textContent?.trim()).filter(Boolean).join(' ')
       : '';
+  const inlineValueKind = getXmlValueKind(inlineText);
+  const editInputWidthCh = Math.min(Math.max(editValue.length + 4, 24), 120);
   const textDomNode = textDomNodes[0] ?? null;
-  const canEdit = !!onContentChange && !hasChildren && textDomNode !== null;
+  const canEdit = !!onContentChange && !hasChildren;
 
   const startEdit = (e: React.MouseEvent) => {
     if (!canEdit) return;
@@ -91,11 +103,26 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
   };
 
   const commitEdit = () => {
-    if (!xmlDoc || !onContentChange || !textDomNode) {
+    if (!xmlDoc || !onContentChange) {
       setIsEditing(false);
       return;
     }
-    textDomNode.textContent = editValue;
+
+    const existingTextNode = Array.from(el.childNodes).find(
+      (n) => n.nodeType === Node.TEXT_NODE
+    ) as ChildNode | undefined;
+    const nextValue = editValue;
+
+    if (existingTextNode) {
+      if (nextValue === '') {
+        el.removeChild(existingTextNode);
+      } else {
+        existingTextNode.textContent = nextValue;
+      }
+    } else if (nextValue !== '') {
+      el.appendChild(xmlDoc.createTextNode(nextValue));
+    }
+
     const raw = new XMLSerializer().serializeToString(xmlDoc);
     onContentChange(formatXml(raw));
     setIsEditing(false);
@@ -122,18 +149,21 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
           )}
         </span>
         <span className="xml-tree-tag-name">{el.localName || el.nodeName}</span>
-        {attrs.map((attr) => (
-          <span key={attr.name} className="xml-tree-attr">
-            <span className="xml-tree-attr-name">{attr.name}</span>
-            <span className="xml-tree-attr-eq">=</span>
-            <span className="xml-tree-attr-val">&quot;{attr.value}&quot;</span>
-          </span>
-        ))}
+        {attrs.map((attr) => {
+          const attrValueKind = getXmlValueKind(attr.value);
+          return (
+            <span key={attr.name} className="xml-tree-attr">
+              <span className="xml-tree-attr-name">{attr.name}</span>
+              <span className="xml-tree-attr-eq">=</span>
+              <span className={`xml-tree-attr-val xml-tree-value xml-tree-value-${attrValueKind}`}>&quot;{attr.value}&quot;</span>
+            </span>
+          );
+        })}
 
         {/* Inline value — editable leaf */}
         {inlineText && !isEditing && (
           <span
-            className={`xml-tree-text-inline ${canEdit ? 'xml-tree-editable' : ''}`}
+            className={`xml-tree-text-inline xml-tree-value xml-tree-value-${inlineValueKind} ${canEdit ? 'xml-tree-editable' : ''}`}
             onClick={startEdit}
             title={canEdit ? 'Click to edit' : undefined}
           >
@@ -145,6 +175,7 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
             ref={inputRef}
             className="xml-tree-edit-input"
             value={editValue}
+            style={{ width: `${editInputWidthCh}ch` }}
             onChange={(e) => setEditValue(e.target.value)}
             onBlur={commitEdit}
             onKeyDown={(e) => {
@@ -157,7 +188,13 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
 
         {/* Empty leaf indicator */}
         {!hasChildren && !inlineText && !isEditing && (
-          <span className="xml-tree-empty">/</span>
+          <span
+            className={`xml-tree-empty ${canEdit ? 'xml-tree-editable' : ''}`}
+            onClick={startEdit}
+            title={canEdit ? 'Click to edit' : undefined}
+          >
+            /
+          </span>
         )}
       </div>
       {hasChildren && !collapsed && (
@@ -179,6 +216,61 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
 };
 
 // ─────────────────────────────────────────────
+// Code-Folding helpers
+// ─────────────────────────────────────────────
+
+const FOLD_MARKER_PREFIX = '<!-- §FOLD_BLOCK:';
+
+/** Replace all fold placeholders with their original lines. */
+function expandAllFolds(text: string, foldMap: Map<number, string[]>): string {
+  if (foldMap.size === 0) return text;
+  const lines = text.split('\n');
+  const result: string[] = [];
+  for (const line of lines) {
+    const match = line.match(/<!-- §FOLD_BLOCK:(\d+)§/);
+    if (match) {
+      const original = foldMap.get(Number(match[1]));
+      if (original) { result.push(...original); continue; }
+    }
+    result.push(line);
+  }
+  return result.join('\n');
+}
+
+/** Find XML tag regions that can be folded (start line → { end, tagName }). */
+function findFoldableRegions(lines: string[]): Map<number, { end: number; tagName: string }> {
+  const result = new Map<number, { end: number; tagName: string }>();
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    // Skip blank, comments, PIs, declarations, closing tags, fold placeholders
+    if (!trimmed || !trimmed.startsWith('<')) continue;
+    if (trimmed.startsWith('<!--') || trimmed.startsWith('<?') ||
+        trimmed.startsWith('<!') || trimmed.startsWith('</')) continue;
+    if (trimmed.endsWith('/>')) continue; // self-closing
+    if (!trimmed.endsWith('>')) continue; // multi-line opening tag (not supported)
+    const tagMatch = trimmed.match(/^<([a-zA-Z_][\w:.-]*)/);
+    if (!tagMatch) continue;
+    const tagName = tagMatch[1];
+    // Exclude one-liners like <tag>text</tag>
+    if (trimmed.includes(`</${tagName}>`)) continue;
+    // Find matching closing tag
+    let depth = 1;
+    for (let j = i + 1; j < lines.length; j++) {
+      const jt = lines[j];
+      const opens = (jt.match(new RegExp(`<${tagName}(?:[\\s>])`, 'g')) ?? []).length
+                  - (jt.match(new RegExp(`<${tagName}[^>]*/>`, 'g')) ?? []).length;
+      const closes = (jt.match(new RegExp(`</${tagName}>`, 'g')) ?? []).length;
+      depth += opens - closes;
+      if (depth <= 0) {
+        if (j > i + 1) result.set(i, { end: j, tagName });
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+// ─────────────────────────────────────────────
 // Main XmlViewer component
 // ─────────────────────────────────────────────
 
@@ -192,14 +284,28 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
   const [treeKey, setTreeKey] = useState(0);
   const [treeDefaultCollapsed, setTreeDefaultCollapsed] = useState(false);
 
+  const [currentLine, setCurrentLine] = useState(1);
+  const [foldMap, setFoldMap] = useState<Map<number, string[]>>(new Map());
+  const foldIdRef = useRef(0);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const pendingCursorRef = useRef<number | null>(null);
+
+  const updateCurrentLine = useCallback(() => {
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      setCurrentLine(ta.value.slice(0, ta.selectionStart).split('\n').length);
+    });
+  }, []);
   const saveStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [externallyChanged, setExternallyChanged] = useState(false);
 
-  const isDirty = content !== savedContent;
+  const isDirty = foldMap.size === 0
+    ? content !== savedContent
+    : expandAllFolds(content, foldMap) !== savedContent;
 
   // ── Load file ──────────────────────────────
   const loadFile = useCallback((path: string) => {
@@ -215,8 +321,11 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
     if (!filePath) return;
     setLoading(true);
     setExternallyChanged(false);
+    setFoldMap(new Map());
+    foldIdRef.current = 0;
+    setCurrentLine(1);
     loadFile(filePath).finally(() => setLoading(false));
-  }, [filePath, loadFile]);
+  }, [filePath, loadFile]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep a ref to isDirty so the watcher callback can read the current value
   const isDirtyRef = useRef(false);
@@ -255,9 +364,10 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
   const handleSave = useCallback(async () => {
     if (!isDirty) return;
     setSaveStatus('saving');
-    const result = await window.electronAPI.writeXmlFile(filePath, content);
+    const contentToSave = expandAllFolds(content, foldMap);
+    const result = await window.electronAPI.writeXmlFile(filePath, contentToSave);
     if (result.success) {
-      setSavedContent(content);
+      setSavedContent(contentToSave);
       setSaveStatus('saved');
       setExternallyChanged(false);
     } else {
@@ -265,7 +375,7 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
     }
     if (saveStatusTimerRef.current) clearTimeout(saveStatusTimerRef.current);
     saveStatusTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2500);
-  }, [filePath, content, isDirty]);
+  }, [filePath, content, foldMap, isDirty]);
 
   // Ctrl+S
   useEffect(() => {
@@ -282,7 +392,38 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
   // ── Revert ─────────────────────────────────
   const handleRevert = () => {
     setContent(savedContent);
+    setFoldMap(new Map());
+    foldIdRef.current = 0;
   };
+
+  // ── Fold / Unfold ───────────────────────────
+  const foldRegion = useCallback((start: number, end: number, tagName: string) => {
+    const lines = content.split('\n');
+    const id = ++foldIdRef.current;
+    const originalLines = lines.slice(start, end + 1);
+    const indent = lines[start].match(/^(\s*)/)?.[1] ?? '';
+    const placeholder = `${indent}${FOLD_MARKER_PREFIX}${id}§ <${tagName}> (${end - start + 1} lines) -->`;
+    const newLines = [...lines.slice(0, start), placeholder, ...lines.slice(end + 1)];
+    const newLineStart = newLines.slice(0, start).reduce((sum, line) => sum + line.length + 1, 0);
+    const newContent = newLines.join('\n');
+    setFoldMap(prev => { const n = new Map(prev); n.set(id, originalLines); return n; });
+    setContent(newContent);
+    pendingCursorRef.current = Math.min(newLineStart, newContent.length);
+    setCurrentLine(start + 1);
+  }, [content]);
+
+  const unfoldLine = useCallback((lineIndex: number, foldId: number) => {
+    const original = foldMap.get(foldId);
+    if (!original) return;
+    const lines = content.split('\n');
+    const newLines = [...lines.slice(0, lineIndex), ...original, ...lines.slice(lineIndex + 1)];
+    const newLineStart = newLines.slice(0, lineIndex).reduce((sum, line) => sum + line.length + 1, 0);
+    const newContent = newLines.join('\n');
+    setFoldMap(prev => { const n = new Map(prev); n.delete(foldId); return n; });
+    setContent(newContent);
+    pendingCursorRef.current = Math.min(newLineStart, newContent.length);
+    setCurrentLine(lineIndex + 1);
+  }, [content, foldMap]);
 
   // Track Ctrl+K chord
   const ctrlKPendingRef = useRef(false);
@@ -514,18 +655,63 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
   };
 
   // ── Parse XML for tree view ─────────────────
+  const xmlSourceForTree = useMemo(() => expandAllFolds(content, foldMap), [content, foldMap]);
+
   const xmlDoc = React.useMemo(() => {
-    if (!content) return null;
+    if (!xmlSourceForTree) return null;
     try {
       const parser = new DOMParser();
-      return parser.parseFromString(content, 'text/xml');
+      return parser.parseFromString(xmlSourceForTree, 'text/xml');
     } catch {
       return null;
     }
-  }, [content]);
+  }, [xmlSourceForTree]);
 
   const parseError = xmlDoc?.querySelector('parsererror');
   const rootElement = !parseError ? xmlDoc?.documentElement ?? null : null;
+
+  // ── Lines + fold analysis ──────────────────
+  const contentLines = useMemo(() => content.split('\n'), [content]);
+  const foldableRegions = useMemo(() => findFoldableRegions(contentLines), [contentLines]);
+  const foldedLines = useMemo(() => {
+    const map = new Map<number, number>();
+    contentLines.forEach((line, i) => {
+      const m = line.match(/<!-- §FOLD_BLOCK:(\d+)§/);
+      if (m) map.set(i, Number(m[1]));
+    });
+    return map;
+  }, [contentLines]);
+
+  const foldControls = useMemo(() => {
+    const controls: Array<
+      | { lineIndex: number; indent: number; mode: 'fold'; end: number; tagName: string }
+      | { lineIndex: number; indent: number; mode: 'unfold'; foldId: number }
+    > = [];
+
+    contentLines.forEach((line, lineIndex) => {
+      const foldable = foldableRegions.get(lineIndex);
+      const foldedId = foldedLines.get(lineIndex);
+      if (foldable && foldedId === undefined) {
+        const indent = line.match(/^(\s*)/)?.[1].length ?? 0;
+        controls.push({ lineIndex, indent, mode: 'fold', end: foldable.end, tagName: foldable.tagName });
+      } else if (foldedId !== undefined) {
+        const indent = line.match(/^(\s*)/)?.[1].length ?? 0;
+        controls.push({ lineIndex, indent, mode: 'unfold', foldId: foldedId });
+      }
+    });
+
+    return controls;
+  }, [contentLines, foldableRegions, foldedLines]);
+
+  // Keep highlighted line within valid range after fold/unfold or external updates.
+  useEffect(() => {
+    const maxLine = Math.max(contentLines.length, 1);
+    if (currentLine > maxLine) {
+      setCurrentLine(maxLine);
+    } else if (currentLine < 1) {
+      setCurrentLine(1);
+    }
+  }, [contentLines.length, currentLine]);
 
   // ── Highlighted HTML ───────────────────────
   const highlightedHtml = React.useMemo(() => highlightXml(content), [content]);
@@ -652,23 +838,64 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
       {/* ── Raw view ────────────────────────────── */}
       {viewMode === 'raw' && (
         <div className="xml-raw-scroller" ref={scrollerRef}>
-          <div className="xml-raw-content">
-            <pre
-              className="xml-highlight-pre"
-              aria-hidden="true"
-              dangerouslySetInnerHTML={{ __html: highlightedHtml + '\n' }}
-            />
-            <textarea
-              ref={textareaRef}
-              className="xml-textarea"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              onKeyDown={handleKeyDown}
-              spellCheck={false}
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-            />
+          <div className="xml-editor-layout">
+            <div className="xml-line-gutter">
+              {contentLines.map((_, i) => {
+                const isActive = i + 1 === currentLine;
+                return (
+                  <div key={i} className={`xml-gutter-line${isActive ? ' active' : ''}`}>
+                    <span className="xml-gutter-number">{i + 1}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="xml-raw-content">
+              <div className="xml-fold-controls" aria-hidden="true">
+                {foldControls.map((control) => (
+                  <button
+                    key={`${control.mode}-${control.lineIndex}`}
+                    className={`xml-fold-btn xml-fold-btn-inline${control.mode === 'unfold' ? ' xml-fold-btn-collapsed' : ''}`}
+                    title={control.mode === 'fold' ? `<${control.tagName}> einklappen` : 'Ausklappen'}
+                    style={{
+                      top: `calc(14px + ${control.lineIndex} * 1.5589rem)`,
+                      left: `calc(20px + ${control.indent}ch - 18px)`,
+                    }}
+                    onClick={() => {
+                      if (control.mode === 'fold') {
+                        foldRegion(control.lineIndex, control.end, control.tagName);
+                      } else {
+                        unfoldLine(control.lineIndex, control.foldId);
+                      }
+                    }}
+                  >
+                    {control.mode === 'fold' ? '▾' : '▸'}
+                  </button>
+                ))}
+              </div>
+              <div
+                className="xml-line-highlight-bar"
+                style={{ top: `calc(14px + ${currentLine - 1} * 1.5589rem)` }}
+              />
+              <pre
+                className="xml-highlight-pre"
+                aria-hidden="true"
+                dangerouslySetInnerHTML={{ __html: highlightedHtml + '\n' }}
+              />
+              <textarea
+                ref={textareaRef}
+                className="xml-textarea"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onSelect={updateCurrentLine}
+                onClick={updateCurrentLine}
+                onKeyUp={updateCurrentLine}
+                spellCheck={false}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+              />
+            </div>
           </div>
         </div>
       )}
@@ -687,9 +914,9 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
           ) : rootElement ? (
             <div key={treeKey} className="xml-tree-root">
               {/* Declaration comment if present */}
-              {content.startsWith('<?xml') && (
+              {xmlSourceForTree.startsWith('<?xml') && (
                 <div className="xml-tree-decl">
-                  {content.match(/^<\?xml[^?]*\?>/)?.[0] ?? '<?xml version="1.0"?>'}
+                  {xmlSourceForTree.match(/^<\?xml[^?]*\?>/)?.[0] ?? '<?xml version="1.0"?>'}
                 </div>
               )}
               <XmlTreeNode
@@ -697,7 +924,11 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
                 depth={0}
                 defaultCollapsed={treeDefaultCollapsed}
                 xmlDoc={xmlDoc ?? undefined}
-                onContentChange={(newXml) => setContent(newXml)}
+                onContentChange={(newXml) => {
+                  setContent(newXml);
+                  setFoldMap(new Map());
+                  foldIdRef.current = 0;
+                }}
               />
             </div>
           ) : (

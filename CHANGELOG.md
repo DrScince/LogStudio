@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.5.1] - 2026-05-27
+
+### Added
+- **Tree editing for empty XML leaf tags**: Empty leaf nodes in XML Tree view are now directly editable. Clicking an empty placeholder opens inline editing, and entering text creates a text node for the element.
+
+### Changed
+- **XML Tree value highlighting**: Value rendering in Tree view now uses stronger visual contrast and type-aware styling to improve readability of booleans, numbers, paths, and plain text values.
+- **Tree inline editor sizing for long values**: The inline editor now adapts to content length and supports a much wider max width, making long file paths and config values easier to edit.
+- **Fold controls in Raw XML editor**: Fold indicators are now positioned next to XML tags instead of in the line-number gutter, and folded lines are rendered in a cleaner collapsed form (`<Tag ...>`).
+
+### Fixed
+- **Raw XML folding no longer affects Tree structure**: Tree parsing now always uses the expanded XML source, so folded placeholders cannot alter the Tree view hierarchy.
+- **Collapsed-line marker rendering**: Internal fold marker comments are no longer shown as technical text in Raw view and are rendered as a readable collapsed-tag representation.
+- **Current-line highlight after fold/unfold**: The highlighted row now remains on a valid line after folding operations and correctly tracks the collapsed parent line.
+- **Empty-tag click target visibility**: Editable empty values now have a larger, clearly highlighted clickable area for better usability.
+
 ## [2.5.0] - 2026-05-12
 
 ### Added

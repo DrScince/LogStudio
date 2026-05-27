@@ -196,11 +196,107 @@
   background: var(--bg-primary);
 }
 
+.xml-editor-layout {
+  display: flex;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.xml-line-gutter {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  padding: 14px 4px 14px 4px;
+  color: var(--text-muted);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.917rem;
+  line-height: 1.7;
+  user-select: none;
+  min-width: 56px;
+}
+
+.xml-gutter-line {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  line-height: 1.7;
+  gap: 0;
+}
+
+.xml-gutter-line.active {
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.xml-gutter-number {
+  min-width: 32px;
+  text-align: right;
+  padding-right: 0;
+}
+
+.xml-fold-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  width: 18px;
+  height: 1.4em;
+  font-size: 0.9rem;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 1;
+  transition: color 0.1s, background 0.1s, border-color 0.1s;
+  border-radius: 3px;
+}
+
+.xml-fold-btn:hover {
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 18%, var(--bg-tertiary));
+}
+
+.xml-fold-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.xml-fold-btn-inline {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.xml-gutter-line.active .xml-fold-btn {
+  color: var(--accent-primary);
+  border-color: color-mix(in srgb, var(--accent-primary) 45%, var(--border-color));
+}
+
 .xml-raw-content {
   display: grid;
   grid-template-areas: "editor";
-  min-width: 100%;
+  flex: 1;
+  min-width: 0;
   min-height: 100%;
+  position: relative;
+}
+
+.xml-line-highlight-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc(0.917rem * 1.7);
+  pointer-events: none;
+  z-index: 0;
+  background: var(--bg-hover);
+  border-left: 2px solid var(--accent-primary);
 }
 
 .xml-highlight-pre,
@@ -263,6 +359,26 @@
 :root.light .xh-op       { color: #656d76; }
 :root.light .xh-attr-val { color: #0550ae; }
 :root.light .xh-text     { color: #1f2328; }
+
+/* Folded line rendering in raw editor */
+.xh-collapsed-line {
+  display: inline-block;
+  padding: 0 6px;
+  margin-left: -6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--accent-primary) 70%, var(--border-color));
+}
+
+.xh-collapsed-ellipsis {
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+
+.xh-collapsed-meta {
+  color: var(--text-muted);
+  font-size: 0.85em;
+}
 
 /* ─────────────────────────────────────────────────────── */
 /* TREE VIEW                                               */
@@ -369,7 +485,7 @@
 }
 
 .xml-tree-attr-val {
-  color: #a5d6ff;
+  color: #b6dcff;
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -382,15 +498,45 @@
 
 /* Inline text (for leaf elements) */
 .xml-tree-text-inline {
-  color: var(--text-secondary);
-  font-style: italic;
+  color: var(--text-primary);
+  font-style: normal;
   margin-left: 6px;
   max-width: 480px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border-radius: 3px;
-  padding: 0 3px;
+  border-radius: 4px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, var(--border-color));
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+}
+
+.xml-tree-value {
+  font-weight: 500;
+}
+
+.xml-tree-value-bool {
+  color: color-mix(in srgb, var(--success) 84%, var(--text-primary));
+}
+
+.xml-tree-value-number {
+  color: #79c0ff;
+}
+
+.xml-tree-value-path {
+  color: #c3d6ff;
+}
+
+:root.light .xml-tree-value-bool {
+  color: #1a7f37;
+}
+
+:root.light .xml-tree-value-number {
+  color: #0550ae;
+}
+
+:root.light .xml-tree-value-path {
+  color: #5a32a3;
 }
 
 .xml-tree-editable {
@@ -399,15 +545,15 @@
 }
 
 .xml-tree-editable:hover {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  outline: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  outline: 1px dashed color-mix(in srgb, var(--accent-primary) 45%, transparent);
   outline-offset: 1px;
 }
 
 .xml-tree-edit-input {
   margin-left: 6px;
   background: var(--bg-primary);
-  border: 1px solid var(--accent);
+  border: 1px solid var(--accent-primary);
   border-radius: 4px;
   color: var(--text-primary);
   font: inherit;
@@ -415,16 +561,36 @@
   font-style: normal;
   padding: 1px 5px;
   outline: none;
-  min-width: 80px;
-  max-width: 480px;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+  min-width: 220px;
+  max-width: min(82vw, 980px);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
 .xml-tree-empty {
   color: var(--text-muted, var(--text-secondary));
-  opacity: 0.4;
+  opacity: 0.95;
   margin-left: 4px;
   font-size: 11px;
+}
+
+.xml-tree-empty.xml-tree-editable {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 18px;
+  padding: 0 7px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, var(--border-color));
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.xml-tree-empty.xml-tree-editable:hover {
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  border-color: color-mix(in srgb, var(--accent-primary) 52%, var(--border-color));
+  color: var(--text-primary);
 }
 
 /* Multi-line text block (when element has only text children) */

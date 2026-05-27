@@ -53,7 +53,22 @@ export function highlightXml(text: string): string {
       // Comment
       const end = text.indexOf('-->', i);
       const len = end === -1 ? text.length : end + 3;
-      html += `<span class="xh-comment">${esc(text.slice(i, len))}</span>`;
+      const commentText = text.slice(i, len);
+      const foldMatch = commentText.match(/^\s*<!--\s*§FOLD_BLOCK:(\d+)§\s*<([\w:.-]+)>\s*\((\d+)\s+lines\)\s*-->$/);
+      if (foldMatch) {
+        const tagName = foldMatch[2];
+        const lineCount = foldMatch[3];
+        html +=
+          `<span class="xh-collapsed-line">` +
+            `<span class="xh-bracket">&lt;</span>` +
+            `<span class="xh-tag-name">${esc(tagName)}</span>` +
+            `<span class="xh-collapsed-ellipsis"> ...</span>` +
+            `<span class="xh-bracket">&gt;</span>` +
+            `<span class="xh-collapsed-meta"> (${esc(lineCount)} lines)</span>` +
+          `</span>`;
+      } else {
+        html += `<span class="xh-comment">${esc(commentText)}</span>`;
+      }
       i = len;
     } else if (text.startsWith('<![CDATA[', i)) {
       // CDATA section
