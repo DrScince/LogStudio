@@ -9,6 +9,78 @@ let mainWindow: BrowserWindow | null = null;
 let logWatchers: Map<string, chokidar.FSWatcher> = new Map();
 let dirWatchers: Map<string, chokidar.FSWatcher> = new Map();
 
+type DiscoveredFile = { name: string; path: string; mtimeMs: number };
+
+const isTextFile = async (filePath: string): Promise<boolean> => {
+  try {
+    const buffer = Buffer.alloc(512);
+    const fd = await fs.promises.open(filePath, 'r');
+    const { bytesRead } = await fd.read(buffer, 0, 512, 0);
+    await fd.close();
+    if (bytesRead === 0) return true;
+    return !buffer.subarray(0, bytesRead).includes(0);
+  } catch {
+    return false;
+  }
+};
+
+const scanDirCandidates = async (dir: string, includeSubdirectories: boolean): Promise<DiscoveredFile[]> => {
+  const items = await fs.promises.readdir(dir, { withFileTypes: true });
+  const results: DiscoveredFile[] = [];
+
+  for (const item of items) {
+    const fullPath = path.join(dir, item.name);
+    if (item.isFile()) {
+      try {
+        const stats = await fs.promises.stat(fullPath);
+        results.push({ name: item.name, path: fullPath, mtimeMs: stats.mtimeMs });
+      } catch {
+        // Ignore inaccessible files
+      }
+    } else if (includeSubdirectories && item.isDirectory()) {
+      try {
+        const nested = await scanDirCandidates(fullPath, includeSubdirectories);
+        results.push(...nested);
+      } catch {
+        // Skip inaccessible subdirectories
+      }
+    }
+  }
+
+  return results;
+};
+
+const sortCandidatesNewestFirst = (files: DiscoveredFile[]): DiscoveredFile[] => {
+  files.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  return files;
+};
+
+const filterTextFilesInBatches = async (
+  files: DiscoveredFile[],
+  batchSize: number,
+  onBatch?: (files: Array<{ name: string; path: string }>) => void
+): Promise<Array<{ name: string; path: string }>> => {
+  const accepted: Array<{ name: string; path: string }> = [];
+
+  for (let i = 0; i < files.length; i += batchSize) {
+    const batch = files.slice(i, i + batchSize);
+    const checks = await Promise.all(
+      batch.map(async (file) => ({ file, isText: await isTextFile(file.path) }))
+    );
+
+    const acceptedBatch = checks
+      .filter((item) => item.isText)
+      .map((item) => ({ name: item.file.name, path: item.file.path }));
+
+    if (acceptedBatch.length > 0) {
+      accepted.push(...acceptedBatch);
+      if (onBatch) onBatch(acceptedBatch);
+    }
+  }
+
+  return accepted;
+};
+
 // Datei die per Kontext-Menü / Kommandozeile übergeben wurde
 const getFileArgument = (argv: string[]): string | null => {
   // In packaged form: argv = ['path/to/exe', 'path/to/file']
@@ -295,46 +367,59 @@ ipcMain.handle('unwatch-log-file', (event, filePath: string) => {
 });
 
 ipcMain.handle('list-log-files', async (event, directory: string, includeSubdirectories: boolean = false) => {
-  // Detect text files by checking for null bytes in the first 512 bytes
-  const isTextFile = async (filePath: string): Promise<boolean> => {
-    try {
-      const buffer = Buffer.alloc(512);
-      const fd = await fs.promises.open(filePath, 'r');
-      const { bytesRead } = await fd.read(buffer, 0, 512, 0);
-      await fd.close();
-      if (bytesRead === 0) return true; // empty file counts as text
-      return !buffer.subarray(0, bytesRead).includes(0); // null byte = binary
-    } catch {
-      return false;
-    }
-  };
-
-  const scanDir = async (dir: string): Promise<Array<{ name: string; path: string }>> => {
-    const items = await fs.promises.readdir(dir, { withFileTypes: true });
-    const results: Array<{ name: string; path: string }> = [];
-    for (const item of items) {
-      const fullPath = path.join(dir, item.name);
-      if (item.isFile() && await isTextFile(fullPath)) {
-        results.push({ name: item.name, path: fullPath });
-      } else if (includeSubdirectories && item.isDirectory()) {
-        try {
-          const sub = await scanDir(fullPath);
-          results.push(...sub);
-        } catch {
-          // Skip inaccessible subdirectories
-        }
-      }
-    }
-    return results;
-  };
-
   try {
-    const logFiles = await scanDir(directory);
+    const candidates = sortCandidatesNewestFirst(
+      await scanDirCandidates(directory, includeSubdirectories)
+    );
+    const logFiles = await filterTextFilesInBatches(candidates, 200);
     return { success: true, files: logFiles };
   } catch (error) {
     return { success: false, error: String(error) };
   }
 });
+
+ipcMain.handle(
+  'list-log-files-stream',
+  async (event, directory: string, includeSubdirectories: boolean = false, requestId: string) => {
+    const sender = event.sender;
+
+    // Start async scan and return immediately so renderer can begin rendering batches.
+    void (async () => {
+      try {
+        const candidates = sortCandidatesNewestFirst(
+          await scanDirCandidates(directory, includeSubdirectories)
+        );
+
+        await filterTextFilesInBatches(candidates, 200, (batch) => {
+          try {
+            sender.send('list-log-files-progress', { requestId, files: batch, done: false });
+          } catch {
+            // Ignore send errors if renderer is gone
+          }
+        });
+
+        try {
+          sender.send('list-log-files-progress', { requestId, files: [], done: true });
+        } catch {
+          // Ignore send errors if renderer is gone
+        }
+      } catch (error) {
+        try {
+          sender.send('list-log-files-progress', {
+            requestId,
+            files: [],
+            done: true,
+            error: String(error),
+          });
+        } catch {
+          // Ignore send errors if renderer is gone
+        }
+      }
+    })();
+
+    return { success: true };
+  }
+);
 
 ipcMain.handle('watch-directory', (event, directory: string) => {
   if (dirWatchers.has(directory)) {

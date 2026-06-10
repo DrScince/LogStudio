@@ -4,6 +4,7 @@ import './NamespaceToolbar.css';
 
 interface NamespaceToolbarProps {
   namespaces: string[];
+  namespaceCounts?: Record<string, number>;
   selectedNamespaces: string[];
   onNamespaceToggle: (namespace: string) => void;
   isVisible: boolean;
@@ -11,6 +12,7 @@ interface NamespaceToolbarProps {
 
 const NamespaceToolbar: React.FC<NamespaceToolbarProps> = ({
   namespaces,
+  namespaceCounts,
   selectedNamespaces,
   onNamespaceToggle,
   isVisible,
@@ -38,6 +40,7 @@ const NamespaceToolbar: React.FC<NamespaceToolbarProps> = ({
         <div className="namespace-toolbar-content">
           <NamespaceTree
             namespaces={namespaces}
+            namespaceCounts={namespaceCounts}
             selectedNamespaces={selectedNamespaces}
             onNamespaceToggle={onNamespaceToggle}
           />

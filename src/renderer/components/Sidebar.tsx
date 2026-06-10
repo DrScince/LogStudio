@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { useTranslation } from '../i18n';
 import './Sidebar.css';
@@ -60,6 +60,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [renameValue, setRenameValue] = useState('');
   const [dragOverDir, setDragOverDir] = useState<string | null>(null);
   const dragSrcDir = React.useRef<string | null>(null);
+  const loadRequestIdRef = useRef<string | null>(null);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -250,9 +251,49 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const loadLogFiles = async () => {
     if (!window.electronAPI || !activeDirectory) return;
-    
+
+    const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    loadRequestIdRef.current = requestId;
     setLoading(true);
+    setLogFiles([]);
+
     try {
+      if (
+        window.electronAPI.listLogFilesStream &&
+        window.electronAPI.onListLogFilesProgress &&
+        window.electronAPI.removeListLogFilesProgressListener
+      ) {
+        window.electronAPI.removeListLogFilesProgressListener();
+
+        window.electronAPI.onListLogFilesProgress((payload) => {
+          if (payload.requestId !== loadRequestIdRef.current) return;
+
+          if (payload.files && payload.files.length > 0) {
+            setLogFiles((prev) => {
+              const existing = new Set(prev.map((f) => f.path));
+              const next = payload.files.filter((f) => !existing.has(f.path));
+              return next.length > 0 ? [...prev, ...next] : prev;
+            });
+          }
+
+          if (payload.done) {
+            setLoading(false);
+          }
+        });
+
+        const streamResult = await window.electronAPI.listLogFilesStream(
+          activeDirectory,
+          includeSubdirectories,
+          requestId
+        );
+
+        if (!streamResult.success) {
+          throw new Error(streamResult.error || 'Failed to start streamed listing');
+        }
+
+        return;
+      }
+
       const result = await window.electronAPI.listLogFiles(activeDirectory, includeSubdirectories);
       if (result.success && result.files) {
         setLogFiles(result.files);
@@ -263,6 +304,12 @@ const Sidebar: React.FC<SidebarProps> = ({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      window.electronAPI?.removeListLogFilesProgressListener?.();
+    };
+  }, []);
 
   const toggleGroup = (dateStr: string) => {
     setCollapsedGroups((prev) => {
@@ -442,12 +489,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <div className="sidebar-empty">
                   <p>{t('sidebar.noDirectory')}</p>
                 </div>
-              ) : loading ? (
+              ) : loading && logFiles.length === 0 ? (
                 <div className="sidebar-loading">{t('sidebar.loading')}</div>
               ) : logFiles.length === 0 ? (
                 <div className="sidebar-empty">{t('sidebar.noFiles')}</div>
               ) : (
                 <div className="log-file-groups">
+                  {loading && <div className="sidebar-loading">{t('sidebar.loading')}</div>}
                   {groupedFiles.map(([dateStr, files]) => {
                     const isGroupCollapsed = collapsedGroups.has(dateStr);
                     const hasDate = dateStr !== 'no-date';

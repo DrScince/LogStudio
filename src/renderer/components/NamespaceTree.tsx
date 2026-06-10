@@ -10,12 +10,14 @@ interface NamespaceNode {
 
 interface NamespaceTreeProps {
   namespaces: string[];
+  namespaceCounts?: Record<string, number>;
   selectedNamespaces: string[];
   onNamespaceToggle: (namespace: string) => void;
 }
 
 const NamespaceTree: React.FC<NamespaceTreeProps> = ({
   namespaces,
+  namespaceCounts = {},
   selectedNamespaces,
   onNamespaceToggle,
 }) => {
@@ -49,6 +51,7 @@ const NamespaceTree: React.FC<NamespaceTreeProps> = ({
     namespaces.forEach((namespace) => {
       const parts = namespace.split('.');
       let current = root;
+      const entryCount = namespaceCounts[namespace] ?? 1;
 
       parts.forEach((part, index) => {
         if (!current.children.has(part)) {
@@ -61,12 +64,12 @@ const NamespaceTree: React.FC<NamespaceTreeProps> = ({
           });
         }
         current = current.children.get(part)!;
-        current.count++;
+        current.count += entryCount;
       });
     });
 
     return root;
-  }, [namespaces]);
+  }, [namespaces, namespaceCounts]);
 
   const toggleExpand = (fullPath: string) => {
     setExpandedNodes((prev) => {

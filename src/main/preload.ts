@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   watchLogFile: (filePath: string) => ipcRenderer.invoke('watch-log-file', filePath),
   unwatchLogFile: (filePath: string) => ipcRenderer.invoke('unwatch-log-file', filePath),
   listLogFiles: (directory: string, includeSubdirectories?: boolean) => ipcRenderer.invoke('list-log-files', directory, includeSubdirectories),
+  listLogFilesStream: (directory: string, includeSubdirectories: boolean | undefined, requestId: string) =>
+    ipcRenderer.invoke('list-log-files-stream', directory, includeSubdirectories, requestId),
   watchDirectory: (directory: string) => ipcRenderer.invoke('watch-directory', directory),
   unwatchDirectory: (directory: string) => ipcRenderer.invoke('unwatch-directory', directory),
   onDirectoryChanged: (callback: (directory: string) => void) => {
@@ -32,6 +34,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   removeDirectoryChangedListener: () => {
     ipcRenderer.removeAllListeners('directory-changed');
+  },
+  onListLogFilesProgress: (callback: (payload: { requestId: string; files: Array<{ name: string; path: string }>; done: boolean; error?: string }) => void) => {
+    ipcRenderer.on('list-log-files-progress', (_event, payload) => callback(payload));
+  },
+  removeListLogFilesProgressListener: () => {
+    ipcRenderer.removeAllListeners('list-log-files-progress');
   },
   getFileStats: (filePath: string) => ipcRenderer.invoke('get-file-stats', filePath),
   readLogChunk: (filePath: string, startByte: number, endByte: number) =>

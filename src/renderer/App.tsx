@@ -94,6 +94,7 @@ function App() {
   }, [tabs, activeTabId]);
   const selectedNamespaces = activeTab?.selectedNamespaces || [];
   const namespaces = activeTab?.namespaces || [];
+  const namespaceCounts = activeTab?.namespaceCounts || {};
 
   useEffect(() => {
     // Set default log directory if not set
@@ -299,6 +300,7 @@ function App() {
         isJson,
         selectedNamespaces: [],
         namespaces: [],
+        namespaceCounts: {},
       };
       
       setTabs((prev) => [...prev, newTab]);
@@ -333,6 +335,7 @@ function App() {
         filePaths: filePaths, // Neue Eigenschaft für mehrere Dateien
         selectedNamespaces: [],
         namespaces: [],
+        namespaceCounts: {},
       };
       
       setTabs((prev) => [...prev, newTab]);
@@ -441,12 +444,14 @@ function App() {
     );
   }, [activeTabId]);
 
-  const handleNamespacesChange = useCallback((newNamespaces: string[]) => {
+  const handleNamespacesChange = useCallback((newNamespaces: string[], newNamespaceCounts: Record<string, number> = {}) => {
     if (!activeTabId) return;
     
     setTabs((prev) =>
       prev.map((tab) =>
-        tab.id === activeTabId ? { ...tab, namespaces: newNamespaces } : tab
+        tab.id === activeTabId
+          ? { ...tab, namespaces: newNamespaces, namespaceCounts: newNamespaceCounts }
+          : tab
       )
     );
   }, [activeTabId]);
@@ -704,6 +709,7 @@ function App() {
             />
             <NamespaceToolbar
               namespaces={namespaces}
+              namespaceCounts={namespaceCounts}
               selectedNamespaces={selectedNamespaces}
               onNamespaceToggle={handleNamespaceToggle}
               isVisible={!!currentLogFile || !!(currentLogFiles && currentLogFiles.length > 0)}

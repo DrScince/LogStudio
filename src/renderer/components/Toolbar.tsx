@@ -8,6 +8,7 @@ export interface Tab {
   filePaths?: string[]; // Für mehrere Dateien
   selectedNamespaces: string[];
   namespaces: string[];
+  namespaceCounts?: Record<string, number>;
   isXml?: boolean;
   isJson?: boolean;
 }

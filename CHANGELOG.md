@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.6.0] - 2026-06-10
+
+### Added
+- **Namespace statistics in filter tree**: The namespace filter now shows real log-entry counts per namespace, including aggregated counts on parent nodes.
+
+### Changed
+- **Progressive sidebar file loading (newest → oldest)**: Large file directories are now loaded in batches and rendered incrementally, so the file list appears immediately and continues to fill in while scanning.
+- **Streaming file-list IPC flow**: Added a dedicated streamed file-list loading path between main and renderer to improve responsiveness for very large directories.
+
+### Fixed
+- **Namespace count semantics**: Namespace tree counters now represent actual log-entry totals instead of only child node counts.
+
 ## [2.5.1] - 2026-05-27
 
 ### Added

@@ -14,7 +14,7 @@ interface LogViewerProps {
   autoRefresh: boolean;
   refreshInterval: number;
   selectedNamespaces: string[];
-  onNamespacesChange: (namespaces: string[]) => void;
+  onNamespacesChange: (namespaces: string[], counts?: Record<string, number>) => void;
   onResetFilters?: () => void;
   editorOrder?: string[];
   autoDetect?: boolean;
@@ -246,12 +246,19 @@ const LogViewer: React.FC<LogViewerProps> = ({
   };
 
   const uniqueNamespaces = useMemo(() => extractUniqueNamespaces(logEntries), [logEntries]);
+  const namespaceEntryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const entry of logEntries) {
+      counts[entry.namespace] = (counts[entry.namespace] ?? 0) + 1;
+    }
+    return counts;
+  }, [logEntries]);
   const uniqueLevels = useMemo(() => extractLogLevels(logEntries), [logEntries]);
 
   // Update namespaces in parent
   useEffect(() => {
-    onNamespacesChange(uniqueNamespaces);
-  }, [uniqueNamespaces, onNamespacesChange]);
+    onNamespacesChange(uniqueNamespaces, namespaceEntryCounts);
+  }, [uniqueNamespaces, namespaceEntryCounts, onNamespacesChange]);
 
   useLayoutEffect(() => {
     updateViewerHeight();
