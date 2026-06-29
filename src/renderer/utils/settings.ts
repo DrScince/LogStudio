@@ -32,18 +32,26 @@ export type HotkeyId =
   | 'uncomment'
   | 'cutLine'
   | 'moveLineUp'
-  | 'moveLineDown';
+  | 'moveLineDown'
+  | 'openSearch'
+  | 'nextMatch'
+  | 'prevMatch'
+  | 'showAllMatches';
 
 export type HotkeyMap = Record<HotkeyId, HotkeyBinding>;
 
 export const DEFAULT_HOTKEYS: HotkeyMap = {
-  save:         { ctrl: true,  alt: false, shift: false, key: 's' },
-  format:       { ctrl: false, alt: false, shift: false, key: 'd', chord: true },
-  comment:      { ctrl: false, alt: false, shift: false, key: 'c', chord: true },
-  uncomment:    { ctrl: false, alt: false, shift: false, key: 'u', chord: true },
-  cutLine:      { ctrl: false, alt: false, shift: true,  key: 'Delete' },
-  moveLineUp:   { ctrl: false, alt: true,  shift: false, key: 'ArrowUp' },
-  moveLineDown: { ctrl: false, alt: true,  shift: false, key: 'ArrowDown' },
+  save:           { ctrl: true,  alt: false, shift: false, key: 's' },
+  format:         { ctrl: false, alt: false, shift: false, key: 'd', chord: true },
+  comment:        { ctrl: false, alt: false, shift: false, key: 'c', chord: true },
+  uncomment:      { ctrl: false, alt: false, shift: false, key: 'u', chord: true },
+  cutLine:        { ctrl: false, alt: false, shift: true,  key: 'Delete' },
+  moveLineUp:     { ctrl: false, alt: true,  shift: false, key: 'ArrowUp' },
+  moveLineDown:   { ctrl: false, alt: true,  shift: false, key: 'ArrowDown' },
+  openSearch:     { ctrl: true,  alt: false, shift: false, key: 'f' },
+  nextMatch:      { ctrl: false, alt: false, shift: false, key: 'F3' },
+  prevMatch:      { ctrl: false, alt: false, shift: true,  key: 'F3' },
+  showAllMatches: { ctrl: false, alt: true,  shift: false, key: 'Enter' },
 };
 
 export interface AppSettings {

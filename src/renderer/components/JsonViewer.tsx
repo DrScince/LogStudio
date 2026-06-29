@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from '../i18n';
 import { highlightJson } from '../utils/jsonHighlighter';
 import { HotkeyMap, DEFAULT_HOTKEYS } from '../utils/settings';
+import { isChordStarter, matchesBinding } from '../utils/hotkeys';
 import './JsonViewer.css';
 
 interface JsonViewerProps {
@@ -320,10 +321,7 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
   // Ctrl+S (global)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      const matchesSave = (e.ctrlKey || e.metaKey) === hk.save.ctrl &&
-        e.key.toLowerCase() === hk.save.key.toLowerCase() &&
-        !!e.altKey === hk.save.alt && !!e.shiftKey === hk.save.shift;
-      if (matchesSave) { e.preventDefault(); handleSave(); }
+      if (matchesBinding(e, hk.save)) { e.preventDefault(); handleSave(); }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -349,7 +347,7 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
     const ta = e.currentTarget;
 
     // ── Alt+Up: move line up ─────────────────
-    if (e.altKey && !e.ctrlKey && e.key === 'ArrowUp') {
+    if (matchesBinding(e, hk.moveLineUp)) {
       e.preventDefault();
       const { content: nc, cursor } = moveLine(content, ta.selectionStart, 'up');
       setContent(nc);
@@ -357,8 +355,7 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
       return;
     }
 
-    // ── Alt+Down: move line down ─────────────
-    if (e.altKey && !e.ctrlKey && e.key === 'ArrowDown') {
+    if (matchesBinding(e, hk.moveLineDown)) {
       e.preventDefault();
       const { content: nc, cursor } = moveLine(content, ta.selectionStart, 'down');
       setContent(nc);
@@ -366,16 +363,14 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
       return;
     }
 
-    // ── Ctrl+K chord ─────────────────────────
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    if (isChordStarter(e)) {
       e.preventDefault();
       ctrlKPendingRef.current = true;
       return;
     }
     if (ctrlKPendingRef.current) {
       ctrlKPendingRef.current = false;
-      // Ctrl+K, D → Format JSON
-      if (e.key === 'd' || e.key === 'D') {
+      if (matchesBinding(e, hk.format, { chordPending: true })) {
         e.preventDefault();
         try {
           setContent(JSON.stringify(JSON.parse(content), null, 2));
@@ -386,8 +381,7 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
       ctrlKPendingRef.current = false;
     }
 
-    // ── Shift+Delete → cut line ──────────────
-    if (e.shiftKey && e.key === 'Delete') {
+    if (matchesBinding(e, hk.cutLine)) {
       e.preventDefault();
       const pos = ta.selectionStart;
       const lines = content.split('\n');

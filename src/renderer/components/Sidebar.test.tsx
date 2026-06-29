@@ -9,6 +9,8 @@ const mockElectronAPI = {
   unwatchDirectory: vi.fn(),
   onDirectoryChanged: vi.fn().mockReturnValue(vi.fn()),
   removeDirectoryChangedListener: vi.fn(),
+  showItemInFolder: vi.fn(),
+  openFileInEditor: vi.fn(),
 };
 
 beforeEach(() => {
@@ -128,5 +130,30 @@ describe('Sidebar', () => {
 
     const activeFile = await screen.findByText('active.log');
     expect(activeFile.closest('.log-file-item')).toHaveClass('active');
+  });
+
+  it('should show file context menu and open in explorer or editor', async () => {
+    const mockFiles = [
+      { name: 'test.log', path: '/test/logs/test.log' },
+    ];
+
+    mockElectronAPI.listLogFiles.mockResolvedValue({
+      success: true,
+      files: mockFiles,
+    });
+
+    render(<Sidebar {...defaultProps} editorOrder={['vscode']} />);
+
+    const fileItem = await screen.findByText('test.log');
+    fireEvent.contextMenu(fileItem);
+
+    const explorerBtn = await screen.findByText(/Explorer/i);
+    fireEvent.click(explorerBtn);
+    expect(mockElectronAPI.showItemInFolder).toHaveBeenCalledWith('/test/logs/test.log');
+
+    fireEvent.contextMenu(fileItem);
+    const editorBtn = await screen.findByText(/editor/i);
+    fireEvent.click(editorBtn);
+    expect(mockElectronAPI.openFileInEditor).toHaveBeenCalledWith('/test/logs/test.log', 1, ['vscode']);
   });
 });

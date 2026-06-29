@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.7.0] - 2026-06-29
+
+### Added
+- **Notepad++-style search with configurable hotkeys**: Search shortcuts (open search, next/previous match, show all matches) can be customized in Settings → Tools & Editors.
+- **"Show all matches" result panel**: Displays all search hits with line numbers in a resizable bottom pane, similar to Notepad++.
+- **Sidebar file context menu**: Right-click a file to *Show in Explorer* or *Open in Editor* (system default application).
+- **Resizable search result pane**: Drag the splitter to adjust panel height; the size is persisted in local storage.
+
+### Changed
+- **Search performance for large files**: Debounced live search (250 ms), virtualized result list, and a cap of 5 000 matches to keep the UI responsive on very large logs.
+- **Drag & drop accepts any file**: Removed the extension whitelist — all dropped files are opened; an error is shown only when reading actually fails.
+- **Search hotkeys unified across viewers**: Log, JSON, and XML viewers share the same configurable hotkey system.
+
+### Fixed
+- **Sidebar context menu**: Menu now closes correctly on outside clicks and *Show in Explorer* works reliably via the main-process IPC handler.
+
 ## [2.6.0] - 2026-06-10
 
 ### Added

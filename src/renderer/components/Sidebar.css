@@ -189,6 +189,36 @@
   color: var(--accent-primary);
 }
 
+.sidebar-file-context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  padding: 4px 0;
+  min-width: 200px;
+}
+
+.sidebar-file-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-file-context-item:hover {
+  background: var(--bg-hover);
+  color: var(--accent-primary);
+}
+
 
 .sidebar.collapsed {
   width: 52px;

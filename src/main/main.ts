@@ -576,6 +576,18 @@ ipcMain.handle('open-external', async (_event, url: string) => {
   await shell.openExternal(url);
 });
 
+ipcMain.handle('show-item-in-folder', async (_event, filePath: string) => {
+  const { shell } = await import('electron');
+  const normalized = path.normalize(filePath);
+
+  if (!fs.existsSync(normalized)) {
+    return { success: false, error: 'File not found' };
+  }
+
+  shell.showItemInFolder(normalized);
+  return { success: true };
+});
+
 ipcMain.handle('open-file-in-editor', async (_event, filePath: string, lineNumber: number, editorOrder?: string[]) => {
   const { exec } = await import('child_process');
   const escaped = filePath.replace(/"/g, '\\"');

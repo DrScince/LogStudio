@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
-import { VariableSizeList } from 'react-window';
+import { VariableSizeList, FixedSizeList } from 'react-window';
 import { LogEntry, LogLevel, LogSchema } from '../types/log';
 import { parseLogFile, filterLogEntries, extractUniqueNamespaces, extractLogLevels } from '../utils/logParser';
 import { detectLogFormat, parseWithFormat, DetectedFormat } from '../utils/logFormatDetector';
+import { HotkeyMap, DEFAULT_HOTKEYS } from '../utils/settings';
+import { matchesBinding } from '../utils/hotkeys';
+import { findSearchMatches, findMatchingEntryIndices, highlightSearchText, SearchMatch } from '../utils/searchUtils';
 import { useTranslation } from '../i18n';
 import Toast from './Toast';
 import './LogViewer.css';
@@ -19,6 +22,7 @@ interface LogViewerProps {
   editorOrder?: string[];
   autoDetect?: boolean;
   enabledFormats?: string[];
+  hotkeys?: HotkeyMap;
 }
 
 type ResizableColumn = 'timestamp' | 'level' | 'namespace';
@@ -35,6 +39,62 @@ const DEFAULT_COLUMN_WIDTHS: Record<ResizableColumn, number> = {
   namespace: 280,
 };
 
+const SEARCH_RESULT_ROW_HEIGHT = 24;
+const DEFAULT_SEARCH_PANE_HEIGHT = 220;
+const MIN_SEARCH_PANE_HEIGHT = 80;
+const MIN_LOG_AREA_HEIGHT = 120;
+const SEARCH_PANE_HEIGHT_KEY = 'logstudio-search-pane-height';
+
+function loadSearchPaneHeight(): number {
+  try {
+    const stored = localStorage.getItem(SEARCH_PANE_HEIGHT_KEY);
+    if (stored) {
+      const parsed = parseInt(stored, 10);
+      if (!Number.isNaN(parsed) && parsed >= MIN_SEARCH_PANE_HEIGHT) return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULT_SEARCH_PANE_HEIGHT;
+}
+
+interface SearchResultRowData {
+  matches: SearchMatch[];
+  searchQuery: string;
+  currentMatchIndex: number;
+  onSelect: (index: number) => void;
+  lineLabel: (line: number) => string;
+}
+
+const SearchResultRow = ({
+  index,
+  style,
+  data,
+}: {
+  index: number;
+  style: React.CSSProperties;
+  data: SearchResultRowData;
+}) => {
+  const match = data.matches[index];
+  if (!match) return null;
+
+  return (
+    <button
+      type="button"
+      style={style}
+      className={`search-result-item ${index === data.currentMatchIndex ? 'active' : ''}`}
+      onClick={() => data.onSelect(index)}
+    >
+      <span className="search-result-line">
+        {data.lineLabel(match.lineNumber)}
+      </span>
+      <span className="search-result-text">
+        {highlightSearchText(match.preview, data.searchQuery)}
+      </span>
+    </button>
+  );
+};
+
 const LogViewer: React.FC<LogViewerProps> = ({
   filePath,
   filePaths,
@@ -46,15 +106,23 @@ const LogViewer: React.FC<LogViewerProps> = ({
   editorOrder,
   autoDetect = true,
   enabledFormats,
+  hotkeys,
 }) => {
   const { t } = useTranslation();
+  const hk = hotkeys ?? DEFAULT_HOTKEYS;
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<LogEntry[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<LogLevel[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchAsFilter, setSearchAsFilter] = useState(false);
-  const [searchMatchIndices, setSearchMatchIndices] = useState<number[]>([]);
+  const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([]);
+  const [searchMatchTotal, setSearchMatchTotal] = useState(0);
+  const [searchMatchesTruncated, setSearchMatchesTruncated] = useState(false);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchResultsPaneHeight, setSearchResultsPaneHeight] = useState(loadSearchPaneHeight);
+  const [searchResultsListHeight, setSearchResultsListHeight] = useState(132);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [isCompactSearchOpen, setIsCompactSearchOpen] = useState(false);
   const [isCompactSearchMode, setIsCompactSearchMode] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -88,18 +156,34 @@ const LogViewer: React.FC<LogViewerProps> = ({
     return () => document.removeEventListener('mousedown', close);
   }, [logContextMenu]);
   const listRef = useRef<VariableSizeList>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
+  const searchResultsMetaRef = useRef<HTMLDivElement>(null);
   const toolbarMainRowRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchControlRef = useRef<HTMLDivElement>(null);
+  const searchResultsListRef = useRef<FixedSizeList>(null);
+  const scrollToMatchRef = useRef(false);
   const resizeStateRef = useRef<{ column: ResizableColumn; startX: number; startWidth: number } | null>(null);
+  const paneResizeStateRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const searchResultsPaneHeightRef = useRef(searchResultsPaneHeight);
   const lastFileSizeRef = useRef<number>(0);
   const scrollPositionRef = useRef<{ scrollOffset: number; scrollUpdateWasRequested: boolean }>({ scrollOffset: 0, scrollUpdateWasRequested: false });
   const pendingScrollRestoreRef = useRef<number | null>(null);
   const hasLoadedRef = useRef(false);
   const detectedFormatRef = useRef<DetectedFormat | null>(null);
   const previousFiltersRef = useRef<{ levels: LogLevel[]; namespaces: string[]; search: string }>({ levels: [], namespaces: [], search: '' });
+
+  useEffect(() => {
+    searchResultsPaneHeightRef.current = searchResultsPaneHeight;
+  }, [searchResultsPaneHeight]);
+
+  const updateSearchResultsListHeight = useCallback(() => {
+    const metaHeight = searchResultsMetaRef.current?.offsetHeight ?? 0;
+    const nextHeight = Math.max(searchResultsPaneHeight - metaHeight, 40);
+    setSearchResultsListHeight((prev) => (prev === nextHeight ? prev : nextHeight));
+  }, [searchResultsPaneHeight]);
 
   const updateViewerHeight = useCallback(() => {
     const containerHeight = containerRef.current?.clientHeight ?? 0;
@@ -265,6 +349,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
 
     const container = containerRef.current;
     const header = headerRef.current;
+    const body = bodyRef.current;
     const supportsResizeObserver = typeof ResizeObserver !== 'undefined';
     const resizeObserver = supportsResizeObserver
       ? new ResizeObserver(() => {
@@ -280,13 +365,36 @@ const LogViewer: React.FC<LogViewerProps> = ({
       resizeObserver.observe(header);
     }
 
+    if (resizeObserver && body) {
+      resizeObserver.observe(body);
+    }
+
     window.addEventListener('resize', updateViewerHeight);
 
     return () => {
       resizeObserver?.disconnect();
       window.removeEventListener('resize', updateViewerHeight);
     };
-  }, [filteredEntries.length, updateViewerHeight]);
+  }, [filteredEntries.length, showSearchResults, searchResultsPaneHeight, updateViewerHeight]);
+
+  useLayoutEffect(() => {
+    if (!showSearchResults) return;
+    updateSearchResultsListHeight();
+    const meta = searchResultsMetaRef.current;
+    if (!meta || typeof ResizeObserver === 'undefined') return;
+
+    const observer = new ResizeObserver(() => updateSearchResultsListHeight());
+    observer.observe(meta);
+    return () => observer.disconnect();
+  }, [
+    showSearchResults,
+    searchResultsPaneHeight,
+    searchMatchTotal,
+    searchMatchesTruncated,
+    filePath,
+    filePaths,
+    updateSearchResultsListHeight,
+  ]);
 
   useEffect(() => {
     const handleDocumentMouseDown = (event: MouseEvent) => {
@@ -334,6 +442,19 @@ const LogViewer: React.FC<LogViewerProps> = ({
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
+      const paneResize = paneResizeStateRef.current;
+      if (paneResize && bodyRef.current) {
+        const bodyHeight = bodyRef.current.clientHeight;
+        const maxPaneHeight = Math.max(MIN_SEARCH_PANE_HEIGHT, bodyHeight - MIN_LOG_AREA_HEIGHT);
+        const delta = paneResize.startY - event.clientY;
+        const nextHeight = Math.min(
+          maxPaneHeight,
+          Math.max(MIN_SEARCH_PANE_HEIGHT, paneResize.startHeight + delta),
+        );
+        setSearchResultsPaneHeight(nextHeight);
+        return;
+      }
+
       const resizeState = resizeStateRef.current;
       if (!resizeState) return;
 
@@ -348,10 +469,24 @@ const LogViewer: React.FC<LogViewerProps> = ({
     };
 
     const handleMouseUp = () => {
-      if (!resizeStateRef.current) return;
-      resizeStateRef.current = null;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
+      const wasPaneResize = paneResizeStateRef.current !== null;
+      const wasColumnResize = resizeStateRef.current !== null;
+
+      if (wasPaneResize) {
+        paneResizeStateRef.current = null;
+        try {
+          localStorage.setItem(SEARCH_PANE_HEIGHT_KEY, String(searchResultsPaneHeightRef.current));
+        } catch {
+          // ignore
+        }
+      }
+      if (wasColumnResize) {
+        resizeStateRef.current = null;
+      }
+      if (wasPaneResize || wasColumnResize) {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -839,6 +974,16 @@ const LogViewer: React.FC<LogViewerProps> = ({
     document.body.style.userSelect = 'none';
   }, [columnWidths]);
 
+  const startPaneResize = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    paneResizeStateRef.current = {
+      startY: event.clientY,
+      startHeight: searchResultsPaneHeight,
+    };
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  }, [searchResultsPaneHeight]);
+
   const toggleCompactSearch = useCallback(() => {
     if (!isCompactSearchMode) return;
     setIsCompactSearchOpen((prev) => {
@@ -850,42 +995,127 @@ const LogViewer: React.FC<LogViewerProps> = ({
     });
   }, [isCompactSearchMode]);
 
-  // Compute match indices whenever filteredEntries or searchQuery changes
+  const focusSearch = useCallback(() => {
+    if (isCompactSearchMode) {
+      setIsCompactSearchOpen(true);
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      });
+      return;
+    }
+    searchInputRef.current?.focus();
+    searchInputRef.current?.select();
+  }, [isCompactSearchMode]);
+
+  // Debounce expensive full-text match indexing
   useEffect(() => {
-    if (!searchQuery.trim() || searchAsFilter) {
-      setSearchMatchIndices([]);
+    const timer = window.setTimeout(() => setDebouncedSearchQuery(searchQuery), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  const matchingEntryIndices = useMemo(
+    () => (
+      searchQuery.trim() && !searchAsFilter
+        ? findMatchingEntryIndices(filteredEntries, searchQuery)
+        : new Set<number>()
+    ),
+    [filteredEntries, searchQuery, searchAsFilter],
+  );
+
+  // Compute full match list from debounced query (avoids UI freeze while typing)
+  useEffect(() => {
+    if (!debouncedSearchQuery.trim() || searchAsFilter) {
+      setSearchMatches([]);
+      setSearchMatchTotal(0);
+      setSearchMatchesTruncated(false);
       setCurrentMatchIndex(0);
       return;
     }
-    const q = searchQuery.toLowerCase();
-    const indices: number[] = [];
-    filteredEntries.forEach((entry, idx) => {
-      // Use fullText so search also finds matches in extra JSON fields (package, process, uri, etc.)
-      const haystack = (entry.fullText + ' ' + entry.namespace + ' ' + entry.timestamp + ' ' + entry.level).toLowerCase();
-      if (haystack.includes(q)) indices.push(idx);
-    });
-    setSearchMatchIndices(indices);
+    const result = findSearchMatches(filteredEntries, debouncedSearchQuery);
+    setSearchMatches(result.matches);
+    setSearchMatchTotal(result.totalFound);
+    setSearchMatchesTruncated(result.truncated);
     setCurrentMatchIndex(0);
-  }, [filteredEntries, searchQuery, searchAsFilter]);
+  }, [filteredEntries, debouncedSearchQuery, searchAsFilter]);
 
-  // Scroll to current match whenever it changes
+  const displayMatchTotal = debouncedSearchQuery === searchQuery
+    ? searchMatchTotal
+    : matchingEntryIndices.size;
+
+  // Scroll only on explicit navigation, not while typing
   useEffect(() => {
-    if (searchMatchIndices.length === 0) return;
-    const targetIdx = searchMatchIndices[currentMatchIndex];
-    if (targetIdx === undefined) return;
+    if (!scrollToMatchRef.current || searchMatches.length === 0) return;
+    scrollToMatchRef.current = false;
+    const match = searchMatches[currentMatchIndex];
+    if (!match) return;
     const listApi = listRef.current as unknown as { scrollToItem?: (index: number, align?: string) => void } | null;
-    listApi?.scrollToItem?.(targetIdx, 'smart');
-  }, [searchMatchIndices, currentMatchIndex]);
+    listApi?.scrollToItem?.(match.entryIndex, 'smart');
+    searchResultsListRef.current?.scrollToItem(currentMatchIndex, 'smart');
+  }, [searchMatches, currentMatchIndex]);
 
   const goToNextMatch = useCallback(() => {
-    if (searchMatchIndices.length === 0) return;
-    setCurrentMatchIndex((prev) => (prev + 1) % searchMatchIndices.length);
-  }, [searchMatchIndices]);
+    if (searchMatches.length === 0) return;
+    scrollToMatchRef.current = true;
+    setCurrentMatchIndex((prev) => (prev + 1) % searchMatches.length);
+  }, [searchMatches]);
 
   const goToPrevMatch = useCallback(() => {
-    if (searchMatchIndices.length === 0) return;
-    setCurrentMatchIndex((prev) => (prev - 1 + searchMatchIndices.length) % searchMatchIndices.length);
-  }, [searchMatchIndices]);
+    if (searchMatches.length === 0) return;
+    scrollToMatchRef.current = true;
+    setCurrentMatchIndex((prev) => (prev - 1 + searchMatches.length) % searchMatches.length);
+  }, [searchMatches]);
+
+  const selectMatch = useCallback((index: number) => {
+    scrollToMatchRef.current = true;
+    setCurrentMatchIndex(index);
+  }, []);
+
+  const searchResultListData = useMemo<SearchResultRowData>(() => ({
+    matches: searchMatches,
+    searchQuery: debouncedSearchQuery || searchQuery,
+    currentMatchIndex,
+    onSelect: selectMatch,
+    lineLabel: (line: number) => t('logviewer.searchResultLine', { line }),
+  }), [searchMatches, debouncedSearchQuery, searchQuery, currentMatchIndex, selectMatch, t]);
+
+  const toggleShowAllMatches = useCallback(() => {
+    if (!searchQuery.trim() || searchAsFilter || displayMatchTotal === 0) return;
+    setShowSearchResults((prev) => !prev);
+  }, [searchAsFilter, displayMatchTotal, searchQuery]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isEditable = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+
+      if (matchesBinding(e, hk.openSearch)) {
+        e.preventDefault();
+        focusSearch();
+        return;
+      }
+
+      if (isEditable && target !== searchInputRef.current) return;
+
+      if (matchesBinding(e, hk.nextMatch)) {
+        e.preventDefault();
+        goToNextMatch();
+        return;
+      }
+      if (matchesBinding(e, hk.prevMatch)) {
+        e.preventDefault();
+        goToPrevMatch();
+        return;
+      }
+      if (matchesBinding(e, hk.showAllMatches)) {
+        e.preventDefault();
+        toggleShowAllMatches();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [focusSearch, goToNextMatch, goToPrevMatch, hk, toggleShowAllMatches]);
 
   const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -893,6 +1123,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
       if (e.shiftKey) goToPrevMatch(); else goToNextMatch();
     } else if (e.key === 'Escape') {
       setIsCompactSearchOpen(false);
+      searchInputRef.current?.blur();
     }
   }, [goToNextMatch, goToPrevMatch]);
 
@@ -974,8 +1205,8 @@ const LogViewer: React.FC<LogViewerProps> = ({
     // Also expand when fullText differs from message (e.g. JSON entries with extra fields)
     const hasExtraFields = entry.fullText !== entry.message;
     const shouldShowExpand = entry.isMultiLine || isLongMessage || hasExtraFields;
-    const isSearchMatch = !searchAsFilter && searchMatchIndices.includes(index);
-    const isActiveMatch = isSearchMatch && searchMatchIndices[currentMatchIndex] === index;
+    const isSearchMatch = !searchAsFilter && matchingEntryIndices.has(index);
+    const isActiveMatch = !searchAsFilter && searchMatches[currentMatchIndex]?.entryIndex === index;
 
     // Analysiere und formatiere den Inhalt wenn expandiert (fullText enthält bei JSON-Einträgen das komplette JSON)
     const expandedContent = isExpanded ? analyzeAndFormatContent(entry.fullText) : null;
@@ -1085,7 +1316,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
         )}
       </div>
     );
-  }, [filteredEntries, expandedLines, toggleExpand, analyzeAndFormatContent, getResizableColumnStyle, filePaths, highlightText, searchMatchIndices, currentMatchIndex, searchAsFilter]);
+  }, [filteredEntries, expandedLines, toggleExpand, analyzeAndFormatContent, getResizableColumnStyle, filePaths, highlightText, searchMatches, currentMatchIndex, searchAsFilter, matchingEntryIndices]);
 
   // Check if we have any files to display (single or multiple)
   const hasFiles = filePath || (filePaths && filePaths.length > 0);
@@ -1163,19 +1394,27 @@ const LogViewer: React.FC<LogViewerProps> = ({
                   />
                 )}
                 {!isCompactSearchMode && searchQuery && !searchAsFilter && (
-                  <span className={`search-match-counter ${searchMatchIndices.length === 0 ? 'no-match' : ''}`}>
-                    {searchMatchIndices.length === 0
+                  <span className={`search-match-counter ${displayMatchTotal === 0 ? 'no-match' : ''}`}>
+                    {displayMatchTotal === 0
                       ? t('logviewer.searchNoMatch')
-                      : t('logviewer.searchMatch', { current: currentMatchIndex + 1, total: searchMatchIndices.length })}
+                      : t('logviewer.searchMatch', { current: currentMatchIndex + 1, total: displayMatchTotal })}
                   </span>
                 )}
-                {!isCompactSearchMode && searchQuery && !searchAsFilter && searchMatchIndices.length > 0 && (
+                {!isCompactSearchMode && searchQuery && !searchAsFilter && displayMatchTotal > 0 && (
                   <>
                     <button type="button" className="search-nav-button" title={t('logviewer.searchPrev')} onClick={goToPrevMatch}>
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 8L6 5L3 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     </button>
                     <button type="button" className="search-nav-button" title={t('logviewer.searchNext')} onClick={goToNextMatch}>
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4L6 7L9 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+                    <button
+                      type="button"
+                      className={`search-show-all-button ${showSearchResults ? 'active' : ''}`}
+                      title={t('logviewer.searchShowAll')}
+                      onClick={toggleShowAllMatches}
+                    >
+                      {t('logviewer.searchShowAll')}
                     </button>
                   </>
                 )}
@@ -1214,18 +1453,26 @@ const LogViewer: React.FC<LogViewerProps> = ({
                     />
                     {searchQuery && !searchAsFilter && (
                       <div className="search-dropdown-controls">
-                        <span className={`search-match-counter ${searchMatchIndices.length === 0 ? 'no-match' : ''}`}>
-                          {searchMatchIndices.length === 0
+                        <span className={`search-match-counter ${displayMatchTotal === 0 ? 'no-match' : ''}`}>
+                          {displayMatchTotal === 0
                             ? t('logviewer.searchNoMatch')
-                            : t('logviewer.searchMatch', { current: currentMatchIndex + 1, total: searchMatchIndices.length })}
+                            : t('logviewer.searchMatch', { current: currentMatchIndex + 1, total: displayMatchTotal })}
                         </span>
-                        {searchMatchIndices.length > 0 && (
+                        {displayMatchTotal > 0 && (
                           <>
                             <button type="button" className="search-nav-button" title={t('logviewer.searchPrev')} onClick={goToPrevMatch}>
                               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 8L6 5L3 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                             </button>
                             <button type="button" className="search-nav-button" title={t('logviewer.searchNext')} onClick={goToNextMatch}>
                               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 4L6 7L9 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            </button>
+                            <button
+                              type="button"
+                              className={`search-show-all-button ${showSearchResults ? 'active' : ''}`}
+                              title={t('logviewer.searchShowAll')}
+                              onClick={toggleShowAllMatches}
+                            >
+                              {t('logviewer.searchShowAll')}
                             </button>
                           </>
                         )}
@@ -1316,6 +1563,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
           </div>
         </div>
       </div>
+      <div className="log-viewer-body" ref={bodyRef}>
       <div className="log-viewer-content" ref={containerRef}>
         {filteredEntries.length > 0 && (
           <div className="log-column-header" role="presentation" ref={headerRef}>
@@ -1371,6 +1619,57 @@ const LogViewer: React.FC<LogViewerProps> = ({
             {Row}
           </VariableSizeList>
         )}
+      </div>
+      {showSearchResults && searchQuery && !searchAsFilter && searchMatches.length > 0 && (
+        <>
+          <div
+            className="search-results-splitter"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label={t('logviewer.searchResizePane')}
+            onMouseDown={startPaneResize}
+          />
+          <div className="search-results-pane" style={{ height: searchResultsPaneHeight }}>
+            <div className="search-results-meta" ref={searchResultsMetaRef}>
+              <div className="search-results-header">
+                <span>{t('logviewer.searchResultsTitle', { count: searchMatchTotal })}</span>
+                <button
+                  type="button"
+                  className="search-results-close"
+                  aria-label={t('settings.cancel')}
+                  onClick={() => setShowSearchResults(false)}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="search-results-summary">
+                {t('logviewer.searchResultsSummary', { query: searchQuery, count: searchMatchTotal })}
+                {searchMatchesTruncated && (
+                  <span className="search-results-truncated">
+                    {' '}{t('logviewer.searchResultsTruncated', { shown: searchMatches.length, total: searchMatchTotal })}
+                  </span>
+                )}
+              </div>
+              {(filePath || (filePaths && filePaths.length > 0)) && (
+                <div className="search-results-file">
+                  {filePath ?? filePaths?.[0]} ({searchMatchTotal})
+                </div>
+              )}
+            </div>
+            <FixedSizeList
+              ref={searchResultsListRef}
+              className="search-results-list"
+              height={searchResultsListHeight}
+              width="100%"
+              itemCount={searchMatches.length}
+              itemSize={SEARCH_RESULT_ROW_HEIGHT}
+              itemData={searchResultListData}
+            >
+              {SearchResultRow}
+            </FixedSizeList>
+          </div>
+        </>
+      )}
       </div>
       {logContextMenu && (
         <div

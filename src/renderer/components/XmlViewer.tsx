@@ -3,6 +3,7 @@ import { useTranslation } from '../i18n';
 import { highlightXml } from '../utils/xmlHighlighter';
 import { formatXml } from '../utils/xmlFormatter';
 import { HotkeyMap, DEFAULT_HOTKEYS } from '../utils/settings';
+import { isChordStarter, matchesBinding } from '../utils/hotkeys';
 import './XmlViewer.css';
 
 interface XmlViewerProps {
@@ -276,6 +277,7 @@ function findFoldableRegions(lines: string[]): Map<number, { end: number; tagNam
 
 const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
   const { t } = useTranslation();
+  const hk = hotkeys ?? DEFAULT_HOTKEYS;
   const [content, setContent] = useState('');
   const [savedContent, setSavedContent] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('raw');
@@ -380,14 +382,14 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
   // Ctrl+S
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      if (matchesBinding(e, hk.save)) {
         e.preventDefault();
         handleSave();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleSave]);
+  }, [handleSave, hk]);
 
   // ── Revert ─────────────────────────────────
   const handleRevert = () => {
@@ -433,7 +435,7 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
     const ta = e.currentTarget;
 
     // ── Alt+Up: move line up ─────────────────
-    if (e.altKey && !e.ctrlKey && e.key === 'ArrowUp') {
+    if (matchesBinding(e, hk.moveLineUp)) {
       e.preventDefault();
       const lines = content.split('\n');
       const pos = ta.selectionStart;
@@ -457,7 +459,7 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
     }
 
     // ── Alt+Down: move line down ─────────────
-    if (e.altKey && !e.ctrlKey && e.key === 'ArrowDown') {
+    if (matchesBinding(e, hk.moveLineDown)) {
       e.preventDefault();
       const lines = content.split('\n');
       const pos = ta.selectionStart;
@@ -481,7 +483,7 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
     }
 
     // ── Ctrl+K chord handling ────────────────
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    if (isChordStarter(e)) {
       e.preventDefault();
       ctrlKPendingRef.current = true;
       return;
@@ -489,8 +491,7 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
     if (ctrlKPendingRef.current) {
       ctrlKPendingRef.current = false;
 
-      // Ctrl+K, D → Format document
-      if (e.key === 'd' || e.key === 'D') {
+      if (matchesBinding(e, hk.format, { chordPending: true })) {
         e.preventDefault();
         try {
           setContent(formatXml(content));
@@ -500,8 +501,7 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
         return;
       }
 
-      // Ctrl+K, C → Add comment on line / selection
-      if (e.key === 'c' || e.key === 'C') {
+      if (matchesBinding(e, hk.comment, { chordPending: true })) {
         e.preventDefault();
         const start = ta.selectionStart;
         const end = ta.selectionEnd;
@@ -528,8 +528,7 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
         return;
       }
 
-      // Ctrl+K, U → Remove comment on line / selection
-      if (e.key === 'u' || e.key === 'U') {
+      if (matchesBinding(e, hk.uncomment, { chordPending: true })) {
         e.preventDefault();
         const start = ta.selectionStart;
         const end = ta.selectionEnd;
@@ -557,7 +556,7 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
     }
 
     // ── Shift+Delete → cut line ──────────────
-    if (e.shiftKey && e.key === 'Delete') {
+    if (matchesBinding(e, hk.cutLine)) {
       e.preventDefault();
       const pos = ta.selectionStart;
       const lines = content.split('\n');

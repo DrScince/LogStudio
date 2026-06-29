@@ -24,6 +24,14 @@ vi.mock('react-window', () => ({
       <div data-testid="virtualized-list" data-height={String(height)} data-item-count={String(itemCount)} />
     );
   }),
+  FixedSizeList: React.forwardRef(({ height, itemCount }: any, ref: any) => {
+    if (ref) {
+      ref.current = { scrollToItem: vi.fn() };
+    }
+    return (
+      <div data-testid="search-results-list" data-height={String(height)} data-item-count={String(itemCount)} />
+    );
+  }),
 }));
 
 const defaultSchema: LogSchema = {

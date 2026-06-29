@@ -42,7 +42,11 @@ function App() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragError, setDragError] = useState<string | null>(null);
 
-  const ALLOWED_EXTENSIONS = ['.log', '.txt', '.xml', '.json'];
+  const canReadFile = useCallback(async (filePath: string): Promise<boolean> => {
+    if (!window.electronAPI) return false;
+    const result = await window.electronAPI.readLogFile(filePath);
+    return result.success;
+  }, []);
 
   // Apply theme to root element
   useEffect(() => {
@@ -255,7 +259,7 @@ function App() {
     }
   };
 
-  const openFileInTab = useCallback(async (filePath: string) => {
+  const openFileInTab = useCallback(async (filePath: string): Promise<boolean> => {
     // Check if file is already open in a single-file tab (not a group tab)
     const existingTab = tabs.find((tab) => 
       tab.filePath === filePath && 
@@ -265,47 +269,51 @@ function App() {
     if (existingTab) {
       // Switch to existing tab
       setActiveTabId(existingTab.id);
-    } else {
-      // Create a new tab — detect type by extension first, then by content
-      const newTabId = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const lp = filePath.toLowerCase();
-      let isXml = lp.endsWith('.xml');
-      let isJson = false;
+      return true;
+    }
 
-      // For JSON files and unknown extensions: peek at content to decide viewer
-      const needsContentCheck = lp.endsWith('.json') || (!isXml && !lp.endsWith('.log') && !lp.endsWith('.txt'));
-      if (needsContentCheck && window.electronAPI) {
-        try {
-          const result = await window.electronAPI.readLogFile(filePath);
-          if (result.success && result.content) {
-            const trimmed = result.content.trimStart();
-            if (!isXml && (trimmed.startsWith('<?xml') || /^<[A-Za-z][A-Za-z0-9\-_]*[\s>]/.test(trimmed))) {
-              isXml = true;
-            } else if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-              // JSON: check if it looks like a log (has timestamp/level/message keys)
-              const fmt = detectLogFormat(result.content);
-              const isJsonLog = fmt.name === 'json-ecs' || fmt.name === 'json-multiline';
-              isJson = !isJsonLog;
-            }
+    if (!window.electronAPI) return false;
+
+    // Create a new tab — detect type by extension first, then by content
+    const newTabId = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const lp = filePath.toLowerCase();
+    let isXml = lp.endsWith('.xml');
+    let isJson = false;
+
+    try {
+      const result = await window.electronAPI.readLogFile(filePath);
+      if (!result.success) return false;
+
+      if (result.content) {
+        const trimmed = result.content.trimStart();
+        const needsContentCheck = lp.endsWith('.json') || (!isXml && !lp.endsWith('.log') && !lp.endsWith('.txt'));
+        if (needsContentCheck) {
+          if (!isXml && (trimmed.startsWith('<?xml') || /^<[A-Za-z][A-Za-z0-9\-_]*[\s>]/.test(trimmed))) {
+            isXml = true;
+          } else if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+            const fmt = detectLogFormat(result.content);
+            const isJsonLog = fmt.name === 'json-ecs' || fmt.name === 'json-multiline';
+            isJson = !isJsonLog;
           }
-        } catch {
-          // ignore — fall through to log viewer
         }
       }
-
-      const newTab: Tab = {
-        id: newTabId,
-        filePath,
-        isXml,
-        isJson,
-        selectedNamespaces: [],
-        namespaces: [],
-        namespaceCounts: {},
-      };
-      
-      setTabs((prev) => [...prev, newTab]);
-      setActiveTabId(newTabId);
+    } catch {
+      return false;
     }
+
+    const newTab: Tab = {
+      id: newTabId,
+      filePath,
+      isXml,
+      isJson,
+      selectedNamespaces: [],
+      namespaces: [],
+      namespaceCounts: {},
+    };
+    
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTabId(newTabId);
+    return true;
   }, [tabs]);
 
   const openMultipleFilesInTab = useCallback((filePaths: string[]) => {
@@ -482,32 +490,41 @@ function App() {
     setIsDragOver(false);
   }, []);
 
-  const handleDroppedPaths = useCallback((paths: string[]) => {
+  const handleDroppedPaths = useCallback(async (paths: string[]) => {
     setIsDragOver(false);
+    if (paths.length === 0) return;
 
-    const invalid = paths.filter(
-      (p) => !ALLOWED_EXTENSIONS.some((ext) => p.toLowerCase().endsWith(ext))
-    );
+    const failed: string[] = [];
 
-    if (invalid.length > 0) {
-      const names = invalid.map((p) => p.split(/[\\/]/).pop() ?? p).join(', ');
+    if (paths.length === 1) {
+      const ok = await openFileInTab(paths[0]);
+      if (!ok) failed.push(paths[0]);
+    } else {
+      const readable: string[] = [];
+      for (const filePath of paths) {
+        if (await canReadFile(filePath)) {
+          readable.push(filePath);
+        } else {
+          failed.push(filePath);
+        }
+      }
+
+      if (readable.length === 1) {
+        await openFileInTab(readable[0]);
+      } else if (readable.length > 1) {
+        openMultipleFilesInTab(readable);
+      }
+    }
+
+    if (failed.length > 0) {
+      const names = failed.map((p) => p.split(/[\\/]/).pop() ?? p).join(', ');
       setDragError(
-        invalid.length === paths.length
-          ? `Datei${invalid.length > 1 ? 'en' : ''} nicht unterstützt: ${names}\nErlaubte Formate: ${ALLOWED_EXTENSIONS.join(', ')}`
-          : `Folgende Dateien werden nicht unterstützt: ${names}\nErlaubte Formate: ${ALLOWED_EXTENSIONS.join(', ')}`
+        failed.length === paths.length
+          ? t('app.unsupportedFiles', { plural: failed.length > 1 ? 'en' : '', names })
+          : t('app.unsupportedSomeFiles', { names })
       );
     }
-
-    const valid = paths.filter((p) =>
-      ALLOWED_EXTENSIONS.some((ext) => p.toLowerCase().endsWith(ext))
-    );
-
-    if (valid.length === 1) {
-      openFileInTab(valid[0]);
-    } else if (valid.length > 1) {
-      openMultipleFilesInTab(valid);
-    }
-  }, [openFileInTab, openMultipleFilesInTab, ALLOWED_EXTENSIONS]);
+  }, [canReadFile, openFileInTab, openMultipleFilesInTab, t]);
 
   useEffect(() => {
     window.electronAPI?.onFilesDropped?.(handleDroppedPaths);
@@ -543,7 +560,7 @@ function App() {
           <div className="drag-overlay-content">
             <span className="drag-overlay-icon">📂</span>
             <span className="drag-overlay-text">{t('app.dragOverHint')}</span>
-            <span className="drag-overlay-hint">{ALLOWED_EXTENSIONS.join(', ')}</span>
+            <span className="drag-overlay-hint">{t('app.dragOverSubhint')}</span>
             <span className="drag-overlay-esc">{t('app.dragOverCancel')}</span>
           </div>
         </div>
@@ -679,10 +696,12 @@ function App() {
           isCollapsed={isFileSidebarCollapsed}
           onToggleCollapse={() => setIsFileSidebarCollapsed((prev) => !prev)}
           includeSubdirectories={settings.includeSubdirectories}
+          editorOrder={settings.editorOrder}
         />
         {activeTab?.isXml ? (
           <XmlViewer
             filePath={activeTab.filePath}
+            hotkeys={settings.hotkeys}
             key={activeTabId ?? ''}
           />
         ) : activeTab?.isJson ? (
@@ -705,6 +724,7 @@ function App() {
               editorOrder={settings.editorOrder}
               autoDetect={settings.autoDetect}
               enabledFormats={settings.enabledFormats}
+              hotkeys={settings.hotkeys}
               key={`${activeTabId}-${resetFilterTrigger}`}
             />
             <NamespaceToolbar

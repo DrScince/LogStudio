@@ -567,6 +567,81 @@
   cursor: not-allowed;
 }
 
+/* Hotkey settings */
+.hotkey-group {
+  margin-top: 16px;
+}
+
+.hotkey-group h4 {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.hotkey-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hotkey-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.hotkey-label {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.hotkey-capture-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hotkey-capture {
+  min-width: 140px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: center;
+}
+
+.hotkey-capture.capturing {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.hotkey-reset-btn {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.hotkey-reset-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
+}
+
 /* ── Animations ──────────────────────────────────────────────────────── */
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -933,4 +1008,79 @@
 .editor-order-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+/* Hotkey settings */
+.hotkey-group {
+  margin-top: 16px;
+}
+
+.hotkey-group h4 {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.hotkey-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hotkey-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.hotkey-label {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.hotkey-capture-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hotkey-capture {
+  min-width: 140px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-align: center;
+}
+
+.hotkey-capture.capturing {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.hotkey-reset-btn {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.hotkey-reset-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
 }

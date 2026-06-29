@@ -21,6 +21,7 @@ interface SidebarProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   includeSubdirectories?: boolean;
+  editorOrder?: string[];
 }
 
 interface FileWithDate {
@@ -47,6 +48,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed = false,
   onToggleCollapse,
   includeSubdirectories = false,
+  editorOrder,
 }) => {
   const { t, language } = useTranslation();
   const [logFiles, setLogFiles] = useState<{ name: string; path: string }[]>([]);
@@ -56,19 +58,57 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // Context menu for directory tabs
   const [dirContextMenu, setDirContextMenu] = useState<{ x: number; y: number; dir: string } | null>(null);
+  const [fileContextMenu, setFileContextMenu] = useState<{ x: number; y: number; filePath: string } | null>(null);
   const [renamingDir, setRenamingDir] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [dragOverDir, setDragOverDir] = useState<string | null>(null);
   const dragSrcDir = React.useRef<string | null>(null);
   const loadRequestIdRef = useRef<string | null>(null);
+  const dirContextMenuRef = useRef<HTMLDivElement>(null);
+  const fileContextMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close context menu on outside click
+  // Close context menus on outside click (ignore clicks inside the menu)
   useEffect(() => {
-    if (!dirContextMenu) return;
-    const close = () => setDirContextMenu(null);
+    if (!dirContextMenu && !fileContextMenu) return;
+    const close = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (dirContextMenuRef.current?.contains(target)) return;
+      if (fileContextMenuRef.current?.contains(target)) return;
+      setDirContextMenu(null);
+      setFileContextMenu(null);
+    };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
-  }, [dirContextMenu]);
+  }, [dirContextMenu, fileContextMenu]);
+
+  const handleFileContextMenu = (e: React.MouseEvent, filePath: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const menuWidth = 200;
+    const menuHeight = 88;
+    const x = Math.min(e.clientX, window.innerWidth - menuWidth - 8);
+    const y = Math.min(e.clientY, window.innerHeight - menuHeight - 8);
+    setFileContextMenu({ x, y, filePath });
+    setDirContextMenu(null);
+  };
+
+  const openFileInExplorer = async (filePath: string) => {
+    setFileContextMenu(null);
+    try {
+      await window.electronAPI?.showItemInFolder(filePath);
+    } catch (error) {
+      console.error('Failed to open file in Explorer:', error);
+    }
+  };
+
+  const openFileInEditor = async (filePath: string) => {
+    setFileContextMenu(null);
+    try {
+      await window.electronAPI?.openFileInEditor(filePath, 1, editorOrder);
+    } catch (error) {
+      console.error('Failed to open file in editor:', error);
+    }
+  };
 
   const handleDirContextMenu = (e: React.MouseEvent, dir: string) => {
     e.preventDefault();
@@ -80,6 +120,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     const rawY = e.clientY - 8;
     const y = Math.min(rawY, window.innerHeight - menuHeight - 8);
     setDirContextMenu({ x, y, dir });
+    setFileContextMenu(null);
   };
 
   const startRename = (dir: string) => {
@@ -537,6 +578,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                                   key={file.path}
                                   className={`log-file-item ${isActive ? 'active' : ''} ${isInActiveTab ? 'in-active-tab' : ''}`}
                                   onClick={(e) => handleFileClick(file.path, e)}
+                                  onContextMenu={(e) => handleFileContextMenu(e, file.path)}
                                 >
                                   {file.name}
                                 </li>
@@ -559,6 +601,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     {/* ── Directory tab context menu (portal to body, avoids backdrop-filter stacking context) ── */}
     {dirContextMenu && ReactDOM.createPortal(
       <div
+        ref={dirContextMenuRef}
         className="sidebar-dir-context-menu"
         style={{ top: dirContextMenu.y, left: dirContextMenu.x }}
         onMouseDown={(e) => e.stopPropagation()}
@@ -580,6 +623,41 @@ const Sidebar: React.FC<SidebarProps> = ({
             <path d="M11 2l3 3-8 8H3v-3L11 2z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           {t('sidebar.renameFolder')}
+        </button>
+      </div>,
+      document.body
+    )}
+
+    {/* ── File context menu ── */}
+    {fileContextMenu && ReactDOM.createPortal(
+      <div
+        ref={fileContextMenuRef}
+        className="sidebar-file-context-menu"
+        style={{ top: fileContextMenu.y, left: fileContextMenu.x }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <button
+          type="button"
+          className="sidebar-file-context-item"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => { void openFileInExplorer(fileContextMenu.filePath); }}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M2 4a1 1 0 011-1h4.586a1 1 0 01.707.293L8.707 4.707A1 1 0 009.414 5H14a1 1 0 011 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1V4z" fill="currentColor"/>
+          </svg>
+          {t('sidebar.openInExplorer')}
+        </button>
+        <button
+          type="button"
+          className="sidebar-file-context-item"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => { void openFileInEditor(fileContextMenu.filePath); }}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M11 2l3 3-8 8H3v-3L11 2z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {t('sidebar.openInEditor')}
         </button>
       </div>,
       document.body

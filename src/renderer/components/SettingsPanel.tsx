@@ -1,7 +1,8 @@
 ﻿import React, { useState } from 'react';
-import { AppSettings, LogSchema, EditorId } from '../utils/settings';
+import { AppSettings, LogSchema, EditorId, HotkeyId, HotkeyBinding, HotkeyMap, DEFAULT_HOTKEYS } from '../utils/settings';
 import { useTranslation } from '../i18n';
 import { LANGUAGE_LABELS, Language } from '../i18n/constants';
+import { bindingFromKeyboardEvent, formatHotkey, isChordStarter, isModifierKey } from '../utils/hotkeys';
 import './SettingsPanel.css';
 
 const EDITOR_LABELS: Record<EditorId, string> = {
@@ -21,6 +22,82 @@ const FORMAT_GROUPS = [
 ];
 
 type SettingsTab = 'general' | 'source' | 'schema' | 'tools';
+
+const EDITOR_HOTKEYS: HotkeyId[] = ['save', 'format', 'comment', 'uncomment', 'cutLine', 'moveLineUp', 'moveLineDown'];
+const SEARCH_HOTKEYS: HotkeyId[] = ['openSearch', 'nextMatch', 'prevMatch', 'showAllMatches'];
+
+const HOTKEY_LABEL_KEYS: Record<HotkeyId, keyof TranslationKeys['settings']> = {
+  save: 'hotkeySave',
+  format: 'hotkeyFormat',
+  comment: 'hotkeyComment',
+  uncomment: 'hotkeyUncomment',
+  cutLine: 'hotkeyCutLine',
+  moveLineUp: 'hotkeyMoveLineUp',
+  moveLineDown: 'hotkeyMoveLineDown',
+  openSearch: 'hotkeyOpenSearch',
+  nextMatch: 'hotkeyNextMatch',
+  prevMatch: 'hotkeyPrevMatch',
+  showAllMatches: 'hotkeyShowAllMatches',
+};
+
+type TranslationKeys = import('../i18n/en').TranslationKeys;
+
+interface HotkeyCaptureProps {
+  binding: HotkeyBinding;
+  onChange: (binding: HotkeyBinding) => void;
+  onReset: () => void;
+  pressLabel: string;
+  resetLabel: string;
+}
+
+const HotkeyCapture: React.FC<HotkeyCaptureProps> = ({ binding, onChange, onReset, pressLabel, resetLabel }) => {
+  const [capturing, setCapturing] = useState(false);
+  const [chordPending, setChordPending] = useState(false);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!capturing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (isModifierKey(e.key)) return;
+
+    if (binding.chord || chordPending) {
+      if (isChordStarter(e)) {
+        setChordPending(true);
+        return;
+      }
+      onChange({ ctrl: false, alt: false, shift: false, key: e.key, chord: true });
+      setCapturing(false);
+      setChordPending(false);
+      return;
+    }
+
+    const next = bindingFromKeyboardEvent(e.nativeEvent);
+    if (next) {
+      onChange(next);
+      setCapturing(false);
+      setChordPending(false);
+    }
+  };
+
+  return (
+    <div className="hotkey-capture-row">
+      <button
+        type="button"
+        className={`hotkey-capture ${capturing ? 'capturing' : ''}`}
+        onClick={() => { setCapturing(true); setChordPending(false); }}
+        onKeyDown={handleKeyDown}
+        onBlur={() => { setCapturing(false); setChordPending(false); }}
+      >
+        {capturing
+          ? (chordPending || binding.chord ? `Ctrl+K, ${pressLabel}` : pressLabel)
+          : formatHotkey(binding)}
+      </button>
+      <button type="button" className="hotkey-reset-btn" onClick={onReset} title={resetLabel}>
+        {resetLabel}
+      </button>
+    </div>
+  );
+};
 
 interface SettingsPanelProps {
   settings: AppSettings;
@@ -96,6 +173,37 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
   };
 
   const editorOrder = localSettings.editorOrder ?? ['vscode', 'notepadplusplus', 'notepad'];
+
+  const updateHotkey = (id: HotkeyId, binding: HotkeyBinding) => {
+    setLocalSettings({
+      ...localSettings,
+      hotkeys: { ...localSettings.hotkeys, [id]: binding },
+    });
+  };
+
+  const resetHotkey = (id: HotkeyId) => {
+    updateHotkey(id, DEFAULT_HOTKEYS[id]);
+  };
+
+  const renderHotkeyGroup = (title: string, ids: HotkeyId[]) => (
+    <div className="hotkey-group">
+      <h4>{title}</h4>
+      <div className="hotkey-list">
+        {ids.map((id) => (
+          <div key={id} className="hotkey-item">
+            <span className="hotkey-label">{t(HOTKEY_LABEL_KEYS[id])}</span>
+            <HotkeyCapture
+              binding={localSettings.hotkeys[id]}
+              onChange={(binding) => updateHotkey(id, binding)}
+              onReset={() => resetHotkey(id)}
+              pressLabel={t('settings.hotkeyPress')}
+              resetLabel={t('settings.hotkeyReset')}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   const TABS: { id: SettingsTab; label: string }[] = [
     { id: 'general', label: t('settings.tabGeneral') },
@@ -428,6 +536,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                       </div>
                     ))}
                   </div>
+                </section>
+
+                <section className="settings-section">
+                  <h3>{t('settings.hotkeys')}</h3>
+                  <p className="settings-help-text">{t('settings.hotkeysHelp')}</p>
+                  {renderHotkeyGroup(t('settings.hotkeyGroupEditor'), EDITOR_HOTKEYS)}
+                  {renderHotkeyGroup(t('settings.hotkeyGroupSearch'), SEARCH_HOTKEYS)}
                 </section>
               </div>
             )}
