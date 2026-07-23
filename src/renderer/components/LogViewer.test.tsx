@@ -6,18 +6,23 @@ import { LogSchema } from '../types/log';
 
 const variableSizeListMock = vi.hoisted(() => ({
   calls: [] as Array<{ height: number; itemCount: number }>,
+  scrollTo: vi.fn(),
+  scrollToItem: vi.fn(),
+  resetAfterIndex: vi.fn(),
+  lastOnItemsRendered: null as null | ((props: { visibleStartIndex: number; visibleStopIndex: number }) => void),
 }));
 
 // Mock react-window
 vi.mock('react-window', () => ({
-  VariableSizeList: React.forwardRef(({ height, itemCount }: any, ref: any) => {
+  VariableSizeList: React.forwardRef(({ height, itemCount, onItemsRendered }: any, ref: any) => {
     variableSizeListMock.calls.push({ height, itemCount });
+    variableSizeListMock.lastOnItemsRendered = onItemsRendered ?? null;
     if (ref) {
       ref.current = {
         state: { scrollOffset: 0 },
-        scrollTo: vi.fn(),
-        scrollToItem: vi.fn(),
-        resetAfterIndex: vi.fn(),
+        scrollTo: variableSizeListMock.scrollTo,
+        scrollToItem: variableSizeListMock.scrollToItem,
+        resetAfterIndex: variableSizeListMock.resetAfterIndex,
       };
     }
     return (
@@ -58,6 +63,7 @@ const defaultProps = {
 beforeEach(() => {
   vi.clearAllMocks();
   variableSizeListMock.calls.length = 0;
+  variableSizeListMock.lastOnItemsRendered = null;
   (window as any).electronAPI = {
     readLogFile: vi.fn(),
     watchLogFile: vi.fn(),
@@ -661,5 +667,83 @@ Caused by: NullPointerException`;
     });
 
     rerender(<LogViewer {...defaultProps} filePath="/test/log.log" refreshInterval={5000} />);
+  });
+
+  it('should preserve scroll position around the visible line when filtering by level', async () => {
+    const logContent = `2025-01-01 12:00:00.000 | INFO | Test | Message 1
+2025-01-01 12:00:01.000 | ERROR | Test | Error 1
+2025-01-01 12:00:02.000 | INFO | Test | Message 2
+2025-01-01 12:00:03.000 | ERROR | Test | Error 2
+2025-01-01 12:00:04.000 | WARN | Test | Warning 1`;
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    render(<LogViewer {...defaultProps} filePath="/test/log.log" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('virtualized-list')).toHaveAttribute('data-item-count', '5');
+    });
+
+    // Sichtbarer Start = 2. ERROR (Index 3) → nach ERROR-Filter Index 1
+    variableSizeListMock.lastOnItemsRendered?.({
+      visibleStartIndex: 3,
+      visibleStopIndex: 4,
+    });
+
+    variableSizeListMock.scrollTo.mockClear();
+    variableSizeListMock.scrollToItem.mockClear();
+
+    const errorButton = screen.getAllByRole('button').find((btn) => btn.textContent?.trim() === 'ERROR');
+    expect(errorButton).toBeDefined();
+    fireEvent.click(errorButton!);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('virtualized-list')).toHaveAttribute('data-item-count', '2');
+    });
+
+    expect(variableSizeListMock.scrollTo).not.toHaveBeenCalledWith(0);
+    expect(variableSizeListMock.scrollToItem).toHaveBeenCalledWith(1, 'start');
+  });
+
+  it('should preserve scroll position around the visible line when filtering by namespace', async () => {
+    const logContent = `2025-01-01 12:00:00.000 | INFO | App.UI | Message 1
+2025-01-01 12:00:01.000 | INFO | App.Service | Message 2
+2025-01-01 12:00:02.000 | INFO | App.UI | Message 3
+2025-01-01 12:00:03.000 | INFO | App.Service | Message 4
+2025-01-01 12:00:04.000 | INFO | App.Other | Message 5`;
+
+    (window as any).electronAPI.readLogFile.mockResolvedValue({
+      success: true,
+      content: logContent,
+    });
+
+    const { rerender } = render(<LogViewer {...defaultProps} filePath="/test/log.log" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('virtualized-list')).toHaveAttribute('data-item-count', '5');
+    });
+
+    // Sichtbarer Start = 2. App.Service (Index 3) → nach Namespace-Filter Index 1
+    variableSizeListMock.lastOnItemsRendered?.({
+      visibleStartIndex: 3,
+      visibleStopIndex: 4,
+    });
+
+    variableSizeListMock.scrollTo.mockClear();
+    variableSizeListMock.scrollToItem.mockClear();
+
+    rerender(
+      <LogViewer {...defaultProps} filePath="/test/log.log" selectedNamespaces={['App.Service']} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('virtualized-list')).toHaveAttribute('data-item-count', '2');
+    });
+
+    expect(variableSizeListMock.scrollTo).not.toHaveBeenCalledWith(0);
+    expect(variableSizeListMock.scrollToItem).toHaveBeenCalledWith(1, 'start');
   });
 });

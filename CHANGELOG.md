@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.7.1] - 2026-07-23
+
+### Fixed
+- **Filter scroll jump**: Filtering by log level or namespace no longer jumps to the start of the file. The view stays anchored on the previously visible line when it still matches, otherwise on the nearest matching entry.
+
 ## [2.7.0] - 2026-06-29
 
 ### Added

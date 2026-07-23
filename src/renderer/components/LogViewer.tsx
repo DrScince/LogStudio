@@ -171,6 +171,8 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const lastFileSizeRef = useRef<number>(0);
   const scrollPositionRef = useRef<{ scrollOffset: number; scrollUpdateWasRequested: boolean }>({ scrollOffset: 0, scrollUpdateWasRequested: false });
   const pendingScrollRestoreRef = useRef<number | null>(null);
+  const visibleStartIndexRef = useRef(0);
+  const pendingAnchorLineRef = useRef<number | null>(null);
   const hasLoadedRef = useRef(false);
   const detectedFormatRef = useRef<DetectedFormat | null>(null);
   const previousFiltersRef = useRef<{ levels: LogLevel[]; namespaces: string[]; search: string }>({ levels: [], namespaces: [], search: '' });
@@ -565,9 +567,17 @@ const LogViewer: React.FC<LogViewerProps> = ({
       namespaces: [...selectedNamespaces],
       search: searchAsFilter ? searchQuery : '',
     };
-    
-    // Save current scroll position BEFORE any state change if tracking is off
-    if (!autoScroll && listRef.current) {
+
+    if (filtersChanged) {
+      // Anker über originalLineNumber halten — Pixel-Offset wäre nach Filter falsch
+      const startIdx = Math.min(
+        Math.max(visibleStartIndexRef.current, 0),
+        Math.max(filteredEntries.length - 1, 0)
+      );
+      pendingAnchorLineRef.current = filteredEntries[startIdx]?.originalLineNumber ?? null;
+      pendingScrollRestoreRef.current = null;
+    } else if (!autoScroll && listRef.current) {
+      // Pixel-Position nur für Live-Append (Tracking aus) merken
       const currentState = listRef.current.state as any;
       const currentOffset = currentState.scrollOffset || scrollPositionRef.current.scrollOffset;
       if (currentOffset > 0) {
@@ -599,18 +609,9 @@ const LogViewer: React.FC<LogViewerProps> = ({
       return cleaned;
     });
     
-    // Wenn sich die Filterung geändert hat, reset die List und scroll zum Anfang
+    // Höhen-Cache zurücksetzen; Scroll-Anker wird im Layout-Effect per scrollToItem gesetzt
     if (filtersChanged && listRef.current) {
-      console.log('Filter changed - resetting list and scrolling to top');
-      // Reset den Cache der List
       listRef.current.resetAfterIndex(0, true);
-      // Scroll zum Anfang
-      requestAnimationFrame(() => {
-        if (listRef.current) {
-          listRef.current.scrollTo(0);
-          pendingScrollRestoreRef.current = null; // Clear pending restore
-        }
-      });
     }
   }, [logEntries, selectedLevels, selectedNamespaces, searchQuery, searchAsFilter, autoScroll]);
 
@@ -919,6 +920,27 @@ const LogViewer: React.FC<LogViewerProps> = ({
       previousLengthRef.current = filteredEntries.length;
       return;
     }
+
+    // Nach Filterwechsel: zuvor sichtbare Zeile (oder nächsten Match) ansteuern
+    const anchorLine = pendingAnchorLineRef.current;
+    if (anchorLine != null) {
+      pendingAnchorLineRef.current = null;
+      if (filteredEntries.length > 0 && listRef.current) {
+        let index = filteredEntries.findIndex((e) => e.originalLineNumber === anchorLine);
+        if (index < 0) {
+          index = filteredEntries.findIndex((e) => e.originalLineNumber >= anchorLine);
+          if (index < 0) {
+            index = filteredEntries.length - 1;
+          }
+        }
+        const listApi = listRef.current as unknown as {
+          scrollToItem?: (index: number, align?: 'auto' | 'smart' | 'center' | 'end' | 'start') => void;
+        };
+        listApi.scrollToItem?.(index, 'start');
+      }
+      previousLengthRef.current = filteredEntries.length;
+      return;
+    }
     
     const hasNewEntries = filteredEntries.length > previousLengthRef.current;
     
@@ -951,6 +973,10 @@ const LogViewer: React.FC<LogViewerProps> = ({
       pendingScrollRestoreRef.current = scrollOffset;
     }
     console.log('Scroll event:', scrollOffset);
+  }, []);
+
+  const handleItemsRendered = useCallback(({ visibleStartIndex }: { visibleStartIndex: number }) => {
+    visibleStartIndexRef.current = visibleStartIndex;
   }, []);
 
   const getResizableColumnStyle = useCallback((column: ResizableColumn): React.CSSProperties => {
@@ -1614,6 +1640,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
             width="100%"
             estimatedItemSize={30}
             onScroll={handleScroll}
+            onItemsRendered={handleItemsRendered}
             innerElementType={innerElementType}
           >
             {Row}
