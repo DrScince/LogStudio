@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.8.1] - 2026-07-31
+
+### Fixed
+- **Markdown editor scroll jump**: Editing no longer yank the caret/viewport when the live preview re-renders (scroll sync is one-way from the active pane; preview updates are debounced).
+- **Blank window on `npm run dev`**: Vite now fails if port 5173 is taken instead of silently moving to another port; Electron waits for the Dev Server before loading the UI.
+
 ## [2.8.0] - 2026-07-31
 
 ### Added

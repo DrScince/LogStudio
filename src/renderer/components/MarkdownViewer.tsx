@@ -36,6 +36,8 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
   const gutterRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const syncingScroll = useRef(false);
+  /** Only the user-driven pane may push scroll to the other side. */
+  const scrollDriver = useRef<'editor' | 'preview' | null>(null);
   const saveStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mermaidGen = useRef(0);
   const isDirty = content !== savedContent;
@@ -126,10 +128,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
     if (!target || syncingScroll.current) return;
     const sourceMax = source.scrollHeight - source.clientHeight;
     const targetMax = target.scrollHeight - target.clientHeight;
-    if (sourceMax <= 0 || targetMax <= 0) {
-      target.scrollTop = 0;
-      return;
-    }
+    if (sourceMax <= 0 || targetMax <= 0) return;
     syncingScroll.current = true;
     target.scrollTop = (source.scrollTop / sourceMax) * targetMax;
     requestAnimationFrame(() => {
@@ -137,16 +136,28 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
     });
   };
 
+  /** Push editor scroll → preview only (never the reverse). Used after preview re-renders. */
+  const syncPreviewFromEditor = () => {
+    const ta = textareaRef.current;
+    if (!ta || !previewEnabled) return;
+    syncScrollRatio(ta, previewRef.current);
+  };
+
   const handleEditorScroll = () => {
     const ta = textareaRef.current;
     if (!ta) return;
     if (gutterRef.current) gutterRef.current.scrollTop = ta.scrollTop;
-    if (previewEnabled) syncScrollRatio(ta, previewRef.current);
+    // Programmatic restores may leave driver as preview; only push when editor is driving.
+    if (previewEnabled && scrollDriver.current !== 'preview') {
+      scrollDriver.current = 'editor';
+      syncScrollRatio(ta, previewRef.current);
+    }
   };
 
   const handlePreviewScroll = () => {
     const preview = previewRef.current;
     if (!preview || !previewEnabled) return;
+    if (scrollDriver.current !== 'preview') return;
     syncScrollRatio(preview, textareaRef.current);
     if (textareaRef.current && gutterRef.current) {
       gutterRef.current.scrollTop = textareaRef.current.scrollTop;
@@ -164,15 +175,32 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
   useEffect(() => {
     if (!previewEnabled || !previewRef.current) return;
     const root = previewRef.current;
-    // Always reset HTML so theme switches re-create mermaid sources (not stale dark SVGs).
-    root.innerHTML = previewHtml;
+    const editorScrollTop = textareaRef.current?.scrollTop ?? 0;
     const gen = ++mermaidGen.current;
+
+    // Debounce while typing so height thrashing / reverse scroll sync cannot yank the editor.
     const timer = window.setTimeout(() => {
+      if (gen !== mermaidGen.current || !previewRef.current) return;
+      // Always reset HTML so theme switches re-create mermaid sources (not stale dark SVGs).
+      previewRef.current.innerHTML = previewHtml;
+      // Keep the editor where the user left it; only follow from editor → preview.
+      if (textareaRef.current) {
+        textareaRef.current.scrollTop = editorScrollTop;
+        if (gutterRef.current) gutterRef.current.scrollTop = editorScrollTop;
+      }
+      syncPreviewFromEditor();
+
       void (async () => {
         if (gen !== mermaidGen.current || !previewRef.current) return;
         await renderMermaidDiagrams(previewRef.current, theme);
+        if (gen !== mermaidGen.current) return;
+        if (textareaRef.current) {
+          textareaRef.current.scrollTop = editorScrollTop;
+          if (gutterRef.current) gutterRef.current.scrollTop = editorScrollTop;
+        }
+        syncPreviewFromEditor();
       })();
-    }, 80);
+    }, 280);
     return () => window.clearTimeout(timer);
   }, [previewHtml, previewEnabled, theme]);
 
@@ -366,9 +394,21 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
               className="md-editor"
               value={content}
               spellCheck={false}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={(e) => {
+                scrollDriver.current = 'editor';
+                setContent(e.target.value);
+              }}
               onKeyDown={handleKeyDown}
               onScroll={handleEditorScroll}
+              onFocus={() => {
+                scrollDriver.current = 'editor';
+              }}
+              onPointerDown={() => {
+                scrollDriver.current = 'editor';
+              }}
+              onWheel={() => {
+                scrollDriver.current = 'editor';
+              }}
               aria-label={t('markdown.editor')}
             />
           </div>
@@ -383,6 +423,12 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
                 ref={previewRef}
                 className="md-preview"
                 onScroll={handlePreviewScroll}
+                onPointerDown={() => {
+                  scrollDriver.current = 'preview';
+                }}
+                onWheel={() => {
+                  scrollDriver.current = 'preview';
+                }}
               />
             </div>
           </>

@@ -231,7 +231,32 @@ function createWindow() {
 
   const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
+    const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
+    const waitForDevServer = async (url: string, attempts = 40): Promise<void> => {
+      for (let i = 0; i < attempts; i++) {
+        try {
+          const res = await fetch(url, { method: 'GET' });
+          if (res.ok || res.status === 404) return;
+        } catch {
+          /* not ready yet */
+        }
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      throw new Error(`Dev server not reachable at ${url}`);
+    };
+
+    waitForDevServer(devUrl)
+      .then(() => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        void mainWindow.loadURL(devUrl);
+      })
+      .catch((err) => {
+        console.error(err);
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        void mainWindow.loadURL(
+          `data:text/html,<h2 style="font-family:sans-serif;color:#e6edf3;background:#0d1117;padding:2rem">LogStudio Dev Server nicht erreichbar (${devUrl}). Bitte \`npm run dev\` neu starten und Port 5173 freigeben.</h2>`
+        );
+      });
   } else {
     mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
   }
