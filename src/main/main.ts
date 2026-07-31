@@ -3,7 +3,7 @@ import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as chokidar from 'chokidar';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 let mainWindow: BrowserWindow | null = null;
 let logWatchers: Map<string, chokidar.FSWatcher> = new Map();
@@ -509,9 +509,10 @@ ipcMain.handle('show-open-dialog', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: 'Log-Datei öffnen',
       filters: [
-        { name: 'Log & Config Files', extensions: ['log', 'txt', 'xml'] },
+        { name: 'Log & Config Files', extensions: ['log', 'txt', 'xml', 'md'] },
         { name: 'Log Files', extensions: ['log', 'txt'] },
         { name: 'XML Files', extensions: ['xml'] },
+        { name: 'Markdown', extensions: ['md', 'markdown'] },
         { name: 'Alle Dateien', extensions: ['*'] },
       ],
       properties: ['openFile'],
@@ -522,6 +523,35 @@ ipcMain.handle('show-open-dialog', async () => {
     }
 
     return { success: true, filePath: result.filePaths[0] };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('show-open-files-dialog', async () => {
+  if (!mainWindow) {
+    return { success: false, error: 'Main window not available' };
+  }
+
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Dateien auswählen',
+      filters: [
+        { name: 'Log & Config Files', extensions: ['log', 'txt', 'xml', 'json', 'md'] },
+        { name: 'Log Files', extensions: ['log', 'txt'] },
+        { name: 'XML Files', extensions: ['xml'] },
+        { name: 'JSON Files', extensions: ['json'] },
+        { name: 'Markdown', extensions: ['md', 'markdown'] },
+        { name: 'Alle Dateien', extensions: ['*'] },
+      ],
+      properties: ['openFile', 'multiSelections'],
+    });
+
+    if (result.canceled) {
+      return { success: false, canceled: true };
+    }
+
+    return { success: true, filePaths: result.filePaths };
   } catch (error) {
     return { success: false, error: String(error) };
   }
@@ -547,6 +577,139 @@ ipcMain.handle('show-open-directory-dialog', async () => {
     return { success: false, error: String(error) };
   }
 });
+
+ipcMain.handle(
+  'export-html-to-pdf',
+  async (event, html: string, defaultFileName?: string) => {
+    if (!mainWindow) {
+      return { success: false, error: 'Main window not available' };
+    }
+
+    const sendProgress = (percent: number, stage: string) => {
+      try {
+        event.sender.send('export-pdf-progress', { percent, stage });
+      } catch {
+        /* ignore */
+      }
+    };
+
+    const withTimeout = async <T,>(
+      promise: Promise<T>,
+      ms: number,
+      label: string
+    ): Promise<T> => {
+      let timer: NodeJS.Timeout | undefined;
+      try {
+        return await Promise.race([
+          promise,
+          new Promise<T>((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+          }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    };
+
+    try {
+      sendProgress(5, 'dialog');
+      const suggested =
+        defaultFileName && defaultFileName.trim()
+          ? defaultFileName.replace(/\.md$/i, '').replace(/\.pdf$/i, '') + '.pdf'
+          : 'document.pdf';
+
+      const saveResult = await dialog.showSaveDialog(mainWindow, {
+        title: 'Als PDF exportieren',
+        defaultPath: suggested,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      });
+
+      if (saveResult.canceled || !saveResult.filePath) {
+        return { success: false, canceled: true };
+      }
+
+      sendProgress(20, 'prepare');
+      // Drop remote font/css references that can hang Chromium offline.
+      const safeHtml = html
+        .replace(/@import\s+[^;]+;/gi, '')
+        .replace(/url\(\s*['"]?https?:\/\/[^)'"]+['"]?\s*\)/gi, 'none');
+
+      const tmpPath = path.join(
+        app.getPath('temp'),
+        `logstudio-md-export-${Date.now()}.html`
+      );
+      await fs.promises.writeFile(tmpPath, safeHtml, 'utf-8');
+
+      sendProgress(35, 'load');
+      const exportWindow = new BrowserWindow({
+        show: false,
+        width: 1024,
+        height: 768,
+        webPreferences: {
+          sandbox: false,
+          contextIsolation: true,
+          nodeIntegration: false,
+          images: true,
+          javascript: false,
+        },
+      });
+
+      // Cancel any non-local network requests (fonts/CDNs) so load cannot hang.
+      try {
+        exportWindow.webContents.session.webRequest.onBeforeRequest(
+          { urls: ['*://*/*'] },
+          (details, callback) => {
+            if (
+              details.url.startsWith('file:') ||
+              details.url.startsWith('data:') ||
+              details.url.startsWith('about:')
+            ) {
+              callback({});
+            } else {
+              callback({ cancel: true });
+            }
+          }
+        );
+      } catch {
+        /* ignore */
+      }
+
+      try {
+        const fileUrl = pathToFileURL(tmpPath).href;
+        await withTimeout(
+          exportWindow.loadURL(fileUrl),
+          12000,
+          'Loading PDF preview'
+        );
+
+        sendProgress(55, 'layout');
+        await new Promise((resolve) => setTimeout(resolve, 150));
+
+        sendProgress(70, 'render');
+        const pdf = await withTimeout(
+          exportWindow.webContents.printToPDF({
+            printBackground: true,
+            pageSize: 'A4',
+            margins: { marginType: 'default' },
+            preferCSSPageSize: true,
+          }),
+          20000,
+          'Rendering PDF'
+        );
+
+        sendProgress(90, 'save');
+        await fs.promises.writeFile(saveResult.filePath, pdf);
+        sendProgress(100, 'done');
+        return { success: true, filePath: saveResult.filePath };
+      } finally {
+        if (!exportWindow.isDestroyed()) exportWindow.destroy();
+        await fs.promises.unlink(tmpPath).catch(() => undefined);
+      }
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  }
+);
 
 // Fenstersteuerung
 ipcMain.handle('minimize-window', () => {

@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readLogFile: (filePath: string) => ipcRenderer.invoke('read-log-file', filePath),
   writeXmlFile: (filePath: string, content: string) => ipcRenderer.invoke('write-xml-file', filePath, content),
   writeJsonFile: (filePath: string, content: string) => ipcRenderer.invoke('write-xml-file', filePath, content),
+  writeMarkdownFile: (filePath: string, content: string) => ipcRenderer.invoke('write-xml-file', filePath, content),
   watchLogFile: (filePath: string) => ipcRenderer.invoke('watch-log-file', filePath),
   unwatchLogFile: (filePath: string) => ipcRenderer.invoke('unwatch-log-file', filePath),
   listLogFiles: (directory: string, includeSubdirectories?: boolean) => ipcRenderer.invoke('list-log-files', directory, includeSubdirectories),
@@ -56,7 +57,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getDefaultLogDirectory: () => ipcRenderer.invoke('get-default-log-directory'),
   showOpenDialog: () => ipcRenderer.invoke('show-open-dialog'),
+  showOpenFilesDialog: () => ipcRenderer.invoke('show-open-files-dialog'),
   showOpenDirectoryDialog: () => ipcRenderer.invoke('show-open-directory-dialog'),
+  exportHtmlToPdf: (html: string, defaultFileName?: string) =>
+    ipcRenderer.invoke('export-html-to-pdf', html, defaultFileName),
+  onExportPdfProgress: (callback: (info: { percent: number; stage: string }) => void) => {
+    const listener = (_event: unknown, info: { percent: number; stage: string }) => callback(info);
+    ipcRenderer.on('export-pdf-progress', listener);
+    return () => ipcRenderer.removeListener('export-pdf-progress', listener);
+  },
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
   maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),

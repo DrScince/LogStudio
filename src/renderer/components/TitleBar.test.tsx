@@ -10,6 +10,12 @@ const defaultProps = {
   currentTheme: 'dark' as const,
   checkingForUpdates: false,
   updateAvailable: false,
+  workspaces: [{ id: 'ws-1', name: 'Default', logDirectories: [], virtualFolders: [] }],
+  activeWorkspaceId: 'ws-1',
+  onWorkspaceSwitch: vi.fn(),
+  onWorkspaceCreate: vi.fn(),
+  onWorkspaceRename: vi.fn(),
+  onWorkspaceDelete: vi.fn(),
 };
 
 describe('TitleBar', () => {
@@ -88,5 +94,21 @@ describe('TitleBar', () => {
     (window as any).electronAPI = undefined;
     render(<TitleBar {...defaultProps} />);
     expect(() => fireEvent.click(screen.getByTitle('Minimize'))).not.toThrow();
+  });
+
+  it('should open workspace dropdown and switch workspace', () => {
+    render(
+      <TitleBar
+        {...defaultProps}
+        workspaces={[
+          { id: 'ws-1', name: 'Default', logDirectories: [], virtualFolders: [] },
+          { id: 'ws-2', name: 'Prod', logDirectories: ['/logs'], virtualFolders: [] },
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByTitle('Workspaces'));
+    fireEvent.click(screen.getByText('Prod'));
+    expect(defaultProps.onWorkspaceSwitch).toHaveBeenCalledWith('ws-2');
   });
 });

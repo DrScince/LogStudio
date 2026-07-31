@@ -2,6 +2,7 @@ export interface ElectronAPI {
   readLogFile: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>;
   writeXmlFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>;
   writeJsonFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>;
+  writeMarkdownFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>;
   watchLogFile: (filePath: string) => Promise<{ success: boolean; alreadyWatching?: boolean; error?: string }>;
   unwatchLogFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   listLogFiles: (directory: string, includeSubdirectories?: boolean) => Promise<{ success: boolean; files?: Array<{ name: string; path: string }>; error?: string }>;
@@ -20,7 +21,15 @@ export interface ElectronAPI {
   getAppVersion: () => Promise<{ success: boolean; version?: string }>;
   getDefaultLogDirectory: () => Promise<{ success: boolean; path?: string; error?: string }>;
   showOpenDialog: () => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
+  showOpenFilesDialog: () => Promise<{ success: boolean; filePaths?: string[]; canceled?: boolean; error?: string }>;
   showOpenDirectoryDialog: () => Promise<{ success: boolean; directoryPath?: string; canceled?: boolean; error?: string }>;
+  exportHtmlToPdf: (
+    html: string,
+    defaultFileName?: string
+  ) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
+  onExportPdfProgress: (
+    callback: (info: { percent: number; stage: string }) => void
+  ) => () => void;
   minimizeWindow: () => void;
   maximizeWindow: () => void;
   closeWindow: () => void;

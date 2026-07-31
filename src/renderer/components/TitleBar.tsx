@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import ReactDOM from 'react-dom';
 import { useTranslation } from '../i18n';
+import { Workspace } from '../utils/workspaces';
 import './TitleBar.css';
 
 interface TitleBarProps {
@@ -10,6 +12,12 @@ interface TitleBarProps {
   currentTheme: 'dark' | 'light';
   checkingForUpdates: boolean;
   updateAvailable: boolean;
+  workspaces?: Workspace[];
+  activeWorkspaceId?: string;
+  onWorkspaceSwitch?: (id: string) => void;
+  onWorkspaceCreate?: () => void;
+  onWorkspaceRename?: (id: string, name: string) => void;
+  onWorkspaceDelete?: (id: string) => void;
 }
 
 const TitleBar: React.FC<TitleBarProps> = ({
@@ -20,8 +28,61 @@ const TitleBar: React.FC<TitleBarProps> = ({
   currentTheme,
   checkingForUpdates,
   updateAvailable,
+  workspaces = [],
+  activeWorkspaceId = '',
+  onWorkspaceSwitch,
+  onWorkspaceCreate,
+  onWorkspaceRename,
+  onWorkspaceDelete,
 }) => {
   const { t } = useTranslation();
+  const [wsOpen, setWsOpen] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
+  const wsBtnRef = useRef<HTMLButtonElement>(null);
+  const wsMenuRef = useRef<HTMLDivElement>(null);
+
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) ?? workspaces[0];
+
+  useEffect(() => {
+    if (!wsOpen) return;
+    const close = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (wsBtnRef.current?.contains(target)) return;
+      if (wsMenuRef.current?.contains(target)) return;
+      setWsOpen(false);
+      setRenamingId(null);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [wsOpen]);
+
+  const toggleWorkspaceMenu = () => {
+    if (!wsOpen && wsBtnRef.current) {
+      const rect = wsBtnRef.current.getBoundingClientRect();
+      setMenuPos({
+        top: rect.bottom + 4,
+        right: Math.max(8, window.innerWidth - rect.right),
+      });
+    }
+    setWsOpen((open) => !open);
+    setRenamingId(null);
+  };
+
+  const startRename = (id: string) => {
+    const ws = workspaces.find((w) => w.id === id);
+    setRenamingId(id);
+    setRenameValue(ws?.name ?? '');
+  };
+
+  const commitRename = () => {
+    if (renamingId && renameValue.trim()) {
+      onWorkspaceRename?.(renamingId, renameValue.trim());
+    }
+    setRenamingId(null);
+  };
+
   const handleMinimize = () => { if (window.electronAPI) window.electronAPI.minimizeWindow(); };
   const handleMaximize = () => { if (window.electronAPI) window.electronAPI.maximizeWindow(); };
   const handleClose = () => { if (window.electronAPI) window.electronAPI.closeWindow(); };
@@ -38,7 +99,6 @@ const TitleBar: React.FC<TitleBarProps> = ({
       <div className="title-bar-actions">
         <div className="title-bar-sep" />
 
-        {/* Icon-Gruppe: Settings, Theme, Updates, About */}
         <button className="title-bar-action" onClick={onSettingsClick} title={t('titlebar.settings')}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
             <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -82,6 +142,26 @@ const TitleBar: React.FC<TitleBarProps> = ({
         </button>
 
         <div className="title-bar-sep" />
+
+        {/* Workspace switcher (Fork-style) */}
+        <button
+          ref={wsBtnRef}
+          type="button"
+          className={`title-bar-workspace${wsOpen ? ' open' : ''}`}
+          onClick={toggleWorkspaceMenu}
+          title={t('workspace.switch')}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <rect x="3" y="4" width="11" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+            <rect x="10" y="11" width="11" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+          </svg>
+          <span className="title-bar-workspace-name">{activeWorkspace?.name ?? t('workspace.switch')}</span>
+          <svg className="title-bar-workspace-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+            <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+
+        <div className="title-bar-sep" />
       </div>
 
       <div className="title-bar-controls">
@@ -101,6 +181,92 @@ const TitleBar: React.FC<TitleBarProps> = ({
           </svg>
         </button>
       </div>
+
+      {wsOpen && ReactDOM.createPortal(
+        <div
+          ref={wsMenuRef}
+          className="title-bar-workspace-menu"
+          style={{ top: menuPos.top, right: menuPos.right }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="title-bar-workspace-menu-label">{t('workspace.switch')}</div>
+          {workspaces.map((ws) => (
+            <div key={ws.id} className="title-bar-workspace-row">
+              {renamingId === ws.id ? (
+                <input
+                  className="title-bar-workspace-rename"
+                  value={renameValue}
+                  autoFocus
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={commitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitRename();
+                    if (e.key === 'Escape') setRenamingId(null);
+                  }}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className={`title-bar-workspace-item${ws.id === activeWorkspaceId ? ' active' : ''}`}
+                  onClick={() => {
+                    onWorkspaceSwitch?.(ws.id);
+                    setWsOpen(false);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    startRename(ws.id);
+                  }}
+                >
+                  <span className="title-bar-workspace-check" aria-hidden>
+                    {ws.id === activeWorkspaceId ? '✓' : ''}
+                  </span>
+                  <span className="title-bar-workspace-item-name">{ws.name}</span>
+                  <span className="title-bar-workspace-item-count">
+                    {ws.logDirectories.length}
+                  </span>
+                </button>
+              )}
+            </div>
+          ))}
+          <div className="title-bar-workspace-sep" />
+          <button
+            type="button"
+            className="title-bar-workspace-item"
+            onClick={() => {
+              onWorkspaceCreate?.();
+              setWsOpen(false);
+            }}
+          >
+            <span className="title-bar-workspace-check">+</span>
+            <span>{t('workspace.new')}</span>
+          </button>
+          {activeWorkspace && (
+            <>
+              <button
+                type="button"
+                className="title-bar-workspace-item"
+                onClick={() => startRename(activeWorkspace.id)}
+              >
+                <span className="title-bar-workspace-check" />
+                <span>{t('workspace.rename')}</span>
+              </button>
+              <button
+                type="button"
+                className="title-bar-workspace-item danger"
+                disabled={workspaces.length <= 1}
+                onClick={() => {
+                  onWorkspaceDelete?.(activeWorkspace.id);
+                  setWsOpen(false);
+                }}
+              >
+                <span className="title-bar-workspace-check" />
+                <span>{t('workspace.delete')}</span>
+              </button>
+            </>
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

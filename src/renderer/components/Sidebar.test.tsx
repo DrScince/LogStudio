@@ -156,4 +156,76 @@ describe('Sidebar', () => {
     fireEvent.click(editorBtn);
     expect(mockElectronAPI.openFileInEditor).toHaveBeenCalledWith('/test/logs/test.log', 1, ['vscode']);
   });
+
+  it('should render color marker and icon on directory tab', () => {
+    mockElectronAPI.listLogFiles.mockResolvedValue({ success: true, files: [] });
+
+    const { container } = render(
+      <Sidebar
+        {...defaultProps}
+        directoryMeta={{
+          '/test/logs': { label: 'Prod', icon: 'server', color: 'blue' },
+        }}
+      />
+    );
+
+    expect(container.querySelector('.sidebar-dir-tab.has-color')).toBeTruthy();
+    expect(container.querySelector('.sidebar-dir-tab-icon')).toBeTruthy();
+    expect(screen.getByText('Prod')).toBeInTheDocument();
+  });
+
+  it('should show icon and color options in directory context menu', async () => {
+    mockElectronAPI.listLogFiles.mockResolvedValue({ success: true, files: [] });
+    const onDirectoryMetaChange = vi.fn();
+
+    render(
+      <Sidebar
+        {...defaultProps}
+        onDirectoryMetaChange={onDirectoryMetaChange}
+      />
+    );
+
+    const tab = screen.getByTitle('/test/logs');
+    fireEvent.contextMenu(tab);
+
+    expect(await screen.findByText(/Set icon/i)).toBeInTheDocument();
+    expect(screen.getByText(/Set color/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(/Set icon/i));
+    fireEvent.click(screen.getByTitle('database'));
+    expect(onDirectoryMetaChange).toHaveBeenCalledWith({
+      '/test/logs': { icon: 'database' },
+    });
+  });
+
+  it('should list files from a virtual folder without watching the filesystem', async () => {
+    const onCreateVirtualFolder = vi.fn();
+    const onAddFilesToVirtualFolder = vi.fn();
+    const folder = {
+      id: 'vf-1',
+      name: 'Pinned',
+      filePaths: ['/elsewhere/app.log', '/tmp/error.log'],
+    };
+
+    render(
+      <Sidebar
+        {...defaultProps}
+        activeDirectory="virtual:vf-1"
+        virtualFolders={[folder]}
+        onCreateVirtualFolder={onCreateVirtualFolder}
+        onAddFilesToVirtualFolder={onAddFilesToVirtualFolder}
+      />
+    );
+
+    expect(await screen.findByText('app.log')).toBeInTheDocument();
+    expect(screen.getByText('error.log')).toBeInTheDocument();
+    expect(mockElectronAPI.listLogFiles).not.toHaveBeenCalled();
+    expect(mockElectronAPI.watchDirectory).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTitle('New virtual folder'));
+    expect(onCreateVirtualFolder).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTitle('Add files'));
+    expect(onAddFilesToVirtualFolder).toHaveBeenCalledWith('vf-1');
+  });
 });

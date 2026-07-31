@@ -147,3 +147,136 @@
 .title-bar-button svg {
   flex-shrink: 0;
 }
+
+/* ── Workspace switcher ───────────────────── */
+
+.title-bar-workspace {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  max-width: 180px;
+  padding: 0 8px;
+  margin: 0 2px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  -webkit-app-region: no-drag;
+  transition: background 0.15s, color 0.15s;
+}
+
+.title-bar-workspace:hover,
+.title-bar-workspace.open {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.title-bar-workspace-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 110px;
+}
+
+.title-bar-workspace-chevron {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.title-bar-workspace-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 220px;
+  max-width: 280px;
+  padding: 6px 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+
+.title-bar-workspace-menu-label {
+  padding: 4px 12px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.title-bar-workspace-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.title-bar-workspace-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.title-bar-workspace-item:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.title-bar-workspace-item.active {
+  color: var(--accent-primary);
+}
+
+.title-bar-workspace-item.danger:hover:not(:disabled) {
+  color: var(--error);
+}
+
+.title-bar-workspace-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.title-bar-workspace-check {
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.title-bar-workspace-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title-bar-workspace-item-count {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.title-bar-workspace-sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--border-color);
+}
+
+.title-bar-workspace-rename {
+  margin: 2px 10px;
+  padding: 5px 8px;
+  border: 1px solid var(--accent-primary);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  outline: none;
+}

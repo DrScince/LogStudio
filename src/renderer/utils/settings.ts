@@ -1,7 +1,10 @@
 import { LogSchema } from '../types/log';
 import { Language, detectLanguage } from '../i18n/constants';
+import { ensureWorkspaces } from './workspaces';
 
 export type { LogSchema };
+export type { Workspace, VirtualFolder } from './workspaces';
+import type { Workspace } from './workspaces';
 
 const SETTINGS_KEY = 'logstudio-settings';
 const DEFAULT_SCHEMA: LogSchema = {
@@ -54,10 +57,20 @@ export const DEFAULT_HOTKEYS: HotkeyMap = {
   showAllMatches: { ctrl: false, alt: true,  shift: false, key: 'Enter' },
 };
 
+export interface DirectoryMeta {
+  label?: string;
+  icon?: string;   // curated Font Awesome icon id, e.g. "folder"
+  color?: string;  // palette key, e.g. "blue"
+}
+
 export interface AppSettings {
   logSchema: LogSchema;
   logDirectory: string;         // kept for migration; use logDirectories
-  logDirectories: string[];     // ordered list of watched directories
+  logDirectories: string[];     // ordered list for the active workspace
+  virtualFolders: import('./workspaces').VirtualFolder[];
+  directoryMeta: Record<string, DirectoryMeta>;
+  workspaces: Workspace[];
+  activeWorkspaceId: string;
   autoRefresh: boolean;
   refreshInterval: number;
   fontSize: number;
@@ -70,10 +83,16 @@ export interface AppSettings {
   hotkeys: HotkeyMap;
 }
 
+const DEFAULT_WORKSPACE_ID = 'default-workspace';
+
 const DEFAULT_SETTINGS: AppSettings = {
   logSchema: DEFAULT_SCHEMA,
   logDirectory: '',
   logDirectories: [],
+  virtualFolders: [],
+  directoryMeta: {},
+  workspaces: [{ id: DEFAULT_WORKSPACE_ID, name: 'Default', logDirectories: [], virtualFolders: [] }],
+  activeWorkspaceId: DEFAULT_WORKSPACE_ID,
   autoRefresh: true,
   refreshInterval: 1000,
   fontSize: 12,
@@ -97,12 +116,16 @@ export function loadSettings(): AppSettings {
         // Deep merge hotkeys so newly added actions get their defaults
         hotkeys: { ...DEFAULT_HOTKEYS, ...(parsed.hotkeys ?? {}) },
         logDirectories: parsed.logDirectories ?? [],
+        virtualFolders: parsed.virtualFolders ?? [],
+        directoryMeta: parsed.directoryMeta ?? {},
+        workspaces: parsed.workspaces ?? [],
+        activeWorkspaceId: parsed.activeWorkspaceId ?? '',
       };
       // Migration: legacy single logDirectory → logDirectories list
       if (base.logDirectory && base.logDirectories.length === 0) {
         base.logDirectories = [base.logDirectory];
       }
-      return base;
+      return ensureWorkspaces(base);
     }
   } catch (error) {
     console.error('Error loading settings:', error);

@@ -33,25 +33,36 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  width: 30px;
-  min-width: 30px;
+  width: 40px;
+  min-width: 40px;
   background: var(--bg-tertiary);
   border-right: 1px solid var(--border-color);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar-dir-tabs-list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: none;
-  flex-shrink: 0;
 }
-.sidebar-dir-tabs::-webkit-scrollbar { display: none; }
+.sidebar-dir-tabs-list::-webkit-scrollbar { display: none; }
 
 .sidebar-dir-tab {
+  --dir-tab-color: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 30px;
+  gap: 8px;
+  width: 40px;
   min-height: 72px;
-  padding: 10px 0;
+  padding: 28px 0 10px;
   background: transparent;
   border: none;
   border-left: 2px solid transparent;
@@ -59,11 +70,28 @@
   border-radius: 0;
   color: var(--text-secondary);
   cursor: grab;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
   position: relative;
   flex-shrink: 0;
   overflow: hidden;
 }
+
+/* Colored tab: soft fill + underline accent */
+.sidebar-dir-tab.has-color {
+  background: color-mix(in srgb, var(--dir-tab-color) 16%, transparent);
+  color: var(--dir-tab-color);
+  border-left-color: color-mix(in srgb, var(--dir-tab-color) 55%, transparent);
+  box-shadow: inset 0 -2px 0 0 var(--dir-tab-color);
+}
+
+.sidebar-dir-tab.has-color .sidebar-dir-tab-icon {
+  color: var(--dir-tab-color);
+}
+
+.sidebar-dir-tab.has-color .sidebar-dir-tab-label {
+  color: var(--text-primary);
+}
+
 .sidebar-dir-tab.drag-over {
   border-top: 2px solid var(--accent-primary);
   background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
@@ -72,14 +100,38 @@
   background: var(--bg-hover);
   color: var(--text-primary);
 }
+.sidebar-dir-tab.has-color:hover {
+  background: color-mix(in srgb, var(--dir-tab-color) 24%, transparent);
+  color: var(--dir-tab-color);
+}
 .sidebar-dir-tab.active {
   background: var(--bg-secondary);
   border-left-color: var(--accent-primary);
   color: var(--accent-primary);
 }
+.sidebar-dir-tab.has-color.active {
+  background: color-mix(in srgb, var(--dir-tab-color) 22%, var(--bg-secondary));
+  border-left-color: var(--dir-tab-color);
+  color: var(--dir-tab-color);
+  box-shadow: inset 0 -2px 0 0 var(--dir-tab-color);
+}
+
+.sidebar-dir-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  order: 2;
+  font-size: 1.05rem;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: inherit;
+}
+
 .sidebar-dir-tab-label {
   writing-mode: vertical-lr;
   transform: rotate(180deg);
+  order: 1;
   font-size: 0.9rem;
   font-family: 'Consolas', monospace;
   white-space: nowrap;
@@ -91,11 +143,11 @@
 }
 .sidebar-dir-tab-close {
   position: absolute;
-  top: 3px;
+  top: 4px;
   left: 50%;
   transform: translateX(-50%);
-  width: 16px;
-  height: 16px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -103,12 +155,13 @@
   border: none;
   color: inherit;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 1.15rem;
+  font-weight: 500;
   line-height: 1;
   padding: 0;
   opacity: 0;
-  transition: opacity 0.15s;
-  border-radius: 3px;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+  border-radius: 4px;
   z-index: 1;
 }
 .sidebar-dir-tab:hover .sidebar-dir-tab-close,
@@ -124,15 +177,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  min-height: 30px;
+  width: 100%;
+  height: 40px;
+  min-height: 40px;
+  margin-top: auto;
   border: none;
-  border-bottom: 1px solid var(--border-color);
-  background: transparent;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
   color: var(--text-secondary);
   cursor: pointer;
   flex-shrink: 0;
+  font-size: 1.25rem;
+  line-height: 1;
   transition: background 0.1s, color 0.1s;
 }
 .sidebar-dir-tab-add:hover:not(:disabled) {
@@ -144,10 +200,15 @@
   cursor: default;
 }
 
+.sidebar-dir-tab-virtual {
+  font-style: italic;
+}
+
 /* ── Directory tab rename input ─────────────────────────────── */
 .sidebar-dir-tab-rename-input {
   writing-mode: vertical-lr;
   transform: rotate(180deg);
+  order: 1;
   width: 22px;
   max-height: 120px;
   background: var(--bg-primary);
@@ -184,7 +245,8 @@
   cursor: pointer;
   text-align: left;
 }
-.sidebar-dir-context-item:hover {
+.sidebar-dir-context-item:hover,
+.sidebar-dir-context-item.active {
   background: var(--bg-hover);
   color: var(--accent-primary);
 }

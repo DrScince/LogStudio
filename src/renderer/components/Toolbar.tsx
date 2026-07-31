@@ -11,6 +11,7 @@ export interface Tab {
   namespaceCounts?: Record<string, number>;
   isXml?: boolean;
   isJson?: boolean;
+  isMarkdown?: boolean;
 }
 
 interface ToolbarProps {
@@ -84,6 +85,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   <span className="toolbar-tab-label">{getTabLabel(tab)}</span>
                   {tab.isXml && <span className="toolbar-tab-badge">XML</span>}
                   {tab.isJson && <span className="toolbar-tab-badge toolbar-tab-badge-json">JSON</span>}
+                  {tab.isMarkdown && <span className="toolbar-tab-badge toolbar-tab-badge-md">MD</span>}
                   <button
                     className="toolbar-tab-close"
                     onClick={(e) => onTabClose(tab.id, e)}

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.8.0] - 2026-07-31
+
+### Added
+- **Workspaces**: Switch between named workspaces with their own log directories and virtual folders.
+- **Virtual folders**: Collect arbitrary files into custom sidebar folders (icons and colors supported).
+- **Directory icons and colors**: Assign icons and accent colors to directory tabs; custom colors via an in-app HSV/hex picker.
+- **Markdown viewer**: Open `.md` / `.markdown` files with editor + live preview, Mermaid diagrams, and save support.
+- **Markdown PDF export**: Export the rendered preview to PDF (always light mode), with progress feedback.
+- **Persisted workspace tabs**: Open tabs for the active workspace are restored when switching workspaces or restarting; standalone files stay open across workspace switches.
+
+### Fixed
+- **PDF export hang**: Export no longer stalls on remote font/CDN requests while loading the print preview.
+
 ## [2.7.1] - 2026-07-23
 
 ### Fixed

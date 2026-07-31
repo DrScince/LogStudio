@@ -1,8 +1,13 @@
-﻿import React, { useState } from 'react';
-import { AppSettings, LogSchema, EditorId, HotkeyId, HotkeyBinding, HotkeyMap, DEFAULT_HOTKEYS } from '../utils/settings';
+import React, { useState } from 'react';
+import { AppSettings, LogSchema, EditorId, HotkeyId, HotkeyBinding, DEFAULT_HOTKEYS, DirectoryMeta } from '../utils/settings';
+import { createWorkspace, createVirtualFolder, syncActiveWorkspaceDirs, fileBasename } from '../utils/workspaces';
 import { useTranslation } from '../i18n';
 import { LANGUAGE_LABELS, Language } from '../i18n/constants';
 import { bindingFromKeyboardEvent, formatHotkey, isChordStarter, isModifierKey } from '../utils/hotkeys';
+import { getDirectoryColor, getDirectoryIcon } from '../utils/directoryIcons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import DirectoryIconPicker from './DirectoryIconPicker';
+import DirectoryColorPicker from './DirectoryColorPicker';
 import './SettingsPanel.css';
 
 const EDITOR_LABELS: Record<EditorId, string> = {
@@ -103,16 +108,16 @@ interface SettingsPanelProps {
   settings: AppSettings;
   onSettingsChange: (settings: AppSettings) => void;
   onClose: () => void;
-  dirLabels?: Record<string, string>;
-  onDirLabelsChange?: (labels: Record<string, string>) => void;
 }
 
-const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChange, onClose, dirLabels = {}, onDirLabelsChange }) => {
+const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChange, onClose }) => {
   const { t, setLanguage } = useTranslation();
   const [activeTab, setActiveTab] = useState<SettingsTab>('source');
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
   const [patternError, setPatternError] = useState<string | null>(null);
   const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
+  const [metaPickerDir, setMetaPickerDir] = useState<string | null>(null);
+  const [metaPickerKind, setMetaPickerKind] = useState<'icon' | 'color' | null>(null);
 
   const REGEX_EXAMPLE = '^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d+)\\s*\\|\\s*([A-Z]+)\\s*\\|\\s*([^|]+)\\s*\\|\\s*(.+)$';
 
@@ -142,8 +147,81 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
     });
   };
 
-  const handleSave = () => { onSettingsChange(localSettings); onClose(); };
+  const handleSave = () => {
+    onSettingsChange(syncActiveWorkspaceDirs(localSettings));
+    onClose();
+  };
   const handleCancel = () => { setLocalSettings(settings); onClose(); };
+
+  const activeWorkspace =
+    (localSettings.workspaces ?? []).find((w) => w.id === localSettings.activeWorkspaceId)
+    ?? localSettings.workspaces?.[0];
+
+  const handleSelectWorkspace = (id: string) => {
+    if (id === localSettings.activeWorkspaceId) return;
+    setLocalSettings((prev) => {
+      const synced = syncActiveWorkspaceDirs(prev);
+      const target = synced.workspaces.find((w) => w.id === id);
+      if (!target) return synced;
+      setMetaPickerDir(null);
+      setMetaPickerKind(null);
+      return {
+        ...synced,
+        activeWorkspaceId: id,
+        logDirectories: [...target.logDirectories],
+        virtualFolders: (target.virtualFolders ?? []).map((v) => ({
+          ...v,
+          filePaths: [...v.filePaths],
+        })),
+      };
+    });
+  };
+
+  const handleWorkspaceNameChange = (name: string) => {
+    setLocalSettings((prev) => ({
+      ...prev,
+      workspaces: (prev.workspaces ?? []).map((w) =>
+        w.id === prev.activeWorkspaceId ? { ...w, name } : w
+      ),
+    }));
+  };
+
+  const handleCreateWorkspace = () => {
+    const name = t('workspace.newName', { n: (localSettings.workspaces?.length ?? 0) + 1 });
+    const ws = createWorkspace(name, [], []);
+    setLocalSettings((prev) => {
+      const synced = syncActiveWorkspaceDirs(prev);
+      return {
+        ...synced,
+        workspaces: [...synced.workspaces, ws],
+        activeWorkspaceId: ws.id,
+        logDirectories: [],
+        virtualFolders: [],
+      };
+    });
+    setMetaPickerDir(null);
+    setMetaPickerKind(null);
+  };
+
+  const handleDeleteWorkspace = () => {
+    setLocalSettings((prev) => {
+      if ((prev.workspaces ?? []).length <= 1) return prev;
+      const workspaces = prev.workspaces.filter((w) => w.id !== prev.activeWorkspaceId);
+      const next = workspaces[0];
+      setMetaPickerDir(null);
+      setMetaPickerKind(null);
+      return {
+        ...prev,
+        workspaces,
+        activeWorkspaceId: next.id,
+        logDirectories: [...next.logDirectories],
+        virtualFolders: (next.virtualFolders ?? []).map((v) => ({
+          ...v,
+          filePaths: [...v.filePaths],
+        })),
+      };
+    });
+  };
 
   const handleSelectDirectory = async () => {
     if (!window.electronAPI?.showOpenDirectoryDialog) return;
@@ -155,11 +233,38 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
         setLocalSettings((prev) => {
           const dirs = prev.logDirectories ?? [];
           if (dirs.includes(newDir)) return prev;
-          return { ...prev, logDirectories: [...dirs, newDir] };
+          return syncActiveWorkspaceDirs({ ...prev, logDirectories: [...dirs, newDir] });
         });
       }
     } finally {
       setIsSelectingDirectory(false);
+    }
+  };
+
+  const updateDirMeta = (dir: string, patch: Partial<DirectoryMeta>) => {
+    setLocalSettings((prev) => {
+      const current = prev.directoryMeta?.[dir] ?? {};
+      const next: DirectoryMeta = { ...current, ...patch };
+      if (!next.label) delete next.label;
+      if (!next.icon) delete next.icon;
+      if (!next.color) delete next.color;
+      const meta = { ...(prev.directoryMeta ?? {}) };
+      if (Object.keys(next).length === 0) {
+        delete meta[dir];
+      } else {
+        meta[dir] = next;
+      }
+      return { ...prev, directoryMeta: meta };
+    });
+  };
+
+  const toggleMetaPicker = (dir: string, kind: 'icon' | 'color') => {
+    if (metaPickerDir === dir && metaPickerKind === kind) {
+      setMetaPickerDir(null);
+      setMetaPickerKind(null);
+    } else {
+      setMetaPickerDir(dir);
+      setMetaPickerKind(kind);
     }
   };
 
@@ -315,36 +420,134 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                 {/* Left column */}
                 <div className="settings-source-left">
                   <section className="settings-section">
+                    <h3>{t('settings.workspaces')}</h3>
+                    <div className="settings-workspace-toolbar">
+                      <select
+                        className="settings-input settings-workspace-select"
+                        value={localSettings.activeWorkspaceId}
+                        onChange={(e) => handleSelectWorkspace(e.target.value)}
+                        aria-label={t('settings.activeWorkspace')}
+                      >
+                        {(localSettings.workspaces ?? []).map((ws) => (
+                          <option key={ws.id} value={ws.id}>
+                            {ws.name} ({ws.logDirectories.length})
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="settings-button settings-workspace-btn"
+                        onClick={handleCreateWorkspace}
+                      >
+                        {t('settings.newWorkspace')}
+                      </button>
+                      <button
+                        type="button"
+                        className="settings-button settings-workspace-btn danger"
+                        onClick={handleDeleteWorkspace}
+                        disabled={(localSettings.workspaces ?? []).length <= 1}
+                        title={t('settings.deleteWorkspace')}
+                      >
+                        {t('settings.deleteWorkspace')}
+                      </button>
+                    </div>
+                    <div className="settings-input-group" style={{ marginTop: 10 }}>
+                      <label>{t('settings.workspaceName')}</label>
+                      <input
+                        className="settings-input"
+                        value={activeWorkspace?.name ?? ''}
+                        onChange={(e) => handleWorkspaceNameChange(e.target.value)}
+                        placeholder={t('settings.workspaceName')}
+                      />
+                    </div>
+                  </section>
+
+                  <section className="settings-section">
                     <h3>{t('settings.logDirectories')}</h3>
+                    <p className="settings-hint">{t('settings.workspaceFoldersHint')}</p>
                     <div className="settings-dir-list">
                       {(localSettings.logDirectories ?? []).length === 0 ? (
                         <div className="settings-dir-empty">{t('settings.noDirectories')}</div>
                       ) : (
                         (localSettings.logDirectories ?? []).map((dir) => {
                           const basename = dir.split(/[\\/]/).filter(Boolean).pop() || dir;
-                          const label = dirLabels[dir] ?? '';
+                          const meta = localSettings.directoryMeta?.[dir] ?? {};
+                          const label = meta.label ?? '';
+                          const colorHex = getDirectoryColor(meta.color);
+                          const iconDef = getDirectoryIcon(meta.icon);
+                          const showIconPicker = metaPickerDir === dir && metaPickerKind === 'icon';
+                          const showColorPicker = metaPickerDir === dir && metaPickerKind === 'color';
                           return (
-                          <div key={dir} className="settings-dir-item">
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, opacity: 0.6 }}>
-                              <path d="M1 4a1 1 0 011-1h4.586a1 1 0 01.707.293L8.707 4.707A1 1 0 009.414 5H14a1 1 0 011 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1V4z" fill="currentColor"/>
-                            </svg>
+                          <div key={dir} className="settings-dir-item-wrap">
+                          <div className="settings-dir-item">
+                            <button
+                              type="button"
+                              className="settings-dir-color-btn"
+                              title={t('settings.directoryColor')}
+                              onClick={() => toggleMetaPicker(dir, 'color')}
+                            >
+                              <span
+                                className="settings-dir-color-dot"
+                                style={colorHex ? { backgroundColor: colorHex } : undefined}
+                              />
+                            </button>
+                            <button
+                              type="button"
+                              className="settings-dir-icon-btn"
+                              title={t('settings.directoryIcon')}
+                              style={colorHex ? { color: colorHex } : undefined}
+                              onClick={() => toggleMetaPicker(dir, 'icon')}
+                            >
+                              {iconDef ? (
+                                <FontAwesomeIcon icon={iconDef} />
+                              ) : (
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                                  <path d="M1 4a1 1 0 011-1h4.586a1 1 0 01.707.293L8.707 4.707A1 1 0 009.414 5H14a1 1 0 011 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1V4z" fill="currentColor"/>
+                                </svg>
+                              )}
+                            </button>
                             <div className="settings-dir-info">
                               <span className="settings-dir-path" title={dir}>{dir}</span>
                               <input
                                 className="settings-dir-label-input"
                                 placeholder={basename}
                                 value={label}
-                                onChange={(e) => onDirLabelsChange?.({ ...dirLabels, [dir]: e.target.value })}
+                                onChange={(e) => updateDirMeta(dir, { label: e.target.value || undefined })}
                               />
                             </div>
                             <button
                               className="settings-dir-remove"
                               title={t('settings.removeDirectory')}
-                              onClick={() => setLocalSettings((prev) => ({
-                                ...prev,
-                                logDirectories: prev.logDirectories.filter((d) => d !== dir),
-                              }))}
+                              onClick={() => setLocalSettings((prev) => {
+                                const nextMeta = { ...(prev.directoryMeta ?? {}) };
+                                delete nextMeta[dir];
+                                return syncActiveWorkspaceDirs({
+                                  ...prev,
+                                  logDirectories: prev.logDirectories.filter((d) => d !== dir),
+                                  directoryMeta: nextMeta,
+                                });
+                              })}
                             >×</button>
+                          </div>
+                          {showIconPicker && (
+                            <div className="settings-dir-picker">
+                              <DirectoryIconPicker
+                                value={meta.icon}
+                                clearLabel={t('sidebar.clearIcon')}
+                                searchPlaceholder={t('sidebar.searchIcons')}
+                                onChange={(iconId) => updateDirMeta(dir, { icon: iconId })}
+                              />
+                            </div>
+                          )}
+                          {showColorPicker && (
+                            <div className="settings-dir-picker">
+                              <DirectoryColorPicker
+                                value={meta.color}
+                                clearLabel={t('sidebar.clearColor')}
+                                onChange={(colorId) => updateDirMeta(dir, { color: colorId })}
+                              />
+                            </div>
+                          )}
                           </div>
                           );
                         })
@@ -378,6 +581,187 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                         {t('settings.autoLoadNewFiles')}
                       </label>
                     </div>
+                  </section>
+
+                  <section className="settings-section">
+                    <h3>{t('settings.virtualFolders')}</h3>
+                    <p className="settings-hint">{t('settings.virtualFoldersHint')}</p>
+                    <div className="settings-dir-list">
+                      {(localSettings.virtualFolders ?? []).length === 0 ? (
+                        <div className="settings-dir-empty">{t('settings.noVirtualFolders')}</div>
+                      ) : (
+                        (localSettings.virtualFolders ?? []).map((folder) => {
+                          const colorHex = getDirectoryColor(folder.color);
+                          const iconDef = getDirectoryIcon(folder.icon) ?? getDirectoryIcon('bookmark');
+                          const showIconPicker = metaPickerDir === folder.id && metaPickerKind === 'icon';
+                          const showColorPicker = metaPickerDir === folder.id && metaPickerKind === 'color';
+                          const patchVirtual = (patch: Partial<typeof folder>) => {
+                            setLocalSettings((prev) =>
+                              syncActiveWorkspaceDirs({
+                                ...prev,
+                                virtualFolders: (prev.virtualFolders ?? []).map((f) => {
+                                  if (f.id !== folder.id) return f;
+                                  const next = { ...f, ...patch };
+                                  if ('icon' in patch && !patch.icon) delete next.icon;
+                                  if ('color' in patch && !patch.color) delete next.color;
+                                  return next;
+                                }),
+                              })
+                            );
+                          };
+                          return (
+                          <div key={folder.id} className="settings-virtual-item">
+                            <div className="settings-virtual-header">
+                              <button
+                                type="button"
+                                className="settings-dir-color-btn"
+                                title={t('settings.directoryColor')}
+                                onClick={() => toggleMetaPicker(folder.id, 'color')}
+                              >
+                                <span
+                                  className="settings-dir-color-dot"
+                                  style={colorHex ? { backgroundColor: colorHex } : undefined}
+                                />
+                              </button>
+                              <button
+                                type="button"
+                                className="settings-dir-icon-btn"
+                                title={t('settings.directoryIcon')}
+                                style={colorHex ? { color: colorHex } : undefined}
+                                onClick={() => toggleMetaPicker(folder.id, 'icon')}
+                              >
+                                {iconDef ? <FontAwesomeIcon icon={iconDef} /> : '★'}
+                              </button>
+                              <input
+                                className="settings-dir-label-input"
+                                value={folder.name}
+                                onChange={(e) =>
+                                  setLocalSettings((prev) =>
+                                    syncActiveWorkspaceDirs({
+                                      ...prev,
+                                      virtualFolders: (prev.virtualFolders ?? []).map((f) =>
+                                        f.id === folder.id ? { ...f, name: e.target.value } : f
+                                      ),
+                                    })
+                                  )
+                                }
+                              />
+                              <button
+                                type="button"
+                                className="settings-button settings-workspace-btn"
+                                onClick={async () => {
+                                  const result = await window.electronAPI?.showOpenFilesDialog?.();
+                                  if (!result?.success || !result.filePaths?.length) return;
+                                  setLocalSettings((prev) =>
+                                    syncActiveWorkspaceDirs({
+                                      ...prev,
+                                      virtualFolders: (prev.virtualFolders ?? []).map((f) => {
+                                        if (f.id !== folder.id) return f;
+                                        const existing = new Set(
+                                          f.filePaths.map((p) => p.replace(/\\/g, '/').toLowerCase())
+                                        );
+                                        const added = result.filePaths!.filter(
+                                          (p) => !existing.has(p.replace(/\\/g, '/').toLowerCase())
+                                        );
+                                        return { ...f, filePaths: [...f.filePaths, ...added] };
+                                      }),
+                                    })
+                                  );
+                                }}
+                              >
+                                {t('virtualFolder.addFiles')}
+                              </button>
+                              <button
+                                type="button"
+                                className="settings-dir-remove"
+                                title={t('virtualFolder.delete')}
+                                onClick={() =>
+                                  setLocalSettings((prev) =>
+                                    syncActiveWorkspaceDirs({
+                                      ...prev,
+                                      virtualFolders: (prev.virtualFolders ?? []).filter(
+                                        (f) => f.id !== folder.id
+                                      ),
+                                    })
+                                  )
+                                }
+                              >
+                                ×
+                              </button>
+                            </div>
+                            {showIconPicker && (
+                              <DirectoryIconPicker
+                                value={folder.icon}
+                                clearLabel={t('sidebar.clearIcon')}
+                                searchPlaceholder={t('sidebar.searchIcons')}
+                                onChange={(iconId) => patchVirtual({ icon: iconId })}
+                              />
+                            )}
+                            {showColorPicker && (
+                              <DirectoryColorPicker
+                                value={folder.color}
+                                clearLabel={t('sidebar.clearColor')}
+                                onChange={(colorId) => patchVirtual({ color: colorId })}
+                              />
+                            )}
+                            <ul className="settings-virtual-files">
+                              {folder.filePaths.length === 0 ? (
+                                <li className="settings-dir-empty">{t('virtualFolder.empty')}</li>
+                              ) : (
+                                folder.filePaths.map((path) => (
+                                  <li key={path} className="settings-virtual-file">
+                                    <span title={path}>{fileBasename(path)}</span>
+                                    <button
+                                      type="button"
+                                      className="settings-dir-remove"
+                                      title={t('virtualFolder.removeFile')}
+                                      onClick={() =>
+                                        setLocalSettings((prev) =>
+                                          syncActiveWorkspaceDirs({
+                                            ...prev,
+                                            virtualFolders: (prev.virtualFolders ?? []).map((f) =>
+                                              f.id !== folder.id
+                                                ? f
+                                                : {
+                                                    ...f,
+                                                    filePaths: f.filePaths.filter((p) => p !== path),
+                                                  }
+                                            ),
+                                          })
+                                        )
+                                      }
+                                    >
+                                      ×
+                                    </button>
+                                  </li>
+                                ))
+                              )}
+                            </ul>
+                          </div>
+                          );
+                        })
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="settings-button settings-directory-button"
+                      style={{ marginTop: 8 }}
+                      onClick={() => {
+                        const folder = createVirtualFolder(
+                          t('virtualFolder.defaultName', {
+                            n: (localSettings.virtualFolders?.length ?? 0) + 1,
+                          })
+                        );
+                        setLocalSettings((prev) =>
+                          syncActiveWorkspaceDirs({
+                            ...prev,
+                            virtualFolders: [...(prev.virtualFolders ?? []), folder],
+                          })
+                        );
+                      }}
+                    >
+                      {t('virtualFolder.create')}
+                    </button>
                   </section>
 
                   <section className="settings-section">

@@ -1,17 +1,37 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useTranslation } from '../i18n';
+import { DirectoryMeta } from '../utils/settings';
+import {
+  VirtualFolder,
+  isVirtualFolderId,
+  fromVirtualFolderId,
+  toVirtualFolderId,
+  fileBasename,
+} from '../utils/workspaces';
+import { getDirectoryColor, getDirectoryIcon } from '../utils/directoryIcons';
+import DirectoryIconPicker from './DirectoryIconPicker';
+import DirectoryColorPicker from './DirectoryColorPicker';
 import './Sidebar.css';
 
 interface SidebarProps {
   logDirectories: string[];
   activeDirectory: string;
-  dirLabels?: Record<string, string>;
+  directoryMeta?: Record<string, DirectoryMeta>;
+  virtualFolders?: VirtualFolder[];
   onDirectorySelect: (dir: string) => void;
   onAddDirectory: (dir: string) => void;
   onRemoveDirectory: (dir: string) => void;
   onRenameDirectory?: (dir: string, label: string) => void;
+  onDirectoryMetaChange?: (meta: Record<string, DirectoryMeta>) => void;
   onReorderDirectories?: (dirs: string[]) => void;
+  onCreateVirtualFolder?: () => void;
+  onRenameVirtualFolder?: (id: string, name: string) => void;
+  onDeleteVirtualFolder?: (id: string) => void;
+  onUpdateVirtualFolder?: (id: string, patch: Partial<VirtualFolder>) => void;
+  onAddFilesToVirtualFolder?: (id: string) => void;
+  onRemoveFileFromVirtualFolder?: (id: string, filePath: string) => void;
   onLogFileSelect: (filePath: string | null) => void;
   onLogFilesSelect: (filePaths: string[], ctrlKey?: boolean) => void;
   onOpenFile?: () => void;
@@ -34,12 +54,20 @@ interface FileWithDate {
 const Sidebar: React.FC<SidebarProps> = ({
   logDirectories,
   activeDirectory,
-  dirLabels = {},
+  directoryMeta = {},
+  virtualFolders = [],
   onDirectorySelect,
   onAddDirectory,
   onRemoveDirectory,
   onRenameDirectory,
+  onDirectoryMetaChange,
   onReorderDirectories,
+  onCreateVirtualFolder,
+  onRenameVirtualFolder,
+  onDeleteVirtualFolder,
+  onUpdateVirtualFolder,
+  onAddFilesToVirtualFolder,
+  onRemoveFileFromVirtualFolder,
   onLogFileSelect,
   onLogFilesSelect,
   onOpenFile,
@@ -58,28 +86,41 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // Context menu for directory tabs
   const [dirContextMenu, setDirContextMenu] = useState<{ x: number; y: number; dir: string } | null>(null);
+  const [virtualContextMenu, setVirtualContextMenu] = useState<{ x: number; y: number; id: string } | null>(null);
   const [fileContextMenu, setFileContextMenu] = useState<{ x: number; y: number; filePath: string } | null>(null);
+  const [dirMenuPanel, setDirMenuPanel] = useState<'icon' | 'color' | null>(null);
   const [renamingDir, setRenamingDir] = useState<string | null>(null);
+  const [renamingVirtualId, setRenamingVirtualId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [dragOverDir, setDragOverDir] = useState<string | null>(null);
   const dragSrcDir = React.useRef<string | null>(null);
   const loadRequestIdRef = useRef<string | null>(null);
   const dirContextMenuRef = useRef<HTMLDivElement>(null);
+  const virtualContextMenuRef = useRef<HTMLDivElement>(null);
   const fileContextMenuRef = useRef<HTMLDivElement>(null);
+
+  const activeVirtualId = fromVirtualFolderId(activeDirectory);
+  const activeVirtualFolder = activeVirtualId
+    ? virtualFolders.find((f) => f.id === activeVirtualId) ?? null
+    : null;
 
   // Close context menus on outside click (ignore clicks inside the menu)
   useEffect(() => {
-    if (!dirContextMenu && !fileContextMenu) return;
+    if (!dirContextMenu && !fileContextMenu && !virtualContextMenu) return;
     const close = (event: MouseEvent) => {
       const target = event.target as Node;
       if (dirContextMenuRef.current?.contains(target)) return;
+      if (virtualContextMenuRef.current?.contains(target)) return;
       if (fileContextMenuRef.current?.contains(target)) return;
       setDirContextMenu(null);
+      setDirMenuPanel(null);
+      setVirtualContextMenu(null);
       setFileContextMenu(null);
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
-  }, [dirContextMenu, fileContextMenu]);
+  }, [dirContextMenu, fileContextMenu, virtualContextMenu]);
+
 
   const handleFileContextMenu = (e: React.MouseEvent, filePath: string) => {
     e.preventDefault();
@@ -90,6 +131,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     const y = Math.min(e.clientY, window.innerHeight - menuHeight - 8);
     setFileContextMenu({ x, y, filePath });
     setDirContextMenu(null);
+    setDirMenuPanel(null);
   };
 
   const openFileInExplorer = async (filePath: string) => {
@@ -114,31 +156,82 @@ const Sidebar: React.FC<SidebarProps> = ({
     e.preventDefault();
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const menuHeight = 80;
+    const menuHeight = 180;
     // Place menu to the right of the tab strip; Y at cursor minus top padding so first item is under cursor
     const x = rect.right + 4;
     const rawY = e.clientY - 8;
     const y = Math.min(rawY, window.innerHeight - menuHeight - 8);
     setDirContextMenu({ x, y, dir });
+    setDirMenuPanel(null);
+    setVirtualContextMenu(null);
     setFileContextMenu(null);
+  };
+
+  const updateDirMeta = (dir: string, patch: Partial<DirectoryMeta>) => {
+    if (!onDirectoryMetaChange) return;
+    const current = directoryMeta[dir] ?? {};
+    const next: DirectoryMeta = { ...current, ...patch };
+    if (!next.label) delete next.label;
+    if (!next.icon) delete next.icon;
+    if (!next.color) delete next.color;
+    const all = { ...directoryMeta };
+    if (Object.keys(next).length === 0) {
+      delete all[dir];
+    } else {
+      all[dir] = next;
+    }
+    onDirectoryMetaChange(all);
   };
 
   const startRename = (dir: string) => {
     setDirContextMenu(null);
+    setDirMenuPanel(null);
     setRenamingDir(dir);
-    setRenameValue(dirLabels[dir] ?? dirBasename(dir));
+    setRenameValue(directoryMeta[dir]?.label ?? dirBasename(dir));
   };
 
   const commitRename = () => {
     if (renamingDir && onRenameDirectory) {
       onRenameDirectory(renamingDir, renameValue.trim());
     }
+    if (renamingVirtualId && onRenameVirtualFolder) {
+      onRenameVirtualFolder(renamingVirtualId, renameValue.trim());
+    }
     setRenamingDir(null);
+    setRenamingVirtualId(null);
   };
 
   const handleRenameKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') commitRename();
-    if (e.key === 'Escape') setRenamingDir(null);
+    if (e.key === 'Escape') {
+      setRenamingDir(null);
+      setRenamingVirtualId(null);
+    }
+  };
+
+  const handleVirtualContextMenu = (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const menuHeight = 220;
+    const x = rect.right + 4;
+    const y = Math.min(e.clientY - 8, window.innerHeight - menuHeight - 8);
+    setVirtualContextMenu({ x, y, id });
+    setDirMenuPanel(null);
+    setDirContextMenu(null);
+    setFileContextMenu(null);
+  };
+
+  const updateVirtualMeta = (id: string, patch: { icon?: string; color?: string }) => {
+    onUpdateVirtualFolder?.(id, patch);
+  };
+
+  const startVirtualRename = (id: string) => {
+    const folder = virtualFolders.find((f) => f.id === id);
+    setVirtualContextMenu(null);
+    setDirMenuPanel(null);
+    setRenamingVirtualId(id);
+    setRenameValue(folder?.name ?? '');
   };
 
   const handleDragStart = (e: React.DragEvent, dir: string) => {
@@ -275,10 +368,10 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     if (!activeDirectory || !window.electronAPI) return;
+    if (isVirtualFolderId(activeDirectory)) return;
 
     loadLogFiles();
 
-    // Start watching for new / removed files in the directory
     window.electronAPI.watchDirectory(activeDirectory);
     window.electronAPI.onDirectoryChanged(() => {
       loadLogFiles();
@@ -289,6 +382,22 @@ const Sidebar: React.FC<SidebarProps> = ({
       window.electronAPI.removeDirectoryChangedListener();
     };
   }, [activeDirectory, includeSubdirectories]);
+
+  const activeVirtualFileKey = activeVirtualFolder
+    ? `${activeVirtualFolder.id}:${activeVirtualFolder.filePaths.join('\0')}`
+    : '';
+
+  useEffect(() => {
+    if (!activeDirectory || !isVirtualFolderId(activeDirectory)) return;
+    const folder = virtualFolders.find((f) => f.id === fromVirtualFolderId(activeDirectory));
+    setLoading(false);
+    setLogFiles(
+      (folder?.filePaths ?? []).map((path) => ({
+        name: fileBasename(path),
+        path,
+      }))
+    );
+  }, [activeDirectory, activeVirtualFileKey]);
 
   const loadLogFiles = async () => {
     if (!window.electronAPI || !activeDirectory) return;
@@ -407,7 +516,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const dirBasename = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() || path;
 
   // Display label: custom label if set, otherwise basename
-  const dirDisplayLabel = (dir: string) => dirLabels[dir] || dirBasename(dir);
+  const dirDisplayLabel = (dir: string) => directoryMeta[dir]?.label || dirBasename(dir);
 
   return (
     <>
@@ -417,12 +526,24 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* ── Vertical directory tab strip (full height, left side) ── */}
         {!isCollapsed && (
           <div className="sidebar-dir-tabs">
-            {logDirectories.map((dir) => (
+            <div className="sidebar-dir-tabs-list">
+            {logDirectories.map((dir) => {
+              const meta = directoryMeta[dir];
+              const colorHex = getDirectoryColor(meta?.color);
+              const iconDef = getDirectoryIcon(meta?.icon);
+              return (
               <button
                 key={dir}
-                className={`sidebar-dir-tab ${activeDirectory === dir ? 'active' : ''} ${dragOverDir === dir ? 'drag-over' : ''}`}
+                className={`sidebar-dir-tab ${activeDirectory === dir ? 'active' : ''} ${dragOverDir === dir ? 'drag-over' : ''} ${colorHex ? 'has-color' : ''}`}
                 title={dir}
                 draggable
+                style={
+                  colorHex
+                    ? ({
+                        '--dir-tab-color': colorHex,
+                      } as React.CSSProperties)
+                    : undefined
+                }
                 onClick={() => onDirectorySelect(dir)}
                 onContextMenu={(e) => handleDirContextMenu(e, dir)}
                 onDragStart={(e) => handleDragStart(e, dir)}
@@ -444,22 +565,98 @@ const Sidebar: React.FC<SidebarProps> = ({
                 ) : (
                   <span className="sidebar-dir-tab-label">{dirDisplayLabel(dir)}</span>
                 )}
+                {iconDef && (
+                  <span className="sidebar-dir-tab-icon" aria-hidden>
+                    <FontAwesomeIcon icon={iconDef} />
+                  </span>
+                )}
                 <button
                   className="sidebar-dir-tab-close"
                   title={t('sidebar.removeDirectory')}
                   onClick={(e) => { e.stopPropagation(); onRemoveDirectory(dir); }}
                 >×</button>
               </button>
-            ))}
+              );
+            })}
+            {virtualFolders.map((folder) => {
+              const tabId = toVirtualFolderId(folder.id);
+              const colorHex = getDirectoryColor(folder.color);
+              const iconDef = getDirectoryIcon(folder.icon) ?? getDirectoryIcon('bookmark');
+              return (
+                <button
+                  key={tabId}
+                  className={`sidebar-dir-tab sidebar-dir-tab-virtual ${activeDirectory === tabId ? 'active' : ''} ${colorHex ? 'has-color' : ''}`}
+                  title={`${folder.name} (${folder.filePaths.length})`}
+                  style={
+                    colorHex
+                      ? ({ '--dir-tab-color': colorHex } as React.CSSProperties)
+                      : undefined
+                  }
+                  onClick={() => onDirectorySelect(tabId)}
+                  onContextMenu={(e) => handleVirtualContextMenu(e, folder.id)}
+                >
+                  {renamingVirtualId === folder.id ? (
+                    <input
+                      className="sidebar-dir-tab-rename-input"
+                      value={renameValue}
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onBlur={commitRename}
+                      onKeyDown={handleRenameKeyDown}
+                    />
+                  ) : (
+                    <span className="sidebar-dir-tab-label">{folder.name}</span>
+                  )}
+                  {iconDef && (
+                    <span className="sidebar-dir-tab-icon" aria-hidden>
+                      <FontAwesomeIcon icon={iconDef} />
+                    </span>
+                  )}
+                  <button
+                    className="sidebar-dir-tab-close"
+                    title={t('virtualFolder.delete')}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteVirtualFolder?.(folder.id);
+                    }}
+                  >×</button>
+                </button>
+              );
+            })}
+            </div>
+            {onCreateVirtualFolder && (
+              <button
+                type="button"
+                className="sidebar-dir-tab-add"
+                title={t('virtualFolder.create')}
+                onClick={onCreateVirtualFolder}
+              >
+                +
+              </button>
+            )}
           </div>
         )}
 
         {/* ── Main area: header + file list ── */}
         <div className="sidebar-main">
           <div className="sidebar-header">
-            {!isCollapsed && <div className="sidebar-title">{t('sidebar.files')}</div>}
+            {!isCollapsed && (
+              <div className="sidebar-title">
+                {activeVirtualFolder ? activeVirtualFolder.name : t('sidebar.files')}
+              </div>
+            )}
             <div className="sidebar-header-buttons">
-              {!isCollapsed && (
+              {!isCollapsed && activeVirtualFolder && (
+                <button
+                  onClick={() => onAddFilesToVirtualFolder?.(activeVirtualFolder.id)}
+                  className="open-file-button"
+                  title={t('virtualFolder.addFiles')}
+                >
+                  +
+                </button>
+              )}
+              {!isCollapsed && !activeVirtualFolder && (
                 <button
                   onClick={handleSelectDirectory}
                   className="open-folder-button"
@@ -533,7 +730,11 @@ const Sidebar: React.FC<SidebarProps> = ({
               ) : loading && logFiles.length === 0 ? (
                 <div className="sidebar-loading">{t('sidebar.loading')}</div>
               ) : logFiles.length === 0 ? (
-                <div className="sidebar-empty">{t('sidebar.noFiles')}</div>
+                <div className="sidebar-empty">
+                  {activeVirtualFolder
+                    ? t('virtualFolder.empty')
+                    : t('sidebar.noFiles')}
+                </div>
               ) : (
                 <div className="log-file-groups">
                   {loading && <div className="sidebar-loading">{t('sidebar.loading')}</div>}
@@ -608,7 +809,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       >
         <button
           className="sidebar-dir-context-item"
-          onClick={() => { onRemoveDirectory(dirContextMenu.dir); setDirContextMenu(null); }}
+          onClick={() => { onRemoveDirectory(dirContextMenu.dir); setDirContextMenu(null); setDirMenuPanel(null); }}
         >
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9h8l1-9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
@@ -624,6 +825,43 @@ const Sidebar: React.FC<SidebarProps> = ({
           </svg>
           {t('sidebar.renameFolder')}
         </button>
+        <button
+          className={`sidebar-dir-context-item ${dirMenuPanel === 'icon' ? 'active' : ''}`}
+          onClick={() => setDirMenuPanel((p) => (p === 'icon' ? null : 'icon'))}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+            <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+            <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+            <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+          </svg>
+          {t('sidebar.setIcon')}
+        </button>
+        {dirMenuPanel === 'icon' && (
+          <DirectoryIconPicker
+            value={directoryMeta[dirContextMenu.dir]?.icon}
+            clearLabel={t('sidebar.clearIcon')}
+            searchPlaceholder={t('sidebar.searchIcons')}
+            onChange={(iconId) => updateDirMeta(dirContextMenu.dir, { icon: iconId })}
+          />
+        )}
+        <button
+          className={`sidebar-dir-context-item ${dirMenuPanel === 'color' ? 'active' : ''}`}
+          onClick={() => setDirMenuPanel((p) => (p === 'color' ? null : 'color'))}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
+            <circle cx="8" cy="8" r="2.5" fill="currentColor"/>
+          </svg>
+          {t('sidebar.setColor')}
+        </button>
+        {dirMenuPanel === 'color' && (
+          <DirectoryColorPicker
+            value={directoryMeta[dirContextMenu.dir]?.color}
+            clearLabel={t('sidebar.clearColor')}
+            onChange={(colorId) => updateDirMeta(dirContextMenu.dir, { color: colorId })}
+          />
+        )}
       </div>,
       document.body
     )}
@@ -658,6 +896,93 @@ const Sidebar: React.FC<SidebarProps> = ({
             <path d="M11 2l3 3-8 8H3v-3L11 2z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           {t('sidebar.openInEditor')}
+        </button>
+        {activeVirtualFolder && (
+          <button
+            type="button"
+            className="sidebar-file-context-item"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onRemoveFileFromVirtualFolder?.(activeVirtualFolder.id, fileContextMenu.filePath);
+              setFileContextMenu(null);
+            }}
+          >
+            {t('virtualFolder.removeFile')}
+          </button>
+        )}
+      </div>,
+      document.body
+    )}
+
+    {virtualContextMenu && ReactDOM.createPortal(
+      <div
+        ref={virtualContextMenuRef}
+        className="sidebar-dir-context-menu"
+        style={{ top: virtualContextMenu.y, left: virtualContextMenu.x }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <button
+          className="sidebar-dir-context-item"
+          onClick={() => {
+            onAddFilesToVirtualFolder?.(virtualContextMenu.id);
+            setVirtualContextMenu(null);
+            setDirMenuPanel(null);
+          }}
+        >
+          {t('virtualFolder.addFiles')}
+        </button>
+        <button
+          className="sidebar-dir-context-item"
+          onClick={() => startVirtualRename(virtualContextMenu.id)}
+        >
+          {t('virtualFolder.rename')}
+        </button>
+        <button
+          className={`sidebar-dir-context-item ${dirMenuPanel === 'icon' ? 'active' : ''}`}
+          onClick={() => setDirMenuPanel((p) => (p === 'icon' ? null : 'icon'))}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+            <rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+            <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+            <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+          </svg>
+          {t('sidebar.setIcon')}
+        </button>
+        {dirMenuPanel === 'icon' && (
+          <DirectoryIconPicker
+            value={virtualFolders.find((f) => f.id === virtualContextMenu.id)?.icon}
+            clearLabel={t('sidebar.clearIcon')}
+            searchPlaceholder={t('sidebar.searchIcons')}
+            onChange={(iconId) => updateVirtualMeta(virtualContextMenu.id, { icon: iconId })}
+          />
+        )}
+        <button
+          className={`sidebar-dir-context-item ${dirMenuPanel === 'color' ? 'active' : ''}`}
+          onClick={() => setDirMenuPanel((p) => (p === 'color' ? null : 'color'))}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.3"/>
+            <circle cx="8" cy="8" r="2.5" fill="currentColor"/>
+          </svg>
+          {t('sidebar.setColor')}
+        </button>
+        {dirMenuPanel === 'color' && (
+          <DirectoryColorPicker
+            value={virtualFolders.find((f) => f.id === virtualContextMenu.id)?.color}
+            clearLabel={t('sidebar.clearColor')}
+            onChange={(colorId) => updateVirtualMeta(virtualContextMenu.id, { color: colorId })}
+          />
+        )}
+        <button
+          className="sidebar-dir-context-item"
+          onClick={() => {
+            onDeleteVirtualFolder?.(virtualContextMenu.id);
+            setVirtualContextMenu(null);
+            setDirMenuPanel(null);
+          }}
+        >
+          {t('virtualFolder.delete')}
         </button>
       </div>,
       document.body

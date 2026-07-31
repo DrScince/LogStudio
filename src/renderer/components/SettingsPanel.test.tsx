@@ -17,6 +17,10 @@ describe('SettingsPanel', () => {
     },
     logDirectory: '/test/logs',
     logDirectories: ['/test/logs'],
+    directoryMeta: {},
+    workspaces: [{ id: 'default-workspace', name: 'Default', logDirectories: ['/test/logs'], virtualFolders: [] }],
+    activeWorkspaceId: 'default-workspace',
+    virtualFolders: [],
     autoRefresh: true,
     refreshInterval: 1000,
     fontSize: 12,
@@ -26,6 +30,19 @@ describe('SettingsPanel', () => {
     autoDetect: true,
     enabledFormats: ['pipe', 'log4j', 'json', 'logfmt', 'syslog', 'apache', 'german'],
     includeSubdirectories: false,
+    hotkeys: {
+      save:           { ctrl: true,  alt: false, shift: false, key: 's' },
+      format:         { ctrl: false, alt: false, shift: false, key: 'd', chord: true },
+      comment:        { ctrl: false, alt: false, shift: false, key: 'c', chord: true },
+      uncomment:      { ctrl: false, alt: false, shift: false, key: 'u', chord: true },
+      cutLine:        { ctrl: false, alt: false, shift: true,  key: 'Delete' },
+      moveLineUp:     { ctrl: false, alt: true,  shift: false, key: 'ArrowUp' },
+      moveLineDown:   { ctrl: false, alt: true,  shift: false, key: 'ArrowDown' },
+      openSearch:     { ctrl: true,  alt: false, shift: false, key: 'f' },
+      nextMatch:      { ctrl: false, alt: false, shift: false, key: 'F3' },
+      prevMatch:      { ctrl: false, alt: false, shift: true,  key: 'F3' },
+      showAllMatches: { ctrl: false, alt: true,  shift: false, key: 'Enter' },
+    },
   };
 
   const defaultProps = {
@@ -62,14 +79,91 @@ describe('SettingsPanel', () => {
   });
 
   it('should update directory label when label input changes', async () => {
-    const onDirLabelsChange = vi.fn();
-    render(<SettingsPanel {...defaultProps} dirLabels={{}} onDirLabelsChange={onDirLabelsChange} />);
+    const onSettingsChange = vi.fn();
+    render(<SettingsPanel {...defaultProps} onSettingsChange={onSettingsChange} />);
 
     // Each directory has a label input with placeholder = basename
     const labelInput = screen.getByPlaceholderText('logs');
     fireEvent.change(labelInput, { target: { value: 'My Logs' } });
 
-    expect(onDirLabelsChange).toHaveBeenCalledWith({ '/test/logs': 'My Logs' });
+    // Label is stored in local state; commit via Save
+    fireEvent.click(screen.getByText('Save'));
+    expect(onSettingsChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        directoryMeta: { '/test/logs': { label: 'My Logs' } },
+      })
+    );
+  });
+
+  it('should update directory icon via icon picker', async () => {
+    const onSettingsChange = vi.fn();
+    render(<SettingsPanel {...defaultProps} onSettingsChange={onSettingsChange} />);
+
+    fireEvent.click(screen.getByTitle('Directory icon'));
+    fireEvent.click(screen.getByTitle('server'));
+    fireEvent.click(screen.getByText('Save'));
+
+    expect(onSettingsChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        directoryMeta: { '/test/logs': { icon: 'server' } },
+      })
+    );
+  });
+
+  it('should update directory color via color picker', async () => {
+    const onSettingsChange = vi.fn();
+    render(<SettingsPanel {...defaultProps} onSettingsChange={onSettingsChange} />);
+
+    fireEvent.click(screen.getByTitle('Directory color'));
+    fireEvent.click(screen.getByTitle('Blue'));
+    fireEvent.click(screen.getByText('Save'));
+
+    expect(onSettingsChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        directoryMeta: { '/test/logs': { color: 'blue' } },
+      })
+    );
+  });
+
+  it('should rename workspace and keep folder config on save', () => {
+    const onSettingsChange = vi.fn();
+    render(<SettingsPanel {...defaultProps} onSettingsChange={onSettingsChange} />);
+
+    expect(screen.getByLabelText('Active workspace')).toBeInTheDocument();
+    const nameInput = screen.getByDisplayValue('Default');
+    fireEvent.change(nameInput, { target: { value: 'Production' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Save$/i }));
+
+    expect(onSettingsChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaces: [
+          expect.objectContaining({
+            id: 'default-workspace',
+            name: 'Production',
+            logDirectories: ['/test/logs'],
+          }),
+        ],
+        logDirectories: ['/test/logs'],
+      })
+    );
+  });
+
+  it('should create a new empty workspace from settings', () => {
+    const onSettingsChange = vi.fn();
+    render(<SettingsPanel {...defaultProps} onSettingsChange={onSettingsChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^New$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Save$/i }));
+
+    expect(onSettingsChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        logDirectories: [],
+        workspaces: expect.arrayContaining([
+          expect.objectContaining({ name: 'Default', logDirectories: ['/test/logs'] }),
+          expect.objectContaining({ logDirectories: [] }),
+        ]),
+      })
+    );
   });
 
   it('should update font size when input changes', async () => {
