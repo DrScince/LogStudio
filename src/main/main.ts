@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, net } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, net, clipboard } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -737,6 +737,25 @@ ipcMain.handle(
 );
 
 // Fenstersteuerung
+ipcMain.handle(
+  'write-clipboard',
+  async (_event, payload: { text?: string; rtf?: string; html?: string }) => {
+    try {
+      const data: Electron.Data = {};
+      if (typeof payload?.text === 'string') data.text = payload.text;
+      if (typeof payload?.rtf === 'string') data.rtf = payload.rtf;
+      if (typeof payload?.html === 'string') data.html = payload.html;
+      if (!data.text && !data.rtf && !data.html) {
+        return { success: false, error: 'No clipboard content provided' };
+      }
+      clipboard.write(data);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  }
+);
+
 ipcMain.handle('minimize-window', () => {
   if (mainWindow) {
     mainWindow.minimize();

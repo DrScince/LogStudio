@@ -27,6 +27,11 @@ export interface ElectronAPI {
     html: string,
     defaultFileName?: string
   ) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
+  writeClipboard: (payload: {
+    text?: string;
+    rtf?: string;
+    html?: string;
+  }) => Promise<{ success: boolean; error?: string }>;
   onExportPdfProgress: (
     callback: (info: { percent: number; stage: string }) => void
   ) => () => void;

@@ -589,6 +589,7 @@ mark.search-highlight-active {
 .log-viewer-stats > button,
 .log-viewer-stats .auto-scroll-button,
 .log-viewer-stats .scroll-to-end-button,
+.log-viewer-stats .copy-rtf-button,
 .log-viewer-stats .reset-filters-button {
   flex-shrink: 0;
 }
@@ -623,6 +624,34 @@ mark.search-highlight-active {
 }
 
 .scroll-to-end-button svg {
+  flex-shrink: 0;
+}
+
+.copy-rtf-button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.917rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.copy-rtf-button:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(88, 166, 255, 0.3);
+}
+
+.copy-rtf-button svg {
   flex-shrink: 0;
 }
 
@@ -1184,6 +1213,13 @@ mark.search-highlight-active {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.5px;
+}
+
+.log-copy-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
 }
 
 .log-copy-button {

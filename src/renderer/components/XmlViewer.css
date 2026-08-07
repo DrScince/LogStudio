@@ -566,6 +566,35 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 20%, transparent);
 }
 
+.xml-tree-edit-select {
+  margin-left: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--accent-primary);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+  outline: none;
+  min-width: 180px;
+  max-width: min(82vw, 980px);
+  cursor: pointer;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 20%, transparent);
+}
+
+.xml-tree-has-options {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.xml-tree-options-hint {
+  color: var(--accent-primary);
+  font-size: 0.7rem;
+  line-height: 1;
+  opacity: 0.85;
+}
+
 .xml-tree-empty {
   color: var(--text-muted, var(--text-secondary));
   opacity: 0.95;
@@ -620,4 +649,33 @@
   color: var(--error);
   font-size: 0.875rem;
   padding: 20px;
+}
+
+/* Shared config viewer context menu */
+.viewer-context-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 180px;
+  padding: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.viewer-context-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.833rem;
+  cursor: pointer;
+}
+
+.viewer-context-menu-item:hover {
+  background: var(--bg-hover);
 }

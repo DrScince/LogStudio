@@ -61,6 +61,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showOpenDirectoryDialog: () => ipcRenderer.invoke('show-open-directory-dialog'),
   exportHtmlToPdf: (html: string, defaultFileName?: string) =>
     ipcRenderer.invoke('export-html-to-pdf', html, defaultFileName),
+  writeClipboard: (payload: { text?: string; rtf?: string; html?: string }) =>
+    ipcRenderer.invoke('write-clipboard', payload),
   onExportPdfProgress: (callback: (info: { percent: number; stage: string }) => void) => {
     const listener = (_event: unknown, info: { percent: number; stage: string }) => callback(info);
     ipcRenderer.on('export-pdf-progress', listener);

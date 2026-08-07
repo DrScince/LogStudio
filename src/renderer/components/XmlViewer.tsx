@@ -4,14 +4,29 @@ import { highlightXml } from '../utils/xmlHighlighter';
 import { formatXml } from '../utils/xmlFormatter';
 import { HotkeyMap, DEFAULT_HOTKEYS } from '../utils/settings';
 import { isChordStarter, matchesBinding } from '../utils/hotkeys';
+import {
+  childNodeKey,
+  getStructuredViewerUi,
+  setStructuredViewerUi,
+  type StructuredViewMode,
+} from '../utils/viewerUiState';
+import {
+  getTrailingCommentOptions,
+} from '../utils/xmlCommentOptions';
+import {
+  copyPlainAndRtf,
+  xmlToRtf,
+} from '../utils/rtfClipboard';
+import Toast from './Toast';
 import './XmlViewer.css';
 
 interface XmlViewerProps {
   filePath: string;
+  tabId?: string;
   hotkeys?: HotkeyMap;
 }
 
-type ViewMode = 'raw' | 'tree';
+type ViewMode = StructuredViewMode;
 
 type XmlValueKind = 'text' | 'bool' | 'number' | 'path';
 
@@ -23,6 +38,23 @@ function getXmlValueKind(value: string): XmlValueKind {
   return 'text';
 }
 
+function getElementChildren(el: Element): ChildNode[] {
+  return Array.from(el.childNodes).filter((n) => n.nodeType === Node.ELEMENT_NODE);
+}
+
+/** Collect keys of all expandable element nodes under `node`. */
+function collectXmlExpandableKeys(node: Node, key: string): string[] {
+  if (node.nodeType !== Node.ELEMENT_NODE) return [];
+  const el = node as Element;
+  const children = getElementChildren(el);
+  if (children.length === 0) return [];
+  const keys = [key];
+  children.forEach((child, i) => {
+    keys.push(...collectXmlExpandableKeys(child, childNodeKey(key, i)));
+  });
+  return keys;
+}
+
 // ─────────────────────────────────────────────
 // XML Tree Node (recursive)
 // ─────────────────────────────────────────────
@@ -30,7 +62,9 @@ function getXmlValueKind(value: string): XmlValueKind {
 interface XmlTreeNodeProps {
   node: Node;
   depth: number;
-  defaultCollapsed: boolean;
+  nodeKey: string;
+  collapsedPaths: Set<string>;
+  onToggleCollapse: (key: string) => void;
   xmlDoc?: Document;
   onContentChange?: (xml: string) => void;
 }
@@ -38,28 +72,27 @@ interface XmlTreeNodeProps {
 const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
   node,
   depth,
-  defaultCollapsed,
+  nodeKey,
+  collapsedPaths,
+  onToggleCollapse,
   xmlDoc,
   onContentChange,
 }) => {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
+    if (!isEditing) return;
+    const el = selectRef.current ?? inputRef.current;
+    if (!el) return;
+    el.focus();
+    if (el instanceof HTMLInputElement) el.select();
   }, [isEditing]);
 
   if (node.nodeType === Node.COMMENT_NODE) {
-    return (
-      <div className="xml-tree-row" style={{ paddingLeft: depth * 20 + 28 }}>
-        <span className="xml-tree-comment">{`<!-- ${node.textContent?.trim()} -->`}</span>
-      </div>
-    );
+    return null;
   }
 
   if (node.nodeType === Node.TEXT_NODE) {
@@ -77,11 +110,10 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
   const el = node as Element;
   const attrs = Array.from(el.attributes);
 
-  // Only element/comment children cause expand-collapse; text nodes are shown inline
-  const elementChildren = Array.from(el.childNodes).filter(
-    (n) => n.nodeType === Node.ELEMENT_NODE || n.nodeType === Node.COMMENT_NODE
-  );
+  // Only element children cause expand-collapse; text nodes are shown inline
+  const elementChildren = getElementChildren(el);
   const hasChildren = elementChildren.length > 0;
+  const collapsed = hasChildren && collapsedPaths.has(nodeKey);
 
   // Find a direct text node for leaf elements
   const textDomNodes = Array.from(el.childNodes).filter(
@@ -92,8 +124,8 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
       ? textDomNodes.map((n) => n.textContent?.trim()).filter(Boolean).join(' ')
       : '';
   const inlineValueKind = getXmlValueKind(inlineText);
+  const optionValues = !hasChildren ? getTrailingCommentOptions(el) : null;
   const editInputWidthCh = Math.min(Math.max(editValue.length + 4, 24), 120);
-  const textDomNode = textDomNodes[0] ?? null;
   const canEdit = !!onContentChange && !hasChildren;
 
   const startEdit = (e: React.MouseEvent) => {
@@ -103,7 +135,7 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
     setIsEditing(true);
   };
 
-  const commitEdit = () => {
+  const commitEditWith = (nextValue: string) => {
     if (!xmlDoc || !onContentChange) {
       setIsEditing(false);
       return;
@@ -112,7 +144,6 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
     const existingTextNode = Array.from(el.childNodes).find(
       (n) => n.nodeType === Node.TEXT_NODE
     ) as ChildNode | undefined;
-    const nextValue = editValue;
 
     if (existingTextNode) {
       if (nextValue === '') {
@@ -129,14 +160,21 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
     setIsEditing(false);
   };
 
+  const commitEdit = () => commitEditWith(editValue);
   const cancelEdit = () => setIsEditing(false);
+
+  const selectOptions =
+    optionValues &&
+    (optionValues.includes(editValue) || editValue === ''
+      ? optionValues
+      : [editValue, ...optionValues]);
 
   return (
     <div className="xml-tree-node">
       <div
         className="xml-tree-row"
         style={{ paddingLeft: depth * 20 }}
-        onClick={() => hasChildren && setCollapsed((c) => !c)}
+        onClick={() => hasChildren && onToggleCollapse(nodeKey)}
       >
         <span className="xml-tree-chevron" style={{ visibility: hasChildren ? 'visible' : 'hidden' }}>
           {collapsed ? (
@@ -164,14 +202,53 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
         {/* Inline value — editable leaf */}
         {inlineText && !isEditing && (
           <span
-            className={`xml-tree-text-inline xml-tree-value xml-tree-value-${inlineValueKind} ${canEdit ? 'xml-tree-editable' : ''}`}
+            className={`xml-tree-text-inline xml-tree-value xml-tree-value-${inlineValueKind} ${canEdit ? 'xml-tree-editable' : ''} ${optionValues ? 'xml-tree-has-options' : ''}`}
             onClick={startEdit}
-            title={canEdit ? 'Click to edit' : undefined}
+            title={
+              canEdit
+                ? optionValues
+                  ? 'Click to choose / edit'
+                  : 'Click to edit'
+                : undefined
+            }
           >
             {inlineText}
+            {optionValues && (
+              <span className="xml-tree-options-hint" aria-hidden>
+                ▾
+              </span>
+            )}
           </span>
         )}
-        {isEditing && (
+        {isEditing && selectOptions && (
+          <select
+            ref={selectRef}
+            className="xml-tree-edit-select"
+            value={editValue}
+            onChange={(e) => {
+              const next = e.target.value;
+              setEditValue(next);
+              commitEditWith(next);
+            }}
+            onBlur={commitEdit}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelEdit();
+              }
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {editValue === '' && <option value="">—</option>}
+            {selectOptions.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        )}
+        {isEditing && !selectOptions && (
           <input
             ref={inputRef}
             className="xml-tree-edit-input"
@@ -190,11 +267,17 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
         {/* Empty leaf indicator */}
         {!hasChildren && !inlineText && !isEditing && (
           <span
-            className={`xml-tree-empty ${canEdit ? 'xml-tree-editable' : ''}`}
+            className={`xml-tree-empty ${canEdit ? 'xml-tree-editable' : ''} ${optionValues ? 'xml-tree-has-options' : ''}`}
             onClick={startEdit}
-            title={canEdit ? 'Click to edit' : undefined}
+            title={
+              canEdit
+                ? optionValues
+                  ? 'Click to choose / edit'
+                  : 'Click to edit'
+                : undefined
+            }
           >
-            /
+            {optionValues ? '▾' : '/'}
           </span>
         )}
       </div>
@@ -202,10 +285,12 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
         <div className="xml-tree-children">
           {elementChildren.map((child, i) => (
             <XmlTreeNode
-              key={i}
+              key={childNodeKey(nodeKey, i)}
               node={child}
               depth={depth + 1}
-              defaultCollapsed={defaultCollapsed}
+              nodeKey={childNodeKey(nodeKey, i)}
+              collapsedPaths={collapsedPaths}
+              onToggleCollapse={onToggleCollapse}
               xmlDoc={xmlDoc}
               onContentChange={onContentChange}
             />
@@ -275,16 +360,21 @@ function findFoldableRegions(lines: string[]): Map<number, { end: number; tagNam
 // Main XmlViewer component
 // ─────────────────────────────────────────────
 
-const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
+const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
+  const savedUi = tabId ? getStructuredViewerUi(tabId) : undefined;
   const [content, setContent] = useState('');
   const [savedContent, setSavedContent] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('raw');
+  const [viewMode, setViewMode] = useState<ViewMode>(savedUi?.viewMode ?? 'raw');
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [treeKey, setTreeKey] = useState(0);
-  const [treeDefaultCollapsed, setTreeDefaultCollapsed] = useState(false);
+  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(
+    () => new Set(savedUi?.collapsedPaths ?? [])
+  );
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [copyToastVisible, setCopyToastVisible] = useState(false);
+  const copyToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [currentLine, setCurrentLine] = useState(1);
   const [foldMap, setFoldMap] = useState<Map<number, string[]>>(new Map());
@@ -712,6 +802,68 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
     }
   }, [contentLines.length, currentLine]);
 
+  // Persist Raw/Tree mode + collapse state across tab remounts
+  useEffect(() => {
+    if (!tabId) return;
+    setStructuredViewerUi(tabId, {
+      viewMode,
+      collapsedPaths: Array.from(collapsedPaths),
+    });
+  }, [tabId, viewMode, collapsedPaths]);
+
+  const toggleCollapse = useCallback((key: string) => {
+    setCollapsedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const showCopyToast = useCallback(() => {
+    if (copyToastTimer.current) clearTimeout(copyToastTimer.current);
+    setCopyToastVisible(false);
+    requestAnimationFrame(() => {
+      setCopyToastVisible(true);
+      copyToastTimer.current = setTimeout(() => setCopyToastVisible(false), 3000);
+    });
+  }, []);
+
+  const getCopyText = useCallback(() => {
+    const ta = textareaRef.current;
+    if (viewMode === 'raw' && ta && ta.selectionStart !== ta.selectionEnd) {
+      return ta.value.slice(ta.selectionStart, ta.selectionEnd);
+    }
+    return content;
+  }, [viewMode, content]);
+
+  const handleCopyPlain = useCallback(() => {
+    const text = getCopyText();
+    navigator.clipboard.writeText(text).then(showCopyToast).catch(console.error);
+    setContextMenu(null);
+  }, [getCopyText, showCopyToast]);
+
+  const handleCopyRtf = useCallback(() => {
+    const text = getCopyText();
+    void copyPlainAndRtf(text, xmlToRtf(text))
+      .then(showCopyToast)
+      .catch(() => {
+        navigator.clipboard.writeText(text).then(showCopyToast).catch(console.error);
+      });
+    setContextMenu(null);
+  }, [getCopyText, showCopyToast]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener('mousedown', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      window.removeEventListener('mousedown', close);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [contextMenu]);
+
   // ── Highlighted HTML ───────────────────────
   const highlightedHtml = React.useMemo(() => highlightXml(content), [content]);
 
@@ -720,8 +872,15 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
 
   // ── Tree expand / collapse all ─────────────
   const triggerCollapse = (collapsed: boolean) => {
-    setTreeDefaultCollapsed(collapsed);
-    setTreeKey((k) => k + 1);
+    if (!collapsed) {
+      setCollapsedPaths(new Set());
+      return;
+    }
+    if (!rootElement) {
+      setCollapsedPaths(new Set());
+      return;
+    }
+    setCollapsedPaths(new Set(collectXmlExpandableKeys(rootElement, '0')));
   };
 
   if (loading) {
@@ -733,7 +892,14 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
   }
 
   return (
-    <div className="xml-viewer">
+    <>
+    <div
+      className="xml-viewer"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY });
+      }}
+    >
       {/* ── External change banner (only when user has unsaved edits) ── */}
       {externallyChanged && (
         <div className="xml-external-banner">
@@ -911,7 +1077,7 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
               {t('xml.parseError')}
             </div>
           ) : rootElement ? (
-            <div key={treeKey} className="xml-tree-root">
+            <div className="xml-tree-root">
               {/* Declaration comment if present */}
               {xmlSourceForTree.startsWith('<?xml') && (
                 <div className="xml-tree-decl">
@@ -921,7 +1087,9 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
               <XmlTreeNode
                 node={rootElement}
                 depth={0}
-                defaultCollapsed={treeDefaultCollapsed}
+                nodeKey="0"
+                collapsedPaths={collapsedPaths}
+                onToggleCollapse={toggleCollapse}
                 xmlDoc={xmlDoc ?? undefined}
                 onContentChange={(newXml) => {
                   setContent(newXml);
@@ -936,6 +1104,23 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
         </div>
       )}
     </div>
+    {contextMenu && (
+      <div
+        className="viewer-context-menu"
+        style={{ top: contextMenu.y, left: contextMenu.x }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <button type="button" className="viewer-context-menu-item" onClick={handleCopyPlain}>
+          {t('app.copy')}
+        </button>
+        <button type="button" className="viewer-context-menu-item" onClick={handleCopyRtf}>
+          {t('app.copyAsRtf')}
+        </button>
+      </div>
+    )}
+    <Toast message={t('logviewer.copiedToClipboard')} visible={copyToastVisible} />
+    </>
   );
 };
 

@@ -8,6 +8,13 @@ import { matchesBinding } from '../utils/hotkeys';
 import { findSearchMatches, findMatchingEntryIndices, highlightSearchText, SearchMatch } from '../utils/searchUtils';
 import { useTranslation } from '../i18n';
 import Toast from './Toast';
+import {
+  copyPlainAndRtf,
+  logEntriesToPlainAndRtf,
+  logEntryToPlainAndRtf,
+  payloadToRtf,
+  plainTextToRtf,
+} from '../utils/rtfClipboard';
 import './LogViewer.css';
 
 interface LogViewerProps {
@@ -1201,6 +1208,26 @@ const LogViewer: React.FC<LogViewerProps> = ({
     });
   }, [showCopyToast]);
 
+  const copyRtfToClipboard = useCallback(
+    async (plain: string, rtf: string) => {
+      try {
+        await copyPlainAndRtf(plain, rtf);
+        showCopyToast();
+      } catch (err) {
+        console.error('Failed to copy RTF to clipboard:', err);
+        // Fallback: at least copy plain text
+        copyToClipboard(plain);
+      }
+    },
+    [showCopyToast, copyToClipboard]
+  );
+
+  const copyFilteredEntriesAsRtf = useCallback(() => {
+    if (filteredEntries.length === 0) return;
+    const { plain, rtf } = logEntriesToPlainAndRtf(filteredEntries);
+    void copyRtfToClipboard(plain, rtf);
+  }, [filteredEntries, copyRtfToClipboard]);
+
   // Highlight matching text in a string for display
   const highlightText = useCallback((text: string, isActiveMatch: boolean): React.ReactNode => {
     if (!searchQuery || searchAsFilter) return text;
@@ -1312,20 +1339,50 @@ const LogViewer: React.FC<LogViewerProps> = ({
                 </div>
               )}
               {(expandedContent.type === 'json' || expandedContent.type === 'xml' || expandedContent.type === 'exception') && (
-                <button 
-                  className="log-copy-button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    copyToClipboard(expandedContent.formatted);
-                  }}
-                  title={t('app.copy')}
-                >
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M4 4V2C4 1.44772 4.44772 1 5 1H13C13.5523 1 14 1.44772 14 2V10C14 10.5523 13.5523 11 13 11H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    <rect x="2" y="5" width="9" height="10" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                  </svg>
-                  {t('app.copy')}
-                </button>
+                <div className="log-copy-actions">
+                  <button
+                    className="log-copy-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const plain =
+                        expandedContent.type === 'exception'
+                          ? entry.fullText
+                          : expandedContent.formatted;
+                      copyToClipboard(plain);
+                    }}
+                    title={t('app.copy')}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M4 4V2C4 1.44772 4.44772 1 5 1H13C13.5523 1 14 1.44772 14 2V10C14 10.5523 13.5523 11 13 11H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      <rect x="2" y="5" width="9" height="10" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                    </svg>
+                    {t('app.copy')}
+                  </button>
+                  <button
+                    className="log-copy-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const source =
+                        expandedContent.type === 'exception'
+                          ? entry.fullText
+                          : expandedContent.formatted;
+                      if (expandedContent.type === 'json' || expandedContent.type === 'xml') {
+                        const { plain, rtf } = payloadToRtf(source);
+                        void copyRtfToClipboard(plain, rtf);
+                      } else {
+                        void copyRtfToClipboard(source, plainTextToRtf(source));
+                      }
+                    }}
+                    title={t('app.copyAsRtf')}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M4 4V2C4 1.44772 4.44772 1 5 1H13C13.5523 1 14 1.44772 14 2V10C14 10.5523 13.5523 11 13 11H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      <rect x="2" y="5" width="9" height="10" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                      <path d="M4 9h5M4 11.5h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                    {t('app.copyAsRtf')}
+                  </button>
+                </div>
               )}
             </div>
             {expandedContent.isHtml ? (
@@ -1342,7 +1399,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
         )}
       </div>
     );
-  }, [filteredEntries, expandedLines, toggleExpand, analyzeAndFormatContent, getResizableColumnStyle, filePaths, highlightText, searchMatches, currentMatchIndex, searchAsFilter, matchingEntryIndices]);
+  }, [filteredEntries, expandedLines, toggleExpand, analyzeAndFormatContent, getResizableColumnStyle, filePaths, highlightText, searchMatches, currentMatchIndex, searchAsFilter, matchingEntryIndices, copyToClipboard, copyRtfToClipboard, t]);
 
   // Check if we have any files to display (single or multiple)
   const hasFiles = filePath || (filePaths && filePaths.length > 0);
@@ -1584,6 +1641,18 @@ const LogViewer: React.FC<LogViewerProps> = ({
                 </svg>
                 {t('logviewer.end')}
               </button>
+              <button
+                onClick={copyFilteredEntriesAsRtf}
+                className="copy-rtf-button"
+                title={t('logviewer.copyFilteredAsRtfTitle')}
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 4V2C4 1.44772 4.44772 1 5 1H13C13.5523 1 14 1.44772 14 2V10C14 10.5523 13.5523 11 13 11H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  <rect x="2" y="5" width="9" height="10" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M4 9h5M4 11.5h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+                {t('logviewer.copyFilteredAsRtf')}
+              </button>
             </>
           )}
           </div>
@@ -1715,6 +1784,17 @@ const LogViewer: React.FC<LogViewerProps> = ({
             }}
           >
             {t('app.copyEntry')}
+          </button>
+          <button
+            className="log-context-menu-item"
+            onClick={() => {
+              const { entry } = logContextMenu;
+              const { plain, rtf } = logEntryToPlainAndRtf(entry);
+              void copyRtfToClipboard(plain, rtf);
+              setLogContextMenu(null);
+            }}
+          >
+            {t('app.copyEntryAsRtf')}
           </button>
           <button
             className="log-context-menu-item"

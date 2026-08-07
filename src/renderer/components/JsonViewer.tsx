@@ -3,14 +3,43 @@ import { useTranslation } from '../i18n';
 import { highlightJson } from '../utils/jsonHighlighter';
 import { HotkeyMap, DEFAULT_HOTKEYS } from '../utils/settings';
 import { isChordStarter, matchesBinding } from '../utils/hotkeys';
+import {
+  getStructuredViewerUi,
+  setStructuredViewerUi,
+  type StructuredViewMode,
+} from '../utils/viewerUiState';
+import {
+  copyPlainAndRtf,
+  jsonToRtf,
+} from '../utils/rtfClipboard';
+import Toast from './Toast';
 import './JsonViewer.css';
 
 interface JsonViewerProps {
   filePath: string;
+  tabId?: string;
   hotkeys?: HotkeyMap;
 }
 
-type ViewMode = 'raw' | 'tree';
+type ViewMode = StructuredViewMode;
+
+function jsonPathKey(path: (string | number)[]): string {
+  return path.length === 0 ? 'root' : path.map(String).join('/');
+}
+
+function collectJsonExpandableKeys(value: unknown, path: (string | number)[] = []): string[] {
+  const isArray = Array.isArray(value);
+  const isObject = !isArray && value !== null && typeof value === 'object';
+  if (!isArray && !isObject) return [];
+  const keys = [jsonPathKey(path)];
+  const entries: [string | number, unknown][] = isArray
+    ? (value as unknown[]).map((v, i) => [i, v])
+    : Object.entries(value as Record<string, unknown>);
+  for (const [k, v] of entries) {
+    keys.push(...collectJsonExpandableKeys(v, [...path, k]));
+  }
+  return keys;
+}
 
 // ─────────────────────────────────────────────
 // Helper: set a value at a nested path
@@ -77,8 +106,9 @@ interface JsonTreeNodeProps {
   nodeKey?: string | number;
   value: unknown;
   depth: number;
-  defaultCollapsed: boolean;
   path: (string | number)[];
+  collapsedPaths: Set<string>;
+  onToggleCollapse: (key: string) => void;
   onValueChange?: (path: (string | number)[], newValue: unknown) => void;
 }
 
@@ -86,16 +116,16 @@ const JsonTreeNode: React.FC<JsonTreeNodeProps> = ({
   nodeKey,
   value,
   depth,
-  defaultCollapsed,
   path,
+  collapsedPaths,
+  onToggleCollapse,
   onValueChange,
 }) => {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { setCollapsed(defaultCollapsed); }, [defaultCollapsed]);
+  const collapseKey = jsonPathKey(path);
+  const collapsed = collapsedPaths.has(collapseKey);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -189,7 +219,7 @@ const JsonTreeNode: React.FC<JsonTreeNodeProps> = ({
       <div className="json-tree-row" style={{ paddingLeft: indent }}>
         <button
           className="json-collapse-btn"
-          onClick={() => setCollapsed(c => !c)}
+          onClick={() => onToggleCollapse(collapseKey)}
           aria-label={collapsed ? 'expand' : 'collapse'}
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -217,8 +247,9 @@ const JsonTreeNode: React.FC<JsonTreeNodeProps> = ({
               nodeKey={k}
               value={v}
               depth={depth + 1}
-              defaultCollapsed={defaultCollapsed}
               path={[...path, k]}
+              collapsedPaths={collapsedPaths}
+              onToggleCollapse={onToggleCollapse}
               onValueChange={onValueChange}
             />
           ))}
@@ -235,18 +266,23 @@ const JsonTreeNode: React.FC<JsonTreeNodeProps> = ({
 // Main JsonViewer component
 // ─────────────────────────────────────────────
 
-const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
+const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, tabId, hotkeys }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
+  const savedUi = tabId ? getStructuredViewerUi(tabId) : undefined;
 
   const [content, setContent] = useState('');
   const [savedContent, setSavedContent] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('raw');
+  const [viewMode, setViewMode] = useState<ViewMode>(savedUi?.viewMode ?? 'raw');
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [treeKey, setTreeKey] = useState(0);
-  const [treeDefaultCollapsed, setTreeDefaultCollapsed] = useState(false);
+  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(
+    () => new Set(savedUi?.collapsedPaths ?? [])
+  );
   const [externallyChanged, setExternallyChanged] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [copyToastVisible, setCopyToastVisible] = useState(false);
+  const copyToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -461,6 +497,68 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
     catch { return { valid: false, value: null as unknown }; }
   }, [content]);
 
+  // Persist Raw/Tree mode + collapse state across tab remounts
+  useEffect(() => {
+    if (!tabId) return;
+    setStructuredViewerUi(tabId, {
+      viewMode,
+      collapsedPaths: Array.from(collapsedPaths),
+    });
+  }, [tabId, viewMode, collapsedPaths]);
+
+  const toggleCollapse = useCallback((key: string) => {
+    setCollapsedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const showCopyToast = useCallback(() => {
+    if (copyToastTimer.current) clearTimeout(copyToastTimer.current);
+    setCopyToastVisible(false);
+    requestAnimationFrame(() => {
+      setCopyToastVisible(true);
+      copyToastTimer.current = setTimeout(() => setCopyToastVisible(false), 3000);
+    });
+  }, []);
+
+  const getCopyText = useCallback(() => {
+    const ta = textareaRef.current;
+    if (viewMode === 'raw' && ta && ta.selectionStart !== ta.selectionEnd) {
+      return ta.value.slice(ta.selectionStart, ta.selectionEnd);
+    }
+    return content;
+  }, [viewMode, content]);
+
+  const handleCopyPlain = useCallback(() => {
+    const text = getCopyText();
+    navigator.clipboard.writeText(text).then(showCopyToast).catch(console.error);
+    setContextMenu(null);
+  }, [getCopyText, showCopyToast]);
+
+  const handleCopyRtf = useCallback(() => {
+    const text = getCopyText();
+    void copyPlainAndRtf(text, jsonToRtf(text))
+      .then(showCopyToast)
+      .catch(() => {
+        navigator.clipboard.writeText(text).then(showCopyToast).catch(console.error);
+      });
+    setContextMenu(null);
+  }, [getCopyText, showCopyToast]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    window.addEventListener('mousedown', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      window.removeEventListener('mousedown', close);
+      window.removeEventListener('scroll', close, true);
+    };
+  }, [contextMenu]);
+
   // ── Highlighted HTML ───────────────────────
   const highlightedHtml = React.useMemo(() => highlightJson(content), [content]);
 
@@ -469,8 +567,15 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
 
   // ── Tree expand / collapse all ─────────────
   const triggerCollapse = (collapsed: boolean) => {
-    setTreeDefaultCollapsed(collapsed);
-    setTreeKey(k => k + 1);
+    if (!collapsed) {
+      setCollapsedPaths(new Set());
+      return;
+    }
+    if (!parsedResult.valid) {
+      setCollapsedPaths(new Set());
+      return;
+    }
+    setCollapsedPaths(new Set(collectJsonExpandableKeys(parsedResult.value)));
   };
 
   if (loading) {
@@ -482,7 +587,14 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
   }
 
   return (
-    <div className="json-viewer">
+    <>
+    <div
+      className="json-viewer"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY });
+      }}
+    >
 
       {/* ── External change banner ─────────────── */}
       {externallyChanged && (
@@ -613,12 +725,13 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
           {!parsedResult.valid ? (
             <div className="json-parse-error">{t('json.parseError')}</div>
           ) : (
-            <div className="json-tree-root" key={treeKey}>
+            <div className="json-tree-root">
               <JsonTreeNode
                 value={parsedResult.value}
                 depth={0}
-                defaultCollapsed={treeDefaultCollapsed}
                 path={[]}
+                collapsedPaths={collapsedPaths}
+                onToggleCollapse={toggleCollapse}
                 onValueChange={handleTreeValueChange}
               />
             </div>
@@ -626,6 +739,23 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
         </div>
       )}
     </div>
+    {contextMenu && (
+      <div
+        className="viewer-context-menu"
+        style={{ top: contextMenu.y, left: contextMenu.x }}
+        onMouseDown={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        <button type="button" className="viewer-context-menu-item" onClick={handleCopyPlain}>
+          {t('app.copy')}
+        </button>
+        <button type="button" className="viewer-context-menu-item" onClick={handleCopyRtf}>
+          {t('app.copyAsRtf')}
+        </button>
+      </div>
+    )}
+    <Toast message={t('logviewer.copiedToClipboard')} visible={copyToastVisible} />
+    </>
   );
 };
 

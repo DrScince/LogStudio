@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.9.0] - 2026-08-07
+
+### Added
+- **RTF clipboard copy**: Copy log entries and JSON/XML payloads as rich text (plain + RTF) for pasting into Word/Outlook. Log toolbar button copies filtered entries; expand panels and context menus offer Copy / Copy as RTF.
+- **Config context menu**: Right-click XML/JSON viewers for *Copy* and *Copy as RTF* (selection in Raw mode, otherwise full document).
+- **XML enum options from comments**: Trailing `<!-- a;b;c -->` comments after leaf nodes provide a dropdown of allowed values in Tree view.
+- **Persisted XML/JSON view state**: Raw/Tree mode and expanded/collapsed tree nodes are remembered per open tab across tab switches.
+
+### Changed
+- **Tree view hides XML comments**: Comments are no longer shown as tree rows (option comments still drive the value dropdown).
+
 ## [2.8.1] - 2026-07-31
 
 ### Fixed
