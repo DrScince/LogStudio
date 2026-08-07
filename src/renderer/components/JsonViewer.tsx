@@ -3,14 +3,36 @@ import { useTranslation } from '../i18n';
 import { highlightJson } from '../utils/jsonHighlighter';
 import { HotkeyMap, DEFAULT_HOTKEYS } from '../utils/settings';
 import { isChordStarter, matchesBinding } from '../utils/hotkeys';
+import {
+  getStructuredViewerUi,
+  setStructuredViewerUi,
+  StructuredViewMode,
+} from '../utils/viewerUiState';
 import './JsonViewer.css';
 
 interface JsonViewerProps {
   filePath: string;
   hotkeys?: HotkeyMap;
+  tabId?: string;
 }
 
-type ViewMode = 'raw' | 'tree';
+function jsonPathKey(path: (string | number)[]): string {
+  return path.length === 0 ? 'root' : path.join('/');
+}
+
+function collectJsonExpandableKeys(value: unknown, path: (string | number)[]): string[] {
+  const isArray = Array.isArray(value);
+  const isObject = !isArray && value !== null && typeof value === 'object';
+  if (!isArray && !isObject) return [];
+  const keys = [jsonPathKey(path)];
+  const entries: [string | number, unknown][] = isArray
+    ? (value as unknown[]).map((v, i) => [i, v])
+    : Object.entries(value as Record<string, unknown>);
+  for (const [k, v] of entries) {
+    keys.push(...collectJsonExpandableKeys(v, [...path, k]));
+  }
+  return keys;
+}
 
 // ─────────────────────────────────────────────
 // Helper: set a value at a nested path
@@ -77,8 +99,9 @@ interface JsonTreeNodeProps {
   nodeKey?: string | number;
   value: unknown;
   depth: number;
-  defaultCollapsed: boolean;
   path: (string | number)[];
+  collapsedPaths: Set<string>;
+  onToggleCollapse: (key: string) => void;
   onValueChange?: (path: (string | number)[], newValue: unknown) => void;
 }
 
@@ -86,16 +109,14 @@ const JsonTreeNode: React.FC<JsonTreeNodeProps> = ({
   nodeKey,
   value,
   depth,
-  defaultCollapsed,
   path,
+  collapsedPaths,
+  onToggleCollapse,
   onValueChange,
 }) => {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { setCollapsed(defaultCollapsed); }, [defaultCollapsed]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -107,6 +128,8 @@ const JsonTreeNode: React.FC<JsonTreeNodeProps> = ({
   const isArray = Array.isArray(value);
   const isObject = !isArray && value !== null && typeof value === 'object';
   const isLeaf = !isArray && !isObject;
+  const pathKey = jsonPathKey(path);
+  const collapsed = collapsedPaths.has(pathKey);
 
   const startEdit = () => {
     if (!onValueChange) return;
@@ -189,7 +212,7 @@ const JsonTreeNode: React.FC<JsonTreeNodeProps> = ({
       <div className="json-tree-row" style={{ paddingLeft: indent }}>
         <button
           className="json-collapse-btn"
-          onClick={() => setCollapsed(c => !c)}
+          onClick={() => onToggleCollapse(pathKey)}
           aria-label={collapsed ? 'expand' : 'collapse'}
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -217,8 +240,9 @@ const JsonTreeNode: React.FC<JsonTreeNodeProps> = ({
               nodeKey={k}
               value={v}
               depth={depth + 1}
-              defaultCollapsed={defaultCollapsed}
               path={[...path, k]}
+              collapsedPaths={collapsedPaths}
+              onToggleCollapse={onToggleCollapse}
               onValueChange={onValueChange}
             />
           ))}
@@ -235,17 +259,19 @@ const JsonTreeNode: React.FC<JsonTreeNodeProps> = ({
 // Main JsonViewer component
 // ─────────────────────────────────────────────
 
-const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
+const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
+  const savedUi = tabId ? getStructuredViewerUi(tabId) : undefined;
 
   const [content, setContent] = useState('');
   const [savedContent, setSavedContent] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('raw');
+  const [viewMode, setViewMode] = useState<StructuredViewMode>(savedUi?.viewMode ?? 'raw');
+  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(
+    () => new Set(savedUi?.collapsedPaths ?? [])
+  );
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [treeKey, setTreeKey] = useState(0);
-  const [treeDefaultCollapsed, setTreeDefaultCollapsed] = useState(false);
   const [externallyChanged, setExternallyChanged] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -467,10 +493,28 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
   // ── File name ─────────────────────────────
   const fileName = filePath.split(/[/\\]/).pop() ?? filePath;
 
+  // ── Persist view mode + tree folds per tab ─
+  useEffect(() => {
+    if (!tabId) return;
+    setStructuredViewerUi(tabId, {
+      viewMode,
+      collapsedPaths: [...collapsedPaths],
+    });
+  }, [tabId, viewMode, collapsedPaths]);
+
+  const handleToggleCollapse = useCallback((key: string) => {
+    setCollapsedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
   // ── Tree expand / collapse all ─────────────
-  const triggerCollapse = (collapsed: boolean) => {
-    setTreeDefaultCollapsed(collapsed);
-    setTreeKey(k => k + 1);
+  const expandAll = () => setCollapsedPaths(new Set());
+  const collapseAll = () => {
+    setCollapsedPaths(new Set(collectJsonExpandableKeys(parsedResult.value, [])));
   };
 
   if (loading) {
@@ -551,13 +595,13 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
 
         {viewMode === 'tree' && (
           <>
-            <button className="json-btn" onClick={() => triggerCollapse(false)} title={t('json.expandAll')}>
+            <button className="json-btn" onClick={expandAll} title={t('json.expandAll')}>
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                 <path d="M2 5l6 6 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               {t('json.expandAll')}
             </button>
-            <button className="json-btn" onClick={() => triggerCollapse(true)} title={t('json.collapseAll')}>
+            <button className="json-btn" onClick={collapseAll} title={t('json.collapseAll')}>
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                 <path d="M2 11l6-6 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -613,12 +657,13 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys }) => {
           {!parsedResult.valid ? (
             <div className="json-parse-error">{t('json.parseError')}</div>
           ) : (
-            <div className="json-tree-root" key={treeKey}>
+            <div className="json-tree-root">
               <JsonTreeNode
                 value={parsedResult.value}
                 depth={0}
-                defaultCollapsed={treeDefaultCollapsed}
                 path={[]}
+                collapsedPaths={collapsedPaths}
+                onToggleCollapse={handleToggleCollapse}
                 onValueChange={handleTreeValueChange}
               />
             </div>

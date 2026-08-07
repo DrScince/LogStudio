@@ -30,6 +30,11 @@ import {
   WorkspaceOpenTab,
 } from './utils/workspaces';
 import { I18nProvider, useTranslation } from './i18n';
+import {
+  clearAllStructuredViewerUi,
+  clearStructuredViewerUi,
+  pruneStructuredViewerUi,
+} from './utils/viewerUiState';
 import './App.css';
 
 function App() {
@@ -369,6 +374,7 @@ function App() {
         if (!cancelled) {
           setTabs(restored.tabs);
           setActiveTabId(restored.activeId);
+          pruneStructuredViewerUi(restored.tabs.map((t) => t.id));
         }
       }
       tabsPersistReady.current = true;
@@ -534,6 +540,7 @@ function App() {
     const restored = await restoreOpenTabs(snapshots, kept, target.activeOpenTabKey);
     setTabs(restored.tabs);
     setActiveTabId(restored.activeId);
+    pruneStructuredViewerUi(restored.tabs.map((t) => t.id));
   };
 
   const handleCreateWorkspace = async () => {
@@ -568,6 +575,7 @@ function App() {
     setActiveDirectory('');
     const kept = keepTabsWhenLeavingWorkspace(currentTabs, leavingDirs, leavingVfs, [], []);
     setTabs(kept);
+    pruneStructuredViewerUi(kept.map((t) => t.id));
     setActiveTabId((current) =>
       current && kept.some((t) => t.id === current) ? current : kept[0]?.id ?? null
     );
@@ -617,6 +625,7 @@ function App() {
       const restored = await restoreOpenTabs(snapshots, kept, nextActive.activeOpenTabKey);
       setTabs(restored.tabs);
       setActiveTabId(restored.activeId);
+      pruneStructuredViewerUi(restored.tabs.map((t) => t.id));
     } else {
       setSettings((prev) => ({ ...prev, workspaces }));
     }
@@ -827,6 +836,7 @@ function App() {
 
   const handleTabClose = useCallback((tabId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    clearStructuredViewerUi(tabId);
     
     setTabs((prev) => {
       const newTabs = prev.filter((tab) => tab.id !== tabId);
@@ -1068,11 +1078,17 @@ function App() {
         onTabSelect={handleTabSelect}
         onTabClose={handleTabClose}
         onCloseAll={() => {
+          clearAllStructuredViewerUi();
           setTabs([]);
           setActiveTabId(null);
         }}
         onCloseOthers={(tabId) => {
-          setTabs((prev) => prev.filter((t) => t.id === tabId));
+          setTabs((prev) => {
+            prev.forEach((t) => {
+              if (t.id !== tabId) clearStructuredViewerUi(t.id);
+            });
+            return prev.filter((t) => t.id === tabId);
+          });
           setActiveTabId(tabId);
         }}
       />
@@ -1186,12 +1202,14 @@ function App() {
           <XmlViewer
             filePath={activeTab.filePath}
             hotkeys={settings.hotkeys}
+            tabId={activeTab.id}
             key={activeTabId ?? ''}
           />
         ) : activeTab?.isJson ? (
           <JsonViewer
             filePath={activeTab.filePath}
             hotkeys={settings.hotkeys}
+            tabId={activeTab.id}
             key={activeTabId ?? ''}
           />
         ) : activeTab?.isMarkdown ? (

@@ -4,14 +4,19 @@ import { highlightXml } from '../utils/xmlHighlighter';
 import { formatXml } from '../utils/xmlFormatter';
 import { HotkeyMap, DEFAULT_HOTKEYS } from '../utils/settings';
 import { isChordStarter, matchesBinding } from '../utils/hotkeys';
+import {
+  childNodeKey,
+  getStructuredViewerUi,
+  setStructuredViewerUi,
+  StructuredViewMode,
+} from '../utils/viewerUiState';
 import './XmlViewer.css';
 
 interface XmlViewerProps {
   filePath: string;
   hotkeys?: HotkeyMap;
+  tabId?: string;
 }
-
-type ViewMode = 'raw' | 'tree';
 
 type XmlValueKind = 'text' | 'bool' | 'number' | 'path';
 
@@ -23,6 +28,24 @@ function getXmlValueKind(value: string): XmlValueKind {
   return 'text';
 }
 
+function getElementChildren(el: Element): ChildNode[] {
+  return Array.from(el.childNodes).filter(
+    (n) => n.nodeType === Node.ELEMENT_NODE || n.nodeType === Node.COMMENT_NODE
+  );
+}
+
+function collectXmlExpandableKeys(node: Node, key: string): string[] {
+  if (node.nodeType !== Node.ELEMENT_NODE) return [];
+  const el = node as Element;
+  const children = getElementChildren(el);
+  if (children.length === 0) return [];
+  const keys = [key];
+  children.forEach((child, i) => {
+    keys.push(...collectXmlExpandableKeys(child, childNodeKey(key, i)));
+  });
+  return keys;
+}
+
 // ─────────────────────────────────────────────
 // XML Tree Node (recursive)
 // ─────────────────────────────────────────────
@@ -30,7 +53,9 @@ function getXmlValueKind(value: string): XmlValueKind {
 interface XmlTreeNodeProps {
   node: Node;
   depth: number;
-  defaultCollapsed: boolean;
+  nodeKey: string;
+  collapsedPaths: Set<string>;
+  onToggleCollapse: (key: string) => void;
   xmlDoc?: Document;
   onContentChange?: (xml: string) => void;
 }
@@ -38,11 +63,12 @@ interface XmlTreeNodeProps {
 const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
   node,
   depth,
-  defaultCollapsed,
+  nodeKey,
+  collapsedPaths,
+  onToggleCollapse,
   xmlDoc,
   onContentChange,
 }) => {
-  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -78,10 +104,9 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
   const attrs = Array.from(el.attributes);
 
   // Only element/comment children cause expand-collapse; text nodes are shown inline
-  const elementChildren = Array.from(el.childNodes).filter(
-    (n) => n.nodeType === Node.ELEMENT_NODE || n.nodeType === Node.COMMENT_NODE
-  );
+  const elementChildren = getElementChildren(el);
   const hasChildren = elementChildren.length > 0;
+  const collapsed = collapsedPaths.has(nodeKey);
 
   // Find a direct text node for leaf elements
   const textDomNodes = Array.from(el.childNodes).filter(
@@ -136,7 +161,7 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
       <div
         className="xml-tree-row"
         style={{ paddingLeft: depth * 20 }}
-        onClick={() => hasChildren && setCollapsed((c) => !c)}
+        onClick={() => hasChildren && onToggleCollapse(nodeKey)}
       >
         <span className="xml-tree-chevron" style={{ visibility: hasChildren ? 'visible' : 'hidden' }}>
           {collapsed ? (
@@ -205,7 +230,9 @@ const XmlTreeNode: React.FC<XmlTreeNodeProps> = ({
               key={i}
               node={child}
               depth={depth + 1}
-              defaultCollapsed={defaultCollapsed}
+              nodeKey={childNodeKey(nodeKey, i)}
+              collapsedPaths={collapsedPaths}
+              onToggleCollapse={onToggleCollapse}
               xmlDoc={xmlDoc}
               onContentChange={onContentChange}
             />
@@ -275,16 +302,18 @@ function findFoldableRegions(lines: string[]): Map<number, { end: number; tagNam
 // Main XmlViewer component
 // ─────────────────────────────────────────────
 
-const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
+const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys, tabId }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
+  const savedUi = tabId ? getStructuredViewerUi(tabId) : undefined;
   const [content, setContent] = useState('');
   const [savedContent, setSavedContent] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('raw');
+  const [viewMode, setViewMode] = useState<StructuredViewMode>(savedUi?.viewMode ?? 'raw');
+  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(
+    () => new Set(savedUi?.collapsedPaths ?? [])
+  );
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [treeKey, setTreeKey] = useState(0);
-  const [treeDefaultCollapsed, setTreeDefaultCollapsed] = useState(false);
 
   const [currentLine, setCurrentLine] = useState(1);
   const [foldMap, setFoldMap] = useState<Map<number, string[]>>(new Map());
@@ -718,10 +747,29 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
   // ── File name for display ──────────────────
   const fileName = filePath.split(/[/\\]/).pop() ?? filePath;
 
+  // ── Persist view mode + tree folds per tab ─
+  useEffect(() => {
+    if (!tabId) return;
+    setStructuredViewerUi(tabId, {
+      viewMode,
+      collapsedPaths: [...collapsedPaths],
+    });
+  }, [tabId, viewMode, collapsedPaths]);
+
+  const handleToggleCollapse = useCallback((key: string) => {
+    setCollapsedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
   // ── Tree expand / collapse all ─────────────
-  const triggerCollapse = (collapsed: boolean) => {
-    setTreeDefaultCollapsed(collapsed);
-    setTreeKey((k) => k + 1);
+  const expandAll = () => setCollapsedPaths(new Set());
+  const collapseAll = () => {
+    if (!rootElement) return;
+    setCollapsedPaths(new Set(collectXmlExpandableKeys(rootElement, '0')));
   };
 
   if (loading) {
@@ -801,13 +849,13 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
 
         {viewMode === 'tree' && (
           <>
-            <button className="xml-btn" onClick={() => triggerCollapse(false)} title={t('xml.expandAll')}>
+            <button className="xml-btn" onClick={expandAll} title={t('xml.expandAll')}>
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                 <path d="M2 5l6 6 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               {t('xml.expandAll')}
             </button>
-            <button className="xml-btn" onClick={() => triggerCollapse(true)} title={t('xml.collapseAll')}>
+            <button className="xml-btn" onClick={collapseAll} title={t('xml.collapseAll')}>
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                 <path d="M2 11l6-6 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -911,7 +959,7 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
               {t('xml.parseError')}
             </div>
           ) : rootElement ? (
-            <div key={treeKey} className="xml-tree-root">
+            <div className="xml-tree-root">
               {/* Declaration comment if present */}
               {xmlSourceForTree.startsWith('<?xml') && (
                 <div className="xml-tree-decl">
@@ -921,7 +969,9 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys }) => {
               <XmlTreeNode
                 node={rootElement}
                 depth={0}
-                defaultCollapsed={treeDefaultCollapsed}
+                nodeKey="0"
+                collapsedPaths={collapsedPaths}
+                onToggleCollapse={handleToggleCollapse}
                 xmlDoc={xmlDoc ?? undefined}
                 onContentChange={(newXml) => {
                   setContent(newXml);
