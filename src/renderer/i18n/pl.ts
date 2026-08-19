@@ -226,6 +226,8 @@ const pl: TranslationKeys = {
     searchResizePane: 'Zmień rozmiar panelu wyników',
     detectedFormat: 'Format: {{format}}',
     copiedToClipboard: 'Skopiowano do schowka',
+    hiddenNew: 'ukrytych',
+    hiddenNewTitle: '{{count}} nowych wpisów ukrytych przez aktywny filtr. Kliknij, aby zresetować.',
   },
   xml: {
     viewRaw: 'Raw',

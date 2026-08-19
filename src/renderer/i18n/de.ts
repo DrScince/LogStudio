@@ -226,6 +226,8 @@ const de: TranslationKeys = {
     searchResizePane: 'Größe des Suchbereichs anpassen',
     detectedFormat: 'Format: {{format}}',
     copiedToClipboard: 'In Zwischenablage kopiert',
+    hiddenNew: 'verborgen',
+    hiddenNewTitle: '{{count}} neue Einträge durch aktiven Filter verborgen. Klicken zum Zurücksetzen.',
   },
   xml: {
     viewRaw: 'Raw',

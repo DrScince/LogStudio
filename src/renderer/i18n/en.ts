@@ -230,6 +230,8 @@ const en = {
     searchResizePane: 'Resize search results pane',
     detectedFormat: 'Format: {{format}}',
     copiedToClipboard: 'Copied to clipboard',
+    hiddenNew: 'hidden',
+    hiddenNewTitle: '{{count}} new entries hidden by active filter. Click to reset.',
   },
   // XML Viewer
   xml: {
