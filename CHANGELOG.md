@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.10.0] - 2026-08-19
+
+### Added
+- **Hidden new entries badge**: When a log-level or namespace filter is active and newly appended log lines don't match the filter, a pulsing badge in the toolbar shows how many new entries are currently hidden. Clicking the badge resets the filters and reveals them.
+
 ## [2.9.0] - 2026-08-07
 
 ### Added
