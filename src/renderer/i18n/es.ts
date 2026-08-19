@@ -225,6 +225,8 @@ const es: TranslationKeys = {
     searchResizePane: 'Redimensionar panel de resultados',
     detectedFormat: 'Formato: {{format}}',
     copiedToClipboard: 'Copiado al portapapeles',
+    hiddenNew: 'ocultos',
+    hiddenNewTitle: '{{count}} nuevas entradas ocultas por el filtro activo. Clic para restablecer.',
   },
   xml: {
     viewRaw: 'Raw',

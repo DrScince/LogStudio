@@ -225,6 +225,8 @@ const ro: TranslationKeys = {
     searchResizePane: 'Redimensionează panoul de rezultate',
     detectedFormat: 'Format: {{format}}',
     copiedToClipboard: 'Copiat în clipboard',
+    hiddenNew: 'ascunse',
+    hiddenNewTitle: '{{count}} intrări noi ascunse de filtrul activ. Click pentru resetare.',
   },
   xml: {
     viewRaw: 'Raw',

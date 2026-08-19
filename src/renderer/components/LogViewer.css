@@ -761,6 +761,23 @@ mark.search-highlight-active {
   max-width: 160px;
 }
 
+.filter-badge-hidden-new {
+  color: var(--level-warn, #e8a838);
+  border-color: color-mix(in srgb, var(--level-warn, #e8a838) 50%, transparent);
+  background: color-mix(in srgb, var(--level-warn, #e8a838) 10%, transparent);
+  cursor: pointer;
+  animation: hidden-new-pulse 1.5s ease-in-out 2;
+}
+
+.filter-badge-hidden-new:hover {
+  background: color-mix(in srgb, var(--level-warn, #e8a838) 20%, transparent);
+}
+
+@keyframes hidden-new-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 .reset-filters-button {
   display: flex;
   align-items: center;

@@ -153,6 +153,8 @@ const LogViewer: React.FC<LogViewerProps> = ({
     [viewerHeight]
   );
   const [autoScroll, setAutoScroll] = useState(false);
+  const [hiddenNewCount, setHiddenNewCount] = useState(0);
+  const previousTotalRef = useRef(0);
   const [columnWidths, setColumnWidths] = useState<Record<ResizableColumn, number>>(DEFAULT_COLUMN_WIDTHS);
   const [logContextMenu, setLogContextMenu] = useState<{ x: number; y: number; entry: LogEntry } | null>(null);
 
@@ -576,6 +578,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
     };
 
     if (filtersChanged) {
+      setHiddenNewCount(0);
       // Anker über originalLineNumber halten — Pixel-Offset wäre nach Filter falsch
       const startIdx = Math.min(
         Math.max(visibleStartIndexRef.current, 0),
@@ -950,7 +953,17 @@ const LogViewer: React.FC<LogViewerProps> = ({
     }
     
     const hasNewEntries = filteredEntries.length > previousLengthRef.current;
-    
+
+    // Track entries hidden by filters
+    const totalGrew = logEntries.length > previousTotalRef.current;
+    if (totalGrew) {
+      const newTotal = logEntries.length - previousTotalRef.current;
+      const newVisible = filteredEntries.length - previousLengthRef.current;
+      const hidden = Math.max(0, newTotal - Math.max(0, newVisible));
+      if (hidden > 0) setHiddenNewCount((prev) => prev + hidden);
+    }
+    previousTotalRef.current = logEntries.length;
+
     if (autoScroll && hasNewEntries) {
       // Scroll to end when new entries are added and tracking is on
       console.log('Auto-scrolling to end');
@@ -1606,6 +1619,18 @@ const LogViewer: React.FC<LogViewerProps> = ({
           {searchAsFilter && searchQuery && (
             <span className="filter-badge filter-badge-search" title={`${t('logviewer.searchBadge', { query: searchQuery })}`}>
               {t('logviewer.searchBadge', { query: searchBadge })}
+            </span>
+          )}
+          {hiddenNewCount > 0 && (
+            <span
+              className="filter-badge filter-badge-hidden-new"
+              title={t('logviewer.hiddenNewTitle', { count: hiddenNewCount })}
+              onClick={() => { setHiddenNewCount(0); onResetFilters?.(); }}
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2a6 6 0 100 12A6 6 0 008 2zm0 9.5a.75.75 0 110-1.5.75.75 0 010 1.5zm.75-3a.75.75 0 01-1.5 0V5.75a.75.75 0 011.5 0v2.75z" fill="currentColor"/>
+              </svg>
+              +{hiddenNewCount} {t('logviewer.hiddenNew')}
             </span>
           )}
           {hasActiveFilters && onResetFilters && (
