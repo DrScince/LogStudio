@@ -4,6 +4,18 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as chokidar from 'chokidar';
 import { fileURLToPath, pathToFileURL } from 'url';
+import {
+  chatWithOllama,
+  DEFAULT_OLLAMA_BASE,
+  DEFAULT_OLLAMA_MODEL,
+  ensureOllamaRunning,
+  getOllamaStatus,
+  installOllama,
+  openOllamaDownloadPage,
+  pullOllamaModel,
+  buildLogAssistantSystemPrompt,
+  type ChatMessage,
+} from './ollama';
 
 let mainWindow: BrowserWindow | null = null;
 let logWatchers: Map<string, chokidar.FSWatcher> = new Map();
@@ -782,6 +794,76 @@ ipcMain.handle('open-external', async (_event, url: string) => {
   const { shell } = await import('electron');
   await shell.openExternal(url);
 });
+
+ipcMain.handle('ollama-status', async (_event, baseUrl?: string) => {
+  return getOllamaStatus(baseUrl || DEFAULT_OLLAMA_BASE);
+});
+
+ipcMain.handle('ollama-install', async () => {
+  try {
+    return await installOllama();
+  } catch (err) {
+    console.error('ollama-install IPC failed', err);
+    return { success: false, message: String(err) };
+  }
+});
+
+ipcMain.handle('ollama-open-download', async () => {
+  await openOllamaDownloadPage();
+  return { success: true };
+});
+
+ipcMain.handle('ollama-ensure-running', async (_event, baseUrl?: string) => {
+  const ok = await ensureOllamaRunning(baseUrl || DEFAULT_OLLAMA_BASE);
+  return { success: ok };
+});
+
+ipcMain.handle('ollama-pull-model', async (event, model?: string, baseUrl?: string) => {
+  const target = model || DEFAULT_OLLAMA_MODEL;
+  const result = await pullOllamaModel(target, baseUrl || DEFAULT_OLLAMA_BASE, (info) => {
+    try {
+      event.sender.send('ollama-pull-progress', { model: target, ...info });
+    } catch {
+      /* ignore */
+    }
+  });
+  return result;
+});
+
+ipcMain.handle(
+  'ollama-chat',
+  async (
+    event,
+    payload: {
+      model?: string;
+      baseUrl?: string;
+      messages: ChatMessage[];
+      requestId?: string;
+      fileContext?: { fileName: string; excerpt: string; note?: string };
+    }
+  ) => {
+    const model = payload.model || DEFAULT_OLLAMA_MODEL;
+    const baseUrl = payload.baseUrl || DEFAULT_OLLAMA_BASE;
+    const requestId = payload.requestId || `chat-${Date.now()}`;
+    const messages: ChatMessage[] = [
+      { role: 'system', content: buildLogAssistantSystemPrompt(payload.fileContext) },
+      ...(payload.messages || []),
+    ];
+    const result = await chatWithOllama({
+      model,
+      baseUrl,
+      messages,
+      onToken: (token) => {
+        try {
+          event.sender.send('ollama-chat-token', { requestId, token });
+        } catch {
+          /* ignore */
+        }
+      },
+    });
+    return { ...result, requestId };
+  }
+);
 
 ipcMain.handle('show-item-in-folder', async (_event, filePath: string) => {
   const { shell } = await import('electron');

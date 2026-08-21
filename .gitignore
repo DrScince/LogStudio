@@ -1,6 +1,7 @@
 node_modules/
 dist/
 release/
+vendor/ollama/
 *.log
 .DS_Store
 *.local
