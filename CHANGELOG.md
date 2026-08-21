@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.11.0-beta.1] - 2026-08-21
+
 ### Added
-- **Local AI assistant (Ollama)**: In-app chat with open-log context. On first use, LogStudio launches the official Ollama installer; the model is pulled on first chat. LogStudio itself stays a normal slim install.
+- **Local AI assistant (Ollama)**: In-app chat grounded in the currently open log file. On first use without Ollama, LogStudio launches the official Ollama installer; the model is downloaded on first chat. LogStudio install stays slim (~100 MB).
+
+### Notes
+- Prerelease for early testing — not a final release.
 
 ## [2.10.0] - 2026-08-19
 
