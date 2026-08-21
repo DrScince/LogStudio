@@ -18,12 +18,6 @@
     "CHANGELOG.md",
     "installer.nsh"
   ],
-  "extraResources": [
-    {
-      "from": "scripts/install-ollama-windows.ps1",
-      "to": "scripts/install-ollama-windows.ps1"
-    }
-  ],
   "fileAssociations": [
     {
       "ext": "log",

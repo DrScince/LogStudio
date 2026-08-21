@@ -16,11 +16,6 @@ import {
   buildLogAssistantSystemPrompt,
   type ChatMessage,
 } from './ollama';
-import {
-  needsAiInstallChoice,
-  readAiComponentPreference,
-  writeAiComponentPreference,
-} from './aiComponent';
 
 let mainWindow: BrowserWindow | null = null;
 let logWatchers: Map<string, chokidar.FSWatcher> = new Map();
@@ -798,27 +793,6 @@ ipcMain.handle('close-window', () => {
 ipcMain.handle('open-external', async (_event, url: string) => {
   const { shell } = await import('electron');
   await shell.openExternal(url);
-});
-
-ipcMain.handle('ai-component-preference', () => {
-  return {
-    preference: readAiComponentPreference(),
-    needsChoice: needsAiInstallChoice(),
-  };
-});
-
-ipcMain.handle('ai-component-set', async (_event, aiEnabled: boolean) => {
-  writeAiComponentPreference({
-    aiEnabled: !!aiEnabled,
-    source: 'first-run',
-    pendingChoice: false,
-  });
-  if (aiEnabled) {
-    // Best-effort: install/start Ollama when user opts in outside the Windows installer.
-    const installed = await installOllama();
-    return { success: true, install: installed };
-  }
-  return { success: true };
 });
 
 ipcMain.handle('ollama-status', async (_event, baseUrl?: string) => {

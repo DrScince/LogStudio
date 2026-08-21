@@ -14,7 +14,6 @@
     "build:run": "npm run build && npm start",
     "start": "electron .",
     "package": "electron-builder",
-    "package:ai": "electron-builder --config electron-builder.ai.json",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",

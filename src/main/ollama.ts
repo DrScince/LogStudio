@@ -4,10 +4,23 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
-import { getBundledOllamaBinary } from './aiComponent';
 
 export const DEFAULT_OLLAMA_BASE = 'http://127.0.0.1:11434';
 export const DEFAULT_OLLAMA_MODEL = 'llama3.2:3b';
+
+function getBundledOllamaBinary(): string | null {
+  const base = app.isPackaged
+    ? path.join(process.resourcesPath, 'ollama')
+    : path.join(app.getAppPath(), 'vendor', 'ollama');
+  const name = process.platform === 'win32' ? 'ollama.exe' : 'ollama';
+  const candidate = path.join(base, name);
+  try {
+    if (fs.existsSync(candidate)) return candidate;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
 
 function resolveOllamaBinary(): string | null {
   const bundled = getBundledOllamaBinary();
@@ -19,7 +32,11 @@ function resolveOllamaBinary(): string | null {
     if (fs.existsSync(prog)) return prog;
   }
   if (process.platform === 'linux' || process.platform === 'darwin') {
-    for (const c of ['/usr/local/bin/ollama', '/usr/bin/ollama', path.join(app.getPath('home'), '.local', 'bin', 'ollama')]) {
+    for (const c of [
+      '/usr/local/bin/ollama',
+      '/usr/bin/ollama',
+      path.join(app.getPath('home'), '.local', 'bin', 'ollama'),
+    ]) {
       if (fs.existsSync(c)) return c;
     }
   }
@@ -127,8 +144,104 @@ export async function openOllamaDownloadPage(): Promise<void> {
   await shell.openExternal('https://ollama.com/download');
 }
 
-/** Best-effort local install for Linux prototypes; otherwise open download page. */
+function downloadFile(url: string, dest: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const follow = (current: string, redirectsLeft: number) => {
+      const lib = current.startsWith('https') ? https : http;
+      const req = lib.get(current, (res) => {
+        const code = res.statusCode ?? 0;
+        if ([301, 302, 303, 307, 308].includes(code) && res.headers.location) {
+          res.resume();
+          if (redirectsLeft <= 0) {
+            reject(new Error('Too many redirects'));
+            return;
+          }
+          const next = new URL(res.headers.location, current).toString();
+          follow(next, redirectsLeft - 1);
+          return;
+        }
+        if (code >= 400) {
+          res.resume();
+          reject(new Error(`Download failed HTTP ${code}`));
+          return;
+        }
+        const out = fs.createWriteStream(dest);
+        res.pipe(out);
+        out.on('finish', () => out.close(() => resolve()));
+        out.on('error', reject);
+      });
+      req.on('error', reject);
+      req.setTimeout(120000, () => {
+        req.destroy();
+        reject(new Error('Download timed out'));
+      });
+    };
+    follow(url, 8);
+  });
+}
+
+async function launchWindowsOllamaInstaller(): Promise<{ success: boolean; message: string }> {
+  const dest = path.join(app.getPath('temp'), 'OllamaSetup-LogStudio.exe');
+  try {
+    const st = await fs.promises.stat(dest).catch(() => null);
+    if (!st || st.size < 1_000_000) {
+      await downloadFile('https://ollama.com/download/OllamaSetup.exe', dest);
+    }
+    spawn(dest, [], { detached: true, stdio: 'ignore' }).unref();
+    return {
+      success: true,
+      message: 'Ollama installer launched. Finish setup, then click Refresh.',
+    };
+  } catch (err) {
+    await openOllamaDownloadPage();
+    return {
+      success: true,
+      message: `Could not launch installer (${String(err)}). Opened download page instead.`,
+    };
+  }
+}
+
+async function launchMacOllamaInstaller(): Promise<{ success: boolean; message: string }> {
+  const dest = path.join(app.getPath('temp'), 'Ollama-darwin.zip');
+  try {
+    const st = await fs.promises.stat(dest).catch(() => null);
+    if (!st || st.size < 1_000_000) {
+      await downloadFile('https://ollama.com/download/Ollama-darwin.zip', dest);
+    }
+    // Open the zip/dmg via Finder so the user can install Ollama.app
+    await shell.openPath(dest);
+    return {
+      success: true,
+      message: 'Ollama download opened. Install the app, then click Refresh.',
+    };
+  } catch (err) {
+    await openOllamaDownloadPage();
+    return {
+      success: true,
+      message: `Could not download installer (${String(err)}). Opened download page instead.`,
+    };
+  }
+}
+
+/**
+ * Launch the platform Ollama installer when the user starts using AI.
+ * Does not silently install — the official installer UI should appear.
+ */
 export async function installOllama(): Promise<{ success: boolean; message: string }> {
+  if (await isOllamaBinaryPresent()) {
+    const running = await ensureOllamaRunning();
+    return {
+      success: true,
+      message: running ? 'Ollama is already installed and running.' : 'Ollama is installed. Starting service…',
+    };
+  }
+
+  if (process.platform === 'win32') {
+    return launchWindowsOllamaInstaller();
+  }
+  if (process.platform === 'darwin') {
+    return launchMacOllamaInstaller();
+  }
   if (process.platform === 'linux') {
     return await new Promise((resolve) => {
       const child = spawn('bash', ['-lc', 'curl -fsSL https://ollama.com/install.sh | sh'], {
@@ -143,25 +256,28 @@ export async function installOllama(): Promise<{ success: boolean; message: stri
       });
       child.on('close', (code) => {
         if (code === 0) {
-          // Try starting the service
-          spawn('ollama', ['serve'], { detached: true, stdio: 'ignore' }).unref();
+          const bin = resolveOllamaBinary() || 'ollama';
+          spawn(bin, ['serve'], { detached: true, stdio: 'ignore' }).unref();
           resolve({ success: true, message: out.slice(-500) || 'Ollama installed' });
         } else {
-          resolve({ success: false, message: out.slice(-800) || `Install failed (${code})` });
+          void openOllamaDownloadPage().then(() =>
+            resolve({
+              success: false,
+              message: out.slice(-800) || `Install failed (${code}). Opened download page.`,
+            })
+          );
         }
       });
-      child.on('error', (err) => resolve({ success: false, message: String(err) }));
+      child.on('error', (err) => {
+        void openOllamaDownloadPage().then(() =>
+          resolve({ success: false, message: String(err) })
+        );
+      });
     });
   }
 
   await openOllamaDownloadPage();
-  return {
-    success: true,
-    message:
-      process.platform === 'win32' || process.platform === 'darwin'
-        ? 'Opened Ollama download page. Install Ollama, then click Refresh.'
-        : 'Please install Ollama manually, then click Refresh.',
-  };
+  return { success: true, message: 'Opened Ollama download page.' };
 }
 
 export async function ensureOllamaRunning(baseUrl = DEFAULT_OLLAMA_BASE): Promise<boolean> {

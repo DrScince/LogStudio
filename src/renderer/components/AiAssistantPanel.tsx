@@ -63,6 +63,7 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
   const listRef = useRef<HTMLDivElement>(null);
   const pendingSeed = useRef<string | null>(null);
   const fileContextRef = useRef<FileContextState>(null);
+  const installerLaunchedRef = useRef(false);
 
   useEffect(() => {
     fileContextRef.current = fileContext;
@@ -137,6 +138,19 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
     void refreshStatus();
   }, [open, refreshStatus]);
 
+  // On first AI use: if Ollama is missing, launch the official installer.
+  useEffect(() => {
+    if (!open || !status || status.installed || status.running) return;
+    if (installerLaunchedRef.current) return;
+    installerLaunchedRef.current = true;
+    void (async () => {
+      setPullInfo(t('ai.launchingInstaller'));
+      const res = await window.electronAPI.ollamaInstall();
+      setPullInfo(res.message || t('ai.installerLaunched'));
+      await refreshStatus();
+    })();
+  }, [open, status, refreshStatus, t]);
+
   useEffect(() => {
     if (!open) return;
     void loadFileContext();
@@ -166,6 +180,13 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
   const ensureModel = async (): Promise<boolean> => {
     const s = await window.electronAPI.ollamaStatus(baseUrl);
     setStatus(s);
+    if (!s.installed && !s.running) {
+      setPullInfo(t('ai.launchingInstaller'));
+      const res = await window.electronAPI.ollamaInstall();
+      setPullInfo(res.message || t('ai.installerLaunched'));
+      await refreshStatus();
+      return false;
+    }
     if (!s.running) {
       const started = await window.electronAPI.ollamaEnsureRunning(baseUrl);
       if (!started.success) {
@@ -327,9 +348,9 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
               disabled={busy}
               onClick={async () => {
                 setBusy(true);
-                setPullInfo(t('ai.installing'));
+                setPullInfo(t('ai.launchingInstaller'));
                 const res = await window.electronAPI.ollamaInstall();
-                setPullInfo(res.message);
+                setPullInfo(res.message || t('ai.installerLaunched'));
                 await refreshStatus();
                 setBusy(false);
               }}
@@ -339,9 +360,9 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
             <button
               type="button"
               className="ai-btn"
-              onClick={() => void window.electronAPI.ollamaOpenDownload()}
+              onClick={() => void refreshStatus()}
             >
-              {t('ai.openDownload')}
+              {t('ai.refresh')}
             </button>
           </div>
         </div>

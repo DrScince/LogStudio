@@ -83,14 +83,6 @@ export interface ElectronAPI {
   onOllamaChatToken: (
     callback: (info: { requestId: string; token: string }) => void
   ) => () => void;
-  aiComponentPreference: () => Promise<{
-    preference: { aiEnabled: boolean; source?: string; pendingChoice?: boolean } | null;
-    needsChoice: boolean;
-  }>;
-  aiComponentSet: (aiEnabled: boolean) => Promise<{
-    success: boolean;
-    install?: { success: boolean; message: string };
-  }>;
 }
 
 declare global {

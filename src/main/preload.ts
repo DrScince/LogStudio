@@ -136,14 +136,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('ollama-chat-token', listener);
     return () => ipcRenderer.removeListener('ollama-chat-token', listener);
   },
-  aiComponentPreference: () =>
-    ipcRenderer.invoke('ai-component-preference') as Promise<{
-      preference: { aiEnabled: boolean; source?: string; pendingChoice?: boolean } | null;
-      needsChoice: boolean;
-    }>,
-  aiComponentSet: (aiEnabled: boolean) =>
-    ipcRenderer.invoke('ai-component-set', aiEnabled) as Promise<{
-      success: boolean;
-      install?: { success: boolean; message: string };
-    }>,
 });

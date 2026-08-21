@@ -8,8 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- **Installer AI choice (Windows NSIS)**: During setup you can pick *Standard (without AI)* or *With AI assistant (Ollama)*. Choosing AI runs the Ollama installer (download ~1.5 GB); the model is pulled on first chat. Portable/AppImage show the same choice on first launch.
-- **Optional offline AI build**: `npm run package:ai` can ship a bundled `vendor/ollama` as `LogStudio-*-ai.exe`.
+- **Local AI assistant (Ollama)**: In-app chat with open-log context. On first use, LogStudio launches the official Ollama installer; the model is pulled on first chat. LogStudio itself stays a normal slim install.
 
 ## [2.10.0] - 2026-08-19
 
