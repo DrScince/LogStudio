@@ -1,4 +1,4 @@
-import { app, shell } from 'electron';
+import { app, shell, net } from 'electron';
 import { spawn, execFile } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -144,8 +144,104 @@ export async function openOllamaDownloadPage(): Promise<void> {
   await shell.openExternal('https://ollama.com/download');
 }
 
-function downloadFile(url: string, dest: string): Promise<void> {
+const OLLAMA_WIN_SETUP_URL = 'https://ollama.com/download/OllamaSetup.exe';
+const OLLAMA_MAC_ZIP_URL = 'https://ollama.com/download/Ollama-darwin.zip';
+
+/** Download via Electron net (Chromium TLS / OS trust store) — avoids Node CA issues. */
+function downloadFileWithElectronNet(url: string, dest: string): Promise<void> {
   return new Promise((resolve, reject) => {
+    try {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+    } catch {
+      /* ignore */
+    }
+    const tmp = `${dest}.part`;
+    try {
+      if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
+    } catch {
+      /* ignore */
+    }
+
+    const request = net.request({ url, method: 'GET', redirect: 'follow' });
+    request.setHeader('User-Agent', 'LogStudio');
+    const out = fs.createWriteStream(tmp);
+
+    request.on('response', (response) => {
+      const code = response.statusCode ?? 0;
+      if (code < 200 || code >= 300) {
+        out.destroy();
+        try {
+          fs.unlinkSync(tmp);
+        } catch {
+          /* ignore */
+        }
+        reject(new Error(`Download failed HTTP ${code}`));
+        return;
+      }
+      response.on('data', (chunk) => {
+        out.write(chunk);
+      });
+      response.on('end', () => {
+        out.end(() => {
+          try {
+            fs.renameSync(tmp, dest);
+            resolve();
+          } catch (err) {
+            reject(err);
+          }
+        });
+      });
+      response.on('error', (err: Error) => {
+        out.destroy();
+        reject(err);
+      });
+    });
+    request.on('error', (err: Error) => {
+      out.destroy();
+      try {
+        fs.unlinkSync(tmp);
+      } catch {
+        /* ignore */
+      }
+      reject(err);
+    });
+    request.end();
+  });
+}
+
+/** Windows fallback: PowerShell uses the system certificate store. */
+function downloadFileWithPowerShell(url: string, dest: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const ps = `
+$ErrorActionPreference = 'Stop'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Invoke-WebRequest -Uri '${url.replace(/'/g, "''")}' -OutFile '${dest.replace(/'/g, "''")}' -UseBasicParsing
+`;
+    execFile(
+      'powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ps],
+      { timeout: 300000, windowsHide: true },
+      (err) => {
+        if (err) reject(err);
+        else resolve();
+      }
+    );
+  });
+}
+
+async function downloadInstaller(url: string, dest: string): Promise<void> {
+  try {
+    await downloadFileWithElectronNet(url, dest);
+    return;
+  } catch (netErr) {
+    console.warn('Electron net download failed, trying fallback…', netErr);
+  }
+  if (process.platform === 'win32') {
+    await downloadFileWithPowerShell(url, dest);
+    return;
+  }
+  // Last resort: Node https (may fail with corporate SSL inspection)
+  await new Promise<void>((resolve, reject) => {
     const follow = (current: string, redirectsLeft: number) => {
       const lib = current.startsWith('https') ? https : http;
       const req = lib.get(current, (res) => {
@@ -156,8 +252,7 @@ function downloadFile(url: string, dest: string): Promise<void> {
             reject(new Error('Too many redirects'));
             return;
           }
-          const next = new URL(res.headers.location, current).toString();
-          follow(next, redirectsLeft - 1);
+          follow(new URL(res.headers.location, current).toString(), redirectsLeft - 1);
           return;
         }
         if (code >= 400) {
@@ -185,18 +280,20 @@ async function launchWindowsOllamaInstaller(): Promise<{ success: boolean; messa
   try {
     const st = await fs.promises.stat(dest).catch(() => null);
     if (!st || st.size < 1_000_000) {
-      await downloadFile('https://ollama.com/download/OllamaSetup.exe', dest);
+      await downloadInstaller(OLLAMA_WIN_SETUP_URL, dest);
     }
-    spawn(dest, [], { detached: true, stdio: 'ignore' }).unref();
+    spawn(dest, [], { detached: true, stdio: 'ignore', windowsHide: false }).unref();
     return {
       success: true,
       message: 'Ollama installer launched. Finish setup, then click Refresh.',
     };
   } catch (err) {
-    await openOllamaDownloadPage();
+    // Browser download uses the system trust store and always works in corporate setups.
+    await shell.openExternal(OLLAMA_WIN_SETUP_URL);
     return {
       success: true,
-      message: `Could not launch installer (${String(err)}). Opened download page instead.`,
+      message:
+        'Could not auto-launch the installer. Your browser should download OllamaSetup.exe — run it, then click Refresh.',
     };
   }
 }
@@ -206,19 +303,19 @@ async function launchMacOllamaInstaller(): Promise<{ success: boolean; message: 
   try {
     const st = await fs.promises.stat(dest).catch(() => null);
     if (!st || st.size < 1_000_000) {
-      await downloadFile('https://ollama.com/download/Ollama-darwin.zip', dest);
+      await downloadInstaller(OLLAMA_MAC_ZIP_URL, dest);
     }
-    // Open the zip/dmg via Finder so the user can install Ollama.app
     await shell.openPath(dest);
     return {
       success: true,
       message: 'Ollama download opened. Install the app, then click Refresh.',
     };
   } catch (err) {
-    await openOllamaDownloadPage();
+    await shell.openExternal(OLLAMA_MAC_ZIP_URL);
     return {
       success: true,
-      message: `Could not download installer (${String(err)}). Opened download page instead.`,
+      message:
+        'Could not auto-download. Your browser should fetch Ollama — install it, then click Refresh.',
     };
   }
 }

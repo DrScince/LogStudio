@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.11.0-beta.2] - 2026-08-21
+
+### Fixed
+- **Ollama installer download**: Use Electron/Chromium TLS (and PowerShell fallback on Windows) so corporate SSL inspection no longer blocks launching the installer (`unable to get local issuer certificate`).
+
 ## [2.11.0-beta.1] - 2026-08-21
 
 ### Added
