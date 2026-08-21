@@ -800,7 +800,12 @@ ipcMain.handle('ollama-status', async (_event, baseUrl?: string) => {
 });
 
 ipcMain.handle('ollama-install', async () => {
-  return installOllama();
+  try {
+    return await installOllama();
+  } catch (err) {
+    console.error('ollama-install IPC failed', err);
+    return { success: false, message: String(err) };
+  }
 });
 
 ipcMain.handle('ollama-open-download', async () => {

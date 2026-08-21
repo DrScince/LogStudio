@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.11.0-beta.3] - 2026-08-21
+
+### Fixed
+- **Ollama installer on Windows**: No longer writes the setup EXE into `%TEMP%` from Electron (caused `EPERM` / main-process crash under AV). Uses PowerShell download into Downloads + launch, with browser fallback. Errors are caught so LogStudio stays open.
+
 ## [2.11.0-beta.2] - 2026-08-21
 
 ### Fixed

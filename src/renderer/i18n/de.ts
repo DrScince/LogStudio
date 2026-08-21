@@ -208,7 +208,7 @@ const de: TranslationKeys = {
       'Ollama fehlt noch. Beim ersten Nutzen öffnet sich der Ollama-Installer. Danach hier auf Aktualisieren tippen.',
     install: 'Ollama-Installer starten',
     installing: 'Installer wird vorbereitet…',
-    launchingInstaller: 'Ollama-Installer wird gestartet…',
+    launchingInstaller: 'Ollama-Installer wird vorbereitet (Download kann einen Moment dauern)…',
     installerLaunched: 'Installer gestartet. Nach der Installation auf Aktualisieren tippen.',
     openDownload: 'Download-Seite öffnen',
     modelMissing: 'Modell {{model}} fehlt noch.',

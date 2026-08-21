@@ -1,4 +1,4 @@
-import { app, shell, net } from 'electron';
+import { app, shell } from 'electron';
 import { spawn, execFile } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -147,80 +147,41 @@ export async function openOllamaDownloadPage(): Promise<void> {
 const OLLAMA_WIN_SETUP_URL = 'https://ollama.com/download/OllamaSetup.exe';
 const OLLAMA_MAC_ZIP_URL = 'https://ollama.com/download/Ollama-darwin.zip';
 
-/** Download via Electron net (Chromium TLS / OS trust store) — avoids Node CA issues. */
-function downloadFileWithElectronNet(url: string, dest: string): Promise<void> {
+function installerDownloadDir(): string {
+  // Prefer Downloads / userData — %TEMP% is often blocked for .exe by AV / policy (EPERM).
+  try {
+    const downloads = app.getPath('downloads');
+    if (downloads) return downloads;
+  } catch {
+    /* ignore */
+  }
+  return path.join(app.getPath('userData'), 'ollama-setup');
+}
+
+/** Windows: download + launch entirely via PowerShell (system certs, no Electron file locks). */
+function downloadAndLaunchWithPowerShell(url: string, dest: string): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
       fs.mkdirSync(path.dirname(dest), { recursive: true });
     } catch {
       /* ignore */
     }
-    const tmp = `${dest}.part`;
-    try {
-      if (fs.existsSync(tmp)) fs.unlinkSync(tmp);
-    } catch {
-      /* ignore */
-    }
-
-    const request = net.request({ url, method: 'GET', redirect: 'follow' });
-    request.setHeader('User-Agent', 'LogStudio');
-    const out = fs.createWriteStream(tmp);
-
-    request.on('response', (response) => {
-      const code = response.statusCode ?? 0;
-      if (code < 200 || code >= 300) {
-        out.destroy();
-        try {
-          fs.unlinkSync(tmp);
-        } catch {
-          /* ignore */
-        }
-        reject(new Error(`Download failed HTTP ${code}`));
-        return;
-      }
-      response.on('data', (chunk) => {
-        out.write(chunk);
-      });
-      response.on('end', () => {
-        out.end(() => {
-          try {
-            fs.renameSync(tmp, dest);
-            resolve();
-          } catch (err) {
-            reject(err);
-          }
-        });
-      });
-      response.on('error', (err: Error) => {
-        out.destroy();
-        reject(err);
-      });
-    });
-    request.on('error', (err: Error) => {
-      out.destroy();
-      try {
-        fs.unlinkSync(tmp);
-      } catch {
-        /* ignore */
-      }
-      reject(err);
-    });
-    request.end();
-  });
-}
-
-/** Windows fallback: PowerShell uses the system certificate store. */
-function downloadFileWithPowerShell(url: string, dest: string): Promise<void> {
-  return new Promise((resolve, reject) => {
     const ps = `
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-Invoke-WebRequest -Uri '${url.replace(/'/g, "''")}' -OutFile '${dest.replace(/'/g, "''")}' -UseBasicParsing
+$dest = '${dest.replace(/'/g, "''")}'
+$uri = '${url.replace(/'/g, "''")}'
+$dir = Split-Path -Parent $dest
+if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+if (-not (Test-Path $dest) -or (Get-Item $dest).Length -lt 1000000) {
+  Invoke-WebRequest -Uri $uri -OutFile $dest -UseBasicParsing
+}
+Start-Process -FilePath $dest
 `;
     execFile(
       'powershell.exe',
       ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ps],
-      { timeout: 300000, windowsHide: true },
+      { timeout: 600000, windowsHide: true },
       (err) => {
         if (err) reject(err);
         else resolve();
@@ -229,152 +190,124 @@ Invoke-WebRequest -Uri '${url.replace(/'/g, "''")}' -OutFile '${dest.replace(/'/
   });
 }
 
-async function downloadInstaller(url: string, dest: string): Promise<void> {
-  try {
-    await downloadFileWithElectronNet(url, dest);
-    return;
-  } catch (netErr) {
-    console.warn('Electron net download failed, trying fallback…', netErr);
-  }
-  if (process.platform === 'win32') {
-    await downloadFileWithPowerShell(url, dest);
-    return;
-  }
-  // Last resort: Node https (may fail with corporate SSL inspection)
-  await new Promise<void>((resolve, reject) => {
-    const follow = (current: string, redirectsLeft: number) => {
-      const lib = current.startsWith('https') ? https : http;
-      const req = lib.get(current, (res) => {
-        const code = res.statusCode ?? 0;
-        if ([301, 302, 303, 307, 308].includes(code) && res.headers.location) {
-          res.resume();
-          if (redirectsLeft <= 0) {
-            reject(new Error('Too many redirects'));
-            return;
-          }
-          follow(new URL(res.headers.location, current).toString(), redirectsLeft - 1);
-          return;
-        }
-        if (code >= 400) {
-          res.resume();
-          reject(new Error(`Download failed HTTP ${code}`));
-          return;
-        }
-        const out = fs.createWriteStream(dest);
-        res.pipe(out);
-        out.on('finish', () => out.close(() => resolve()));
-        out.on('error', reject);
-      });
-      req.on('error', reject);
-      req.setTimeout(120000, () => {
-        req.destroy();
-        reject(new Error('Download timed out'));
-      });
-    };
-    follow(url, 8);
-  });
-}
-
+/**
+ * On Windows we intentionally avoid writing the .exe from Electron/Node
+ * (Temp + AV often causes EPERM / uncaught exceptions). PowerShell or the
+ * browser download are more reliable in corporate environments.
+ */
 async function launchWindowsOllamaInstaller(): Promise<{ success: boolean; message: string }> {
-  const dest = path.join(app.getPath('temp'), 'OllamaSetup-LogStudio.exe');
+  const dest = path.join(installerDownloadDir(), 'OllamaSetup-LogStudio.exe');
   try {
-    const st = await fs.promises.stat(dest).catch(() => null);
-    if (!st || st.size < 1_000_000) {
-      await downloadInstaller(OLLAMA_WIN_SETUP_URL, dest);
-    }
-    spawn(dest, [], { detached: true, stdio: 'ignore', windowsHide: false }).unref();
+    await downloadAndLaunchWithPowerShell(OLLAMA_WIN_SETUP_URL, dest);
     return {
       success: true,
       message: 'Ollama installer launched. Finish setup, then click Refresh.',
     };
   } catch (err) {
-    // Browser download uses the system trust store and always works in corporate setups.
-    await shell.openExternal(OLLAMA_WIN_SETUP_URL);
-    return {
-      success: true,
-      message:
-        'Could not auto-launch the installer. Your browser should download OllamaSetup.exe — run it, then click Refresh.',
-    };
+    console.warn('PowerShell Ollama install failed, opening browser download…', err);
+    try {
+      await shell.openExternal(OLLAMA_WIN_SETUP_URL);
+      return {
+        success: true,
+        message:
+          'Browser download started (OllamaSetup.exe). Run the installer, then click Refresh here.',
+      };
+    } catch (openErr) {
+      await openOllamaDownloadPage();
+      return {
+        success: false,
+        message: `Could not start Ollama setup (${String(openErr)}). Opened the download page.`,
+      };
+    }
   }
 }
 
 async function launchMacOllamaInstaller(): Promise<{ success: boolean; message: string }> {
-  const dest = path.join(app.getPath('temp'), 'Ollama-darwin.zip');
   try {
-    const st = await fs.promises.stat(dest).catch(() => null);
-    if (!st || st.size < 1_000_000) {
-      await downloadInstaller(OLLAMA_MAC_ZIP_URL, dest);
-    }
-    await shell.openPath(dest);
-    return {
-      success: true,
-      message: 'Ollama download opened. Install the app, then click Refresh.',
-    };
-  } catch (err) {
     await shell.openExternal(OLLAMA_MAC_ZIP_URL);
     return {
       success: true,
-      message:
-        'Could not auto-download. Your browser should fetch Ollama — install it, then click Refresh.',
+      message: 'Ollama download opened in your browser. Install the app, then click Refresh.',
+    };
+  } catch (err) {
+    await openOllamaDownloadPage();
+    return {
+      success: false,
+      message: `Could not open download (${String(err)}). Opened the Ollama website.`,
     };
   }
 }
 
 /**
  * Launch the platform Ollama installer when the user starts using AI.
- * Does not silently install — the official installer UI should appear.
+ * Must never throw — failures are returned as messages.
  */
 export async function installOllama(): Promise<{ success: boolean; message: string }> {
-  if (await isOllamaBinaryPresent()) {
-    const running = await ensureOllamaRunning();
+  try {
+    if (await isOllamaBinaryPresent()) {
+      const running = await ensureOllamaRunning();
+      return {
+        success: true,
+        message: running
+          ? 'Ollama is already installed and running.'
+          : 'Ollama is installed. Starting service…',
+      };
+    }
+
+    if (process.platform === 'win32') {
+      return await launchWindowsOllamaInstaller();
+    }
+    if (process.platform === 'darwin') {
+      return await launchMacOllamaInstaller();
+    }
+    if (process.platform === 'linux') {
+      return await new Promise((resolve) => {
+        const child = spawn('bash', ['-lc', 'curl -fsSL https://ollama.com/install.sh | sh'], {
+          env: process.env,
+        });
+        let out = '';
+        child.stdout.on('data', (d) => {
+          out += d.toString();
+        });
+        child.stderr.on('data', (d) => {
+          out += d.toString();
+        });
+        child.on('close', (code) => {
+          if (code === 0) {
+            const bin = resolveOllamaBinary() || 'ollama';
+            spawn(bin, ['serve'], { detached: true, stdio: 'ignore' }).unref();
+            resolve({ success: true, message: out.slice(-500) || 'Ollama installed' });
+          } else {
+            void openOllamaDownloadPage().then(() =>
+              resolve({
+                success: false,
+                message: out.slice(-800) || `Install failed (${code}). Opened download page.`,
+              })
+            );
+          }
+        });
+        child.on('error', (err) => {
+          void openOllamaDownloadPage().then(() =>
+            resolve({ success: false, message: String(err) })
+          );
+        });
+      });
+    }
+
+    await openOllamaDownloadPage();
+    return { success: true, message: 'Opened Ollama download page.' };
+  } catch (err) {
+    console.error('installOllama failed', err);
+    try {
+      await openOllamaDownloadPage();
+    } catch {
+      /* ignore */
+    }
     return {
-      success: true,
-      message: running ? 'Ollama is already installed and running.' : 'Ollama is installed. Starting service…',
+      success: false,
+      message: `Setup failed (${String(err)}). Opened the Ollama download page if possible.`,
     };
   }
-
-  if (process.platform === 'win32') {
-    return launchWindowsOllamaInstaller();
-  }
-  if (process.platform === 'darwin') {
-    return launchMacOllamaInstaller();
-  }
-  if (process.platform === 'linux') {
-    return await new Promise((resolve) => {
-      const child = spawn('bash', ['-lc', 'curl -fsSL https://ollama.com/install.sh | sh'], {
-        env: process.env,
-      });
-      let out = '';
-      child.stdout.on('data', (d) => {
-        out += d.toString();
-      });
-      child.stderr.on('data', (d) => {
-        out += d.toString();
-      });
-      child.on('close', (code) => {
-        if (code === 0) {
-          const bin = resolveOllamaBinary() || 'ollama';
-          spawn(bin, ['serve'], { detached: true, stdio: 'ignore' }).unref();
-          resolve({ success: true, message: out.slice(-500) || 'Ollama installed' });
-        } else {
-          void openOllamaDownloadPage().then(() =>
-            resolve({
-              success: false,
-              message: out.slice(-800) || `Install failed (${code}). Opened download page.`,
-            })
-          );
-        }
-      });
-      child.on('error', (err) => {
-        void openOllamaDownloadPage().then(() =>
-          resolve({ success: false, message: String(err) })
-        );
-      });
-    });
-  }
-
-  await openOllamaDownloadPage();
-  return { success: true, message: 'Opened Ollama download page.' };
 }
 
 export async function ensureOllamaRunning(baseUrl = DEFAULT_OLLAMA_BASE): Promise<boolean> {
