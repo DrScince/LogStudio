@@ -55,6 +55,33 @@ export interface ElectronAPI {
   removeFilesDroppedListener: () => void;
   onOpenFileFromCli: (callback: (filePath: string) => void) => void;
   removeOpenFileFromCliListener: () => void;
+  ollamaStatus: (baseUrl?: string) => Promise<{
+    installed: boolean;
+    running: boolean;
+    baseUrl: string;
+    version?: string;
+    models: string[];
+    error?: string;
+  }>;
+  ollamaInstall: () => Promise<{ success: boolean; message: string }>;
+  ollamaOpenDownload: () => Promise<{ success: boolean }>;
+  ollamaEnsureRunning: (baseUrl?: string) => Promise<{ success: boolean }>;
+  ollamaPullModel: (
+    model?: string,
+    baseUrl?: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  onOllamaPullProgress: (
+    callback: (info: { model: string; status: string; percent?: number }) => void
+  ) => () => void;
+  ollamaChat: (payload: {
+    model?: string;
+    baseUrl?: string;
+    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+    requestId?: string;
+  }) => Promise<{ success: boolean; content?: string; error?: string; requestId?: string }>;
+  onOllamaChatToken: (
+    callback: (info: { requestId: string; token: string }) => void
+  ) => () => void;
 }
 
 declare global {

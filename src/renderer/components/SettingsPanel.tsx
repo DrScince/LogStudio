@@ -928,6 +928,44 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                   {renderHotkeyGroup(t('settings.hotkeyGroupEditor'), EDITOR_HOTKEYS)}
                   {renderHotkeyGroup(t('settings.hotkeyGroupSearch'), SEARCH_HOTKEYS)}
                 </section>
+
+                <section className="settings-section">
+                  <h3>{t('settings.aiTitle')}</h3>
+                  <p className="settings-help-text">{t('settings.aiHelp')}</p>
+                  <label className="settings-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={!!localSettings.aiEnabled}
+                      onChange={(e) =>
+                        setLocalSettings({ ...localSettings, aiEnabled: e.target.checked })
+                      }
+                    />
+                    <span>{t('settings.aiEnabled')}</span>
+                  </label>
+                  <div className="form-group" style={{ marginTop: 12 }}>
+                    <label>{t('settings.aiModel')}</label>
+                    <select
+                      value={localSettings.aiModel || 'llama3.2:3b'}
+                      onChange={(e) =>
+                        setLocalSettings({ ...localSettings, aiModel: e.target.value })
+                      }
+                    >
+                      <option value="llama3.2:3b">llama3.2:3b (~2 GB)</option>
+                      <option value="qwen2.5:7b">qwen2.5:7b (~4–5 GB)</option>
+                      <option value="llama3.1:8b">llama3.1:8b (~4–5 GB)</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginTop: 12 }}>
+                    <label>{t('settings.aiBaseUrl')}</label>
+                    <input
+                      type="text"
+                      value={localSettings.aiBaseUrl || 'http://127.0.0.1:11434'}
+                      onChange={(e) =>
+                        setLocalSettings({ ...localSettings, aiBaseUrl: e.target.value })
+                      }
+                    />
+                  </div>
+                </section>
               </div>
             )}
 

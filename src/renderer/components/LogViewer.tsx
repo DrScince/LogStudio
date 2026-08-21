@@ -26,6 +26,7 @@ interface LogViewerProps {
   selectedNamespaces: string[];
   onNamespacesChange: (namespaces: string[], counts?: Record<string, number>) => void;
   onResetFilters?: () => void;
+  onAskAi?: (entry: LogEntry) => void;
   editorOrder?: string[];
   autoDetect?: boolean;
   enabledFormats?: string[];
@@ -110,6 +111,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
   selectedNamespaces,
   onNamespacesChange,
   onResetFilters,
+  onAskAi,
   editorOrder,
   autoDetect = true,
   enabledFormats,
@@ -1835,6 +1837,17 @@ const LogViewer: React.FC<LogViewerProps> = ({
           >
             {t('app.openInEditor')}
           </button>
+          {onAskAi && (
+            <button
+              className="log-context-menu-item"
+              onClick={() => {
+                onAskAi(logContextMenu.entry);
+                setLogContextMenu(null);
+              }}
+            >
+              {t('app.askAi')}
+            </button>
+          )}
           {filePaths && filePaths.length > 1 && logContextMenu.entry.sourceFile && (
             <div className="log-context-menu-info">
               📄 {logContextMenu.entry.sourceFile.split(/[/\\]/).pop()}

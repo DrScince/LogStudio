@@ -81,6 +81,9 @@ export interface AppSettings {
   enabledFormats: string[];
   includeSubdirectories: boolean;
   hotkeys: HotkeyMap;
+  aiEnabled: boolean;
+  aiModel: string;
+  aiBaseUrl: string;
 }
 
 const DEFAULT_WORKSPACE_ID = 'default-workspace';
@@ -103,6 +106,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   enabledFormats: ['pipe', 'log4j', 'json', 'logfmt', 'syslog', 'apache', 'german'],
   includeSubdirectories: false,
   hotkeys: DEFAULT_HOTKEYS,
+  aiEnabled: true,
+  aiModel: 'llama3.2:3b',
+  aiBaseUrl: 'http://127.0.0.1:11434',
 };
 
 export function loadSettings(): AppSettings {
@@ -120,6 +126,9 @@ export function loadSettings(): AppSettings {
         directoryMeta: parsed.directoryMeta ?? {},
         workspaces: parsed.workspaces ?? [],
         activeWorkspaceId: parsed.activeWorkspaceId ?? '',
+        aiEnabled: parsed.aiEnabled ?? DEFAULT_SETTINGS.aiEnabled,
+        aiModel: parsed.aiModel || DEFAULT_SETTINGS.aiModel,
+        aiBaseUrl: parsed.aiBaseUrl || DEFAULT_SETTINGS.aiBaseUrl,
       };
       // Migration: legacy single logDirectory → logDirectories list
       if (base.logDirectory && base.logDirectories.length === 0) {

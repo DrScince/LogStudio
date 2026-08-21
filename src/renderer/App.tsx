@@ -12,7 +12,9 @@ import SettingsPanel from './components/SettingsPanel';
 import AboutPanel from './components/AboutPanel';
 import TitleBar from './components/TitleBar';
 import Toast from './components/Toast';
+import AiAssistantPanel, { buildAskPromptFromLog, AiSeedContext } from './components/AiAssistantPanel';
 import { loadSettings, saveSettings, AppSettings, DirectoryMeta } from './utils/settings';
+import { LogEntry } from './types/log';
 import {
   createWorkspace,
   createVirtualFolder,
@@ -44,6 +46,8 @@ function App() {
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showAiAssistant, setShowAiAssistant] = useState(false);
+  const [aiSeed, setAiSeed] = useState<AiSeedContext | null>(null);
   const [resetFilterTrigger, setResetFilterTrigger] = useState(0);
   const [isFileSidebarCollapsed, setIsFileSidebarCollapsed] = useState(false);
   const [activeDirectory, setActiveDirectory] = useState<string>(() => {
@@ -1062,6 +1066,12 @@ function App() {
         onAboutClick={() => setShowAbout(!showAbout)}
         onThemeToggle={handleThemeToggle}
         onCheckForUpdates={handleCheckForUpdates}
+        onAiClick={
+          settings.aiEnabled
+            ? () => setShowAiAssistant((v) => !v)
+            : undefined
+        }
+        aiActive={showAiAssistant}
         currentTheme={settings.theme}
         checkingForUpdates={checkingForUpdates}
         updateAvailable={updateState !== null}
@@ -1230,6 +1240,17 @@ function App() {
               selectedNamespaces={selectedNamespaces}
               onNamespacesChange={handleNamespacesChange}
               onResetFilters={handleResetFilters}
+              onAskAi={
+                settings.aiEnabled
+                  ? (entry: LogEntry) => {
+                      setAiSeed({
+                        title: entry.message,
+                        prompt: buildAskPromptFromLog(entry),
+                      });
+                      setShowAiAssistant(true);
+                    }
+                  : undefined
+              }
               editorOrder={settings.editorOrder}
               autoDetect={settings.autoDetect}
               enabledFormats={settings.enabledFormats}
@@ -1244,6 +1265,16 @@ function App() {
               isVisible={!!currentLogFile || !!(currentLogFiles && currentLogFiles.length > 0)}
             />
           </>
+        )}
+        {settings.aiEnabled && (
+          <AiAssistantPanel
+            open={showAiAssistant}
+            onClose={() => setShowAiAssistant(false)}
+            model={settings.aiModel || 'llama3.2:3b'}
+            baseUrl={settings.aiBaseUrl || 'http://127.0.0.1:11434'}
+            seed={aiSeed}
+            onSeedConsumed={() => setAiSeed(null)}
+          />
         )}
       </div>
       {showSettings && (
