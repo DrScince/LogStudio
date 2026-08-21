@@ -137,7 +137,8 @@ const de: TranslationKeys = {
     hotkeys: 'Tastenkürzel',
     hotkeysHelp: 'Feld anklicken und gewünschte Tastenkombination drücken. Akkord-Kürzel nutzen Ctrl+K gefolgt von einer zweiten Taste.',
     aiTitle: 'KI-Assistent (Ollama)',
-    aiHelp: 'Lokaler Test-Assistent ohne Cloud-Kosten. Ollama muss installiert sein.',
+    aiHelp:
+      'Lokaler Assistent ohne Cloud-Kosten. Beim Setup kannst du „mit“ oder „ohne KI“ wählen; hier später änderbar. Ollama wird bei Bedarf installiert.',
     aiEnabled: 'KI-Assistent aktivieren',
     aiModel: 'Modell',
     aiBaseUrl: 'Ollama URL',
@@ -225,6 +226,15 @@ const de: TranslationKeys = {
     placeholder: 'Frage zu Logs / Fehlern…',
     send: 'Senden',
     thinking: 'Denkt…',
+    installChoiceTitle: 'LogStudio Installation',
+    installChoiceLead:
+      'Möchtest du den lokalen KI-Assistenten (Ollama) mitnutzen? Das entscheidet über zwei Installationspfade.',
+    installChoiceWithout: 'Standard – ohne KI',
+    installChoiceWithoutDesc: 'Nur LogStudio. KI später jederzeit in den Einstellungen aktivierbar.',
+    installChoiceWith: 'Mit KI-Assistent',
+    installChoiceWithDesc:
+      'Installiert/nutzt Ollama lokal (~1,5 GB Download). Das Modell (~2 GB) kommt beim ersten Chat.',
+    installChoiceWorking: 'Einrichtung läuft…',
   },
   logviewer: {
     entries: '{{filtered}} / {{total}} Einträge',

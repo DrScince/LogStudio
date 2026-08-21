@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Installer AI choice (Windows NSIS)**: During setup you can pick *Standard (without AI)* or *With AI assistant (Ollama)*. Choosing AI runs the Ollama installer (download ~1.5 GB); the model is pulled on first chat. Portable/AppImage show the same choice on first launch.
+- **Optional offline AI build**: `npm run package:ai` can ship a bundled `vendor/ollama` as `LogStudio-*-ai.exe`.
+
 ## [2.10.0] - 2026-08-19
 
 ### Added

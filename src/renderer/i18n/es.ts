@@ -136,7 +136,7 @@ const es: TranslationKeys = {
     hotkeys: 'Atajos de teclado',
     hotkeysHelp: 'Haga clic en un campo y pulse la combinación de teclas deseada.',
     aiTitle: 'Asistente IA (Ollama)',
-    aiHelp: 'Asistente local de prueba sin coste cloud. Se necesita Ollama.',
+    aiHelp: 'Asistente local sin coste cloud. En el instalador eliges con/sin IA; luego en Ajustes. Ollama se instala si hace falta.',
     aiEnabled: 'Activar asistente IA',
     aiModel: 'Modelo',
     aiBaseUrl: 'URL de Ollama',
@@ -224,6 +224,15 @@ const es: TranslationKeys = {
     placeholder: 'Pregunta sobre logs / errores…',
     send: 'Enviar',
     thinking: 'Pensando…',
+    installChoiceTitle: 'Instalación de LogStudio',
+    installChoiceLead:
+      '¿Quieres el asistente IA local (Ollama)? Son dos rutas de instalación.',
+    installChoiceWithout: 'Estándar – sin IA',
+    installChoiceWithoutDesc: 'Solo LogStudio. Puedes activar la IA después en Ajustes.',
+    installChoiceWith: 'Con asistente IA',
+    installChoiceWithDesc:
+      'Instala/usa Ollama localmente (~1,5 GB). El modelo (~2 GB) se descarga en el primer chat.',
+    installChoiceWorking: 'Configurando…',
   },
   logviewer: {
     entries: '{{filtered}} / {{total}} Entradas',

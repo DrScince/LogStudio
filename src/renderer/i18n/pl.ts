@@ -137,7 +137,7 @@ const pl: TranslationKeys = {
     hotkeys: 'Skróty klawiszowe',
     hotkeysHelp: 'Kliknij pole i naciśnij żądaną kombinację klawiszy.',
     aiTitle: 'Asystent AI (Ollama)',
-    aiHelp: 'Lokalny asystent testowy bez kosztów chmury. Wymagane Ollama.',
+    aiHelp: 'Lokalny asystent bez kosztów chmury. Instalator: z AI lub bez; później w ustawieniach. Ollama instaluje się w razie potrzeby.',
     aiEnabled: 'Włącz asystenta AI',
     aiModel: 'Model',
     aiBaseUrl: 'URL Ollama',
@@ -225,6 +225,15 @@ const pl: TranslationKeys = {
     placeholder: 'Pytanie o logi / błędy…',
     send: 'Wyślij',
     thinking: 'Myślę…',
+    installChoiceTitle: 'Instalacja LogStudio',
+    installChoiceLead:
+      'Czy chcesz lokalnego asystenta AI (Ollama)? To dwa ścieżki instalacji.',
+    installChoiceWithout: 'Standard – bez AI',
+    installChoiceWithoutDesc: 'Tylko LogStudio. AI włączysz później w ustawieniach.',
+    installChoiceWith: 'Z asystentem AI',
+    installChoiceWithDesc:
+      'Instaluje/używa Ollama lokalnie (~1,5 GB). Model (~2 GB) pobiera się przy pierwszym czacie.',
+    installChoiceWorking: 'Konfiguracja…',
   },
   logviewer: {
     entries: '{{filtered}} / {{total}} Wpisów',

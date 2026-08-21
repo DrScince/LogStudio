@@ -13,6 +13,7 @@ import AboutPanel from './components/AboutPanel';
 import TitleBar from './components/TitleBar';
 import Toast from './components/Toast';
 import AiAssistantPanel, { buildAskPromptFromLog, AiSeedContext } from './components/AiAssistantPanel';
+import AiInstallChoice from './components/AiInstallChoice';
 import { loadSettings, saveSettings, AppSettings, DirectoryMeta } from './utils/settings';
 import { LogEntry } from './types/log';
 import {
@@ -48,6 +49,7 @@ function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showAiAssistant, setShowAiAssistant] = useState(false);
   const [aiSeed, setAiSeed] = useState<AiSeedContext | null>(null);
+  const [showAiInstallChoice, setShowAiInstallChoice] = useState(false);
   const [resetFilterTrigger, setResetFilterTrigger] = useState(0);
   const [isFileSidebarCollapsed, setIsFileSidebarCollapsed] = useState(false);
   const [activeDirectory, setActiveDirectory] = useState<string>(() => {
@@ -96,6 +98,26 @@ function App() {
     const root = document.documentElement;
     root.style.setProperty('--base-font-size', `${settings.fontSize}px`);
   }, [settings.fontSize]);
+
+  // Installer / first-run AI component choice (with vs without KI)
+  useEffect(() => {
+    void (async () => {
+      if (!window.electronAPI?.aiComponentPreference) return;
+      const { preference, needsChoice } = await window.electronAPI.aiComponentPreference();
+      const hasStoredSettings = !!localStorage.getItem('logstudio-settings');
+      if (needsChoice && !hasStoredSettings) {
+        setShowAiInstallChoice(true);
+        return;
+      }
+      if (!hasStoredSettings && preference && typeof preference.aiEnabled === 'boolean') {
+        setSettings((prev) => {
+          const next = { ...prev, aiEnabled: preference.aiEnabled };
+          saveSettings(next);
+          return next;
+        });
+      }
+    })();
+  }, []);
 
   // Active tab
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
@@ -1279,6 +1301,19 @@ function App() {
           />
         )}
       </div>
+      {showAiInstallChoice && (
+        <AiInstallChoice
+          onChoose={async (aiEnabled) => {
+            await window.electronAPI?.aiComponentSet?.(aiEnabled);
+            setSettings((prev) => {
+              const next = { ...prev, aiEnabled };
+              saveSettings(next);
+              return next;
+            });
+            setShowAiInstallChoice(false);
+          }}
+        />
+      )}
       {showSettings && (
         <SettingsPanel
           settings={settings}

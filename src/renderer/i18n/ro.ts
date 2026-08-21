@@ -136,7 +136,7 @@ const ro: TranslationKeys = {
     hotkeys: 'Scurtături tastatură',
     hotkeysHelp: 'Faceți clic pe un câmp și apăsați combinația de taste dorită.',
     aiTitle: 'Asistent AI (Ollama)',
-    aiHelp: 'Asistent local de test fără cost cloud. Este necesar Ollama.',
+    aiHelp: 'Asistent local fără cost cloud. La instalare alegi cu/fără AI; ulterior în Setări. Ollama se instalează la nevoie.',
     aiEnabled: 'Activează asistentul AI',
     aiModel: 'Model',
     aiBaseUrl: 'URL Ollama',
@@ -224,6 +224,15 @@ const ro: TranslationKeys = {
     placeholder: 'Întrebare despre loguri / erori…',
     send: 'Trimite',
     thinking: 'Gândesc…',
+    installChoiceTitle: 'Instalare LogStudio',
+    installChoiceLead:
+      'Vrei asistentul AI local (Ollama)? Sunt două căi de instalare.',
+    installChoiceWithout: 'Standard – fără AI',
+    installChoiceWithoutDesc: 'Doar LogStudio. Poți activa AI ulterior în Setări.',
+    installChoiceWith: 'Cu asistent AI',
+    installChoiceWithDesc:
+      'Instalează/folosește Ollama local (~1,5 GB). Modelul (~2 GB) se descarcă la primul chat.',
+    installChoiceWorking: 'Se configurează…',
   },
   logviewer: {
     entries: '{{filtered}} / {{total}} Intrări',

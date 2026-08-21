@@ -1,0 +1,28 @@
+{
+  "extends": "./electron-builder.json",
+  "extraResources": [
+    {
+      "from": "scripts/install-ollama-windows.ps1",
+      "to": "scripts/install-ollama-windows.ps1"
+    },
+    {
+      "from": "vendor/ollama",
+      "to": "ollama",
+      "filter": ["**/*"]
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "artifactName": "${productName}-${version}-${arch}-ai.${ext}"
+  },
+  "nsis": {
+    "artifactName": "${productName}-${version}-${arch}-ai.${ext}",
+    "shortcutName": "LogStudio (AI)",
+    "include": "installer.nsh"
+  }
+}

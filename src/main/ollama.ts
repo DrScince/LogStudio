@@ -4,9 +4,27 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
+import { getBundledOllamaBinary } from './aiComponent';
 
 export const DEFAULT_OLLAMA_BASE = 'http://127.0.0.1:11434';
 export const DEFAULT_OLLAMA_MODEL = 'llama3.2:3b';
+
+function resolveOllamaBinary(): string | null {
+  const bundled = getBundledOllamaBinary();
+  if (bundled) return bundled;
+  if (process.platform === 'win32') {
+    const local = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Ollama', 'ollama.exe');
+    const prog = path.join(process.env.ProgramFiles || '', 'Ollama', 'ollama.exe');
+    if (fs.existsSync(local)) return local;
+    if (fs.existsSync(prog)) return prog;
+  }
+  if (process.platform === 'linux' || process.platform === 'darwin') {
+    for (const c of ['/usr/local/bin/ollama', '/usr/bin/ollama', path.join(app.getPath('home'), '.local', 'bin', 'ollama')]) {
+      if (fs.existsSync(c)) return c;
+    }
+  }
+  return null;
+}
 
 export type OllamaStatus = {
   installed: boolean;
@@ -91,21 +109,13 @@ export async function getOllamaStatus(baseUrl = DEFAULT_OLLAMA_BASE): Promise<Ol
 }
 
 async function isOllamaBinaryPresent(): Promise<boolean> {
-  const candidates = [
-    'ollama',
-    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Ollama', 'ollama.exe'),
-    path.join(process.env.ProgramFiles || '', 'Ollama', 'ollama.exe'),
-    '/usr/local/bin/ollama',
-    '/usr/bin/ollama',
-    path.join(app.getPath('home'), '.local', 'bin', 'ollama'),
-  ];
-  for (const c of candidates) {
-    if (!c || c === 'ollama') continue;
+  const resolved = resolveOllamaBinary();
+  if (resolved) {
     try {
-      await fs.promises.access(c, fs.constants.X_OK);
+      await fs.promises.access(resolved, fs.constants.F_OK);
       return true;
     } catch {
-      /* continue */
+      /* fall through */
     }
   }
   return await new Promise((resolve) => {
@@ -157,8 +167,9 @@ export async function installOllama(): Promise<{ success: boolean; message: stri
 export async function ensureOllamaRunning(baseUrl = DEFAULT_OLLAMA_BASE): Promise<boolean> {
   const status = await getOllamaStatus(baseUrl);
   if (status.running) return true;
+  const bin = resolveOllamaBinary() || 'ollama';
   try {
-    spawn('ollama', ['serve'], { detached: true, stdio: 'ignore' }).unref();
+    spawn(bin, ['serve'], { detached: true, stdio: 'ignore' }).unref();
   } catch {
     return false;
   }

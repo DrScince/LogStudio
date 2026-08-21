@@ -139,7 +139,8 @@ const en = {
     hotkeys: 'Keyboard shortcuts',
     hotkeysHelp: 'Click a field and press the desired key combination. Chord shortcuts use Ctrl+K followed by a second key.',
     aiTitle: 'AI assistant (Ollama)',
-    aiHelp: 'Local test assistant with no cloud cost. Ollama must be installed.',
+    aiHelp:
+      'Local assistant with no cloud cost. The installer lets you choose with or without AI; change it here later. Ollama is installed when needed.',
     aiEnabled: 'Enable AI assistant',
     aiModel: 'Model',
     aiBaseUrl: 'Ollama URL',
@@ -229,6 +230,15 @@ const en = {
     placeholder: 'Ask about logs / errors…',
     send: 'Send',
     thinking: 'Thinking…',
+    installChoiceTitle: 'LogStudio installation',
+    installChoiceLead:
+      'Do you want the local AI assistant (Ollama)? This chooses between two install paths.',
+    installChoiceWithout: 'Standard – without AI',
+    installChoiceWithoutDesc: 'LogStudio only. You can enable AI later in Settings.',
+    installChoiceWith: 'With AI assistant',
+    installChoiceWithDesc:
+      'Installs/uses Ollama locally (~1.5 GB download). The model (~2 GB) downloads on first chat.',
+    installChoiceWorking: 'Setting up…',
   },
   logviewer: {
     entries: '{{filtered}} / {{total}} Entries',
