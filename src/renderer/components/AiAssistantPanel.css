@@ -49,6 +49,30 @@
   border-bottom: 1px solid var(--border-color);
 }
 
+.ai-context {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.ai-context.ok {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+}
+
+.ai-context.missing {
+  color: var(--level-warn, #e8a838);
+}
+
+.ai-context .ai-mini-btn {
+  flex-shrink: 0;
+}
+
 .ai-dot {
   width: 8px;
   height: 8px;

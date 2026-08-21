@@ -1272,6 +1272,8 @@ function App() {
             onClose={() => setShowAiAssistant(false)}
             model={settings.aiModel || 'llama3.2:3b'}
             baseUrl={settings.aiBaseUrl || 'http://127.0.0.1:11434'}
+            filePath={currentLogFile}
+            filePaths={currentLogFiles}
             seed={aiSeed}
             onSeedConsumed={() => setAiSeed(null)}
           />

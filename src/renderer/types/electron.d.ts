@@ -78,6 +78,7 @@ export interface ElectronAPI {
     baseUrl?: string;
     messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
     requestId?: string;
+    fileContext?: { fileName: string; excerpt: string; note?: string };
   }) => Promise<{ success: boolean; content?: string; error?: string; requestId?: string }>;
   onOllamaChatToken: (
     callback: (info: { requestId: string; token: string }) => void

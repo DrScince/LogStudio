@@ -834,13 +834,14 @@ ipcMain.handle(
       baseUrl?: string;
       messages: ChatMessage[];
       requestId?: string;
+      fileContext?: { fileName: string; excerpt: string; note?: string };
     }
   ) => {
     const model = payload.model || DEFAULT_OLLAMA_MODEL;
     const baseUrl = payload.baseUrl || DEFAULT_OLLAMA_BASE;
     const requestId = payload.requestId || `chat-${Date.now()}`;
     const messages: ChatMessage[] = [
-      { role: 'system', content: buildLogAssistantSystemPrompt() },
+      { role: 'system', content: buildLogAssistantSystemPrompt(payload.fileContext) },
       ...(payload.messages || []),
     ];
     const result = await chatWithOllama({

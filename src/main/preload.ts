@@ -129,6 +129,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     baseUrl?: string;
     messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
     requestId?: string;
+    fileContext?: { fileName: string; excerpt: string; note?: string };
   }) => ipcRenderer.invoke('ollama-chat', payload),
   onOllamaChatToken: (callback: (info: { requestId: string; token: string }) => void) => {
     const listener = (_event: unknown, info: { requestId: string; token: string }) => callback(info);

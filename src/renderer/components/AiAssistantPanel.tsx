@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from '../i18n';
+import { buildLogFileExcerpt, fileLabelFromPath } from '../utils/aiLogContext';
 import './AiAssistantPanel.css';
 
 export type AiSeedContext = {
@@ -15,11 +16,22 @@ type UiMessage = {
   content: string;
 };
 
+type FileContextState = {
+  fileName: string;
+  excerpt: string;
+  note: string;
+  truncated: boolean;
+  lineCount: number;
+  totalLines: number;
+} | null;
+
 interface AiAssistantPanelProps {
   open: boolean;
   onClose: () => void;
   model: string;
   baseUrl: string;
+  filePath?: string | null;
+  filePaths?: string[] | null;
   seed?: AiSeedContext | null;
   onSeedConsumed?: () => void;
 }
@@ -29,6 +41,8 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
   onClose,
   model,
   baseUrl,
+  filePath,
+  filePaths,
   seed,
   onSeedConsumed,
 }) => {
@@ -44,8 +58,22 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
   const [pullInfo, setPullInfo] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<UiMessage[]>([]);
+  const [fileContext, setFileContext] = useState<FileContextState>(null);
+  const [contextLoading, setContextLoading] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const pendingSeed = useRef<string | null>(null);
+  const fileContextRef = useRef<FileContextState>(null);
+
+  useEffect(() => {
+    fileContextRef.current = fileContext;
+  }, [fileContext]);
+
+  const activePaths = (filePaths && filePaths.length > 0
+    ? filePaths
+    : filePath
+      ? [filePath]
+      : []
+  ).filter(Boolean) as string[];
 
   const refreshStatus = useCallback(async () => {
     if (!window.electronAPI?.ollamaStatus) return;
@@ -53,10 +81,66 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
     setStatus(s);
   }, [baseUrl]);
 
+  const loadFileContext = useCallback(async (): Promise<FileContextState> => {
+    if (!window.electronAPI?.readLogFile || activePaths.length === 0) {
+      setFileContext(null);
+      fileContextRef.current = null;
+      return null;
+    }
+    setContextLoading(true);
+    try {
+      const parts: string[] = [];
+      let totalLines = 0;
+      const labels: string[] = [];
+      const perFileBudget = activePaths.length > 1 ? 12000 : 24000;
+      for (const path of activePaths.slice(0, 5)) {
+        const result = await window.electronAPI.readLogFile(path);
+        if (!result.success || result.content == null) continue;
+        const built = buildLogFileExcerpt(result.content, perFileBudget);
+        const label = fileLabelFromPath(path);
+        labels.push(label);
+        totalLines += built.totalLines;
+        parts.push(
+          activePaths.length > 1
+            ? `### File: ${label}\n${built.excerpt}`
+            : built.excerpt
+        );
+      }
+      if (parts.length === 0) {
+        setFileContext(null);
+        fileContextRef.current = null;
+        return null;
+      }
+      const combined = parts.join('\n\n');
+      const final = buildLogFileExcerpt(combined, 28000);
+      const truncated = final.truncated || parts.length < activePaths.length;
+      const next: FileContextState = {
+        fileName: labels.join(', '),
+        excerpt: final.excerpt,
+        truncated,
+        lineCount: final.lineCount,
+        totalLines,
+        note: truncated
+          ? `Excerpt of the currently open log file(s). Showing the most recent ~${final.lineCount} lines of ${totalLines} total.`
+          : `Full content of the currently open log file(s) (${totalLines} lines).`,
+      };
+      setFileContext(next);
+      fileContextRef.current = next;
+      return next;
+    } finally {
+      setContextLoading(false);
+    }
+  }, [activePaths.join('|')]);
+
   useEffect(() => {
     if (!open) return;
     void refreshStatus();
   }, [open, refreshStatus]);
+
+  useEffect(() => {
+    if (!open) return;
+    void loadFileContext();
+  }, [open, loadFileContext]);
 
   useEffect(() => {
     if (!open || !seed?.prompt) return;
@@ -67,11 +151,13 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
   useEffect(() => {
     if (!open || !pendingSeed.current) return;
     if (!status?.running) return;
+    // Wait until context finished loading (or there is no file).
+    if (contextLoading) return;
     const prompt = pendingSeed.current;
     pendingSeed.current = null;
     void sendPrompt(prompt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, status?.running]);
+  }, [open, status?.running, contextLoading, fileContext]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -90,7 +176,9 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
     }
     const again = await window.electronAPI.ollamaStatus(baseUrl);
     setStatus(again);
-    const hasModel = again.models.some((m) => m === model || m.startsWith(`${model}:`) || m.startsWith(model.split(':')[0]));
+    const hasModel = again.models.some(
+      (m) => m === model || m.startsWith(`${model}:`) || m.startsWith(model.split(':')[0])
+    );
     if (hasModel) return true;
 
     setPullInfo(t('ai.pulling', { model }));
@@ -121,13 +209,14 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
     const ok = await ensureModel();
     if (!ok) {
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId ? { ...m, content: t('ai.setupNeeded') } : m
-        )
+        prev.map((m) => (m.id === assistantId ? { ...m, content: t('ai.setupNeeded') } : m))
       );
       setBusy(false);
       return;
     }
+
+    // Refresh context right before asking so live log updates are included.
+    const ctx = await loadFileContext();
 
     const history = [...messages, userMsg].map((m) => ({
       role: m.role,
@@ -137,9 +226,7 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
     const unsub = window.electronAPI.onOllamaChatToken?.((info) => {
       if (info.requestId !== requestId) return;
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId ? { ...m, content: m.content + info.token } : m
-        )
+        prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + info.token } : m))
       );
     });
 
@@ -148,6 +235,9 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
       baseUrl,
       requestId,
       messages: history,
+      fileContext: ctx
+        ? { fileName: ctx.fileName, excerpt: ctx.excerpt, note: ctx.note }
+        : undefined,
     });
     unsub?.();
 
@@ -161,7 +251,9 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
       );
     } else if (result.content) {
       setMessages((prev) =>
-        prev.map((m) => (m.id === assistantId && !m.content ? { ...m, content: result.content! } : m))
+        prev.map((m) =>
+          m.id === assistantId && !m.content ? { ...m, content: result.content! } : m
+        )
       );
     }
     setBusy(false);
@@ -197,6 +289,31 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
         </span>
         <button type="button" className="ai-mini-btn" onClick={() => void refreshStatus()} disabled={busy}>
           {t('ai.refresh')}
+        </button>
+      </div>
+
+      <div className={`ai-context ${fileContext ? 'ok' : 'missing'}`}>
+        {contextLoading ? (
+          <span>{t('ai.contextLoading')}</span>
+        ) : fileContext ? (
+          <span>
+            {t('ai.contextAttached', {
+              file: fileContext.fileName,
+              lines: String(fileContext.lineCount),
+              total: String(fileContext.totalLines),
+            })}
+            {fileContext.truncated ? ` · ${t('ai.contextTruncated')}` : ''}
+          </span>
+        ) : (
+          <span>{t('ai.contextMissing')}</span>
+        )}
+        <button
+          type="button"
+          className="ai-mini-btn"
+          onClick={() => void loadFileContext()}
+          disabled={busy || contextLoading || activePaths.length === 0}
+        >
+          {t('ai.contextReload')}
         </button>
       </div>
 
@@ -251,9 +368,7 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
       {pullInfo && <div className="ai-pull-info">{pullInfo}</div>}
 
       <div className="ai-messages" ref={listRef}>
-        {messages.length === 0 && (
-          <div className="ai-empty">{t('ai.empty')}</div>
-        )}
+        {messages.length === 0 && <div className="ai-empty">{t('ai.empty')}</div>}
         {messages.map((m) => (
           <div key={m.id} className={`ai-msg ${m.role}`}>
             <div className="ai-msg-role">{m.role === 'user' ? t('ai.you') : t('ai.assistant')}</div>
@@ -300,14 +415,14 @@ export function buildAskPromptFromLog(entry: {
   fullText: string;
 }): string {
   return [
-    'Bitte erkläre diesen Log-Eintrag und schlage mögliche Ursachen sowie nächste Checks vor:',
+    'Bitte erkläre diesen Log-Eintrag im Kontext der aktuell geöffneten Log-Datei und schlage mögliche Ursachen sowie nächste Checks vor:',
     '',
     `Timestamp: ${entry.timestamp}`,
     `Level: ${entry.level}`,
     `Namespace: ${entry.namespace}`,
     `Message: ${entry.message}`,
     '',
-    'Raw:',
+    'Raw entry:',
     entry.fullText,
   ].join('\n');
 }

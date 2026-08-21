@@ -290,11 +290,56 @@ export async function chatWithOllama(params: {
   });
 }
 
-export function buildLogAssistantSystemPrompt(): string {
-  return [
+export function buildLogAssistantSystemPrompt(fileContext?: {
+  fileName: string;
+  excerpt: string;
+  note?: string;
+}): string {
+  const base = [
     'You are LogStudio AI, a local assistant that helps developers understand log files.',
     'Explain errors clearly and practically. Prefer concise German answers unless the user writes in another language.',
-    'When given a log entry, cover: what happened, likely cause, and concrete next checks.',
-    'Do not invent stack frames or file paths that are not in the provided context.',
+    'When analyzing logs, cover: what happened, likely cause, and concrete next checks.',
+    'Do not invent stack frames, timestamps, or file paths that are not in the provided context.',
+    'Always ground your answer in the provided log context from the currently open file.',
   ].join(' ');
+
+  if (!fileContext?.excerpt?.trim()) {
+    return (
+      base +
+      ' No log file context is currently attached. Ask the user to open a log file in LogStudio if needed.'
+    );
+  }
+
+  return [
+    base,
+    '',
+    `Current open log file: ${fileContext.fileName}`,
+    fileContext.note ? `Context note: ${fileContext.note}` : '',
+    '----- BEGIN LOG CONTEXT -----',
+    fileContext.excerpt.trim(),
+    '----- END LOG CONTEXT -----',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** Keep the last portion of a log so the model sees recent errors without overflowing context. */
+export function buildLogFileExcerpt(content: string, maxChars = 24000): {
+  excerpt: string;
+  truncated: boolean;
+  lineCount: number;
+} {
+  const normalized = content.replace(/\r\n/g, '\n');
+  const lines = normalized.split('\n');
+  if (normalized.length <= maxChars) {
+    return { excerpt: normalized, truncated: false, lineCount: lines.length };
+  }
+  let excerpt = normalized.slice(-maxChars);
+  const firstNl = excerpt.indexOf('\n');
+  if (firstNl > 0 && firstNl < 200) excerpt = excerpt.slice(firstNl + 1);
+  return {
+    excerpt,
+    truncated: true,
+    lineCount: excerpt.split('\n').length,
+  };
 }
