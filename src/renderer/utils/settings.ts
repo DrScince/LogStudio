@@ -107,9 +107,17 @@ const DEFAULT_SETTINGS: AppSettings = {
   includeSubdirectories: false,
   hotkeys: DEFAULT_HOTKEYS,
   aiEnabled: true,
-  aiModel: 'llama3.2:3b',
+  aiModel: 'qwen2.5:7b',
   aiBaseUrl: 'http://127.0.0.1:11434',
 };
+
+function migrateAiModel(model: unknown): string {
+  const value = typeof model === 'string' ? model : '';
+  if (!value || value === 'llama3.2:3b' || value === 'llama3.2:1b') {
+    return DEFAULT_SETTINGS.aiModel;
+  }
+  return value;
+}
 
 export function loadSettings(): AppSettings {
   try {
@@ -127,7 +135,7 @@ export function loadSettings(): AppSettings {
         workspaces: parsed.workspaces ?? [],
         activeWorkspaceId: parsed.activeWorkspaceId ?? '',
         aiEnabled: parsed.aiEnabled ?? DEFAULT_SETTINGS.aiEnabled,
-        aiModel: parsed.aiModel || DEFAULT_SETTINGS.aiModel,
+        aiModel: migrateAiModel(parsed.aiModel) || DEFAULT_SETTINGS.aiModel,
         aiBaseUrl: parsed.aiBaseUrl || DEFAULT_SETTINGS.aiBaseUrl,
       };
       // Migration: legacy single logDirectory → logDirectories list

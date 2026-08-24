@@ -945,14 +945,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettingsChang
                   <div className="form-group" style={{ marginTop: 12 }}>
                     <label>{t('settings.aiModel')}</label>
                     <select
-                      value={localSettings.aiModel || 'llama3.2:3b'}
+                      value={localSettings.aiModel || 'qwen2.5:7b'}
                       onChange={(e) =>
                         setLocalSettings({ ...localSettings, aiModel: e.target.value })
                       }
                     >
-                      <option value="llama3.2:3b">llama3.2:3b (~2 GB)</option>
-                      <option value="qwen2.5:7b">qwen2.5:7b (~4–5 GB)</option>
-                      <option value="llama3.1:8b">llama3.1:8b (~4–5 GB)</option>
+                      <option value="qwen2.5:7b">qwen2.5:7b (empfohlen, ~4.7 GB)</option>
+                      <option value="qwen2.5:14b">qwen2.5:14b (stärker, ~9 GB, mehr RAM)</option>
+                      <option value="llama3.1:8b">llama3.1:8b (~4.9 GB)</option>
+                      <option value="llama3.2:3b">llama3.2:3b (schnell, schwächer, ~2 GB)</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ marginTop: 12 }}>

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.11.0-beta.4] - 2026-08-24
+
+### Changed
+- **Smarter local AI**: Default model is now `qwen2.5:7b` (existing 3B installs are migrated). Tighter on-call prompt, lower temperature, 16k context, and error/warn-biased log excerpts so answers cite real log lines instead of guessing.
+
 ## [2.11.0-beta.3] - 2026-08-21
 
 ### Fixed

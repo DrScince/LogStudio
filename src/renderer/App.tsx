@@ -1270,7 +1270,7 @@ function App() {
           <AiAssistantPanel
             open={showAiAssistant}
             onClose={() => setShowAiAssistant(false)}
-            model={settings.aiModel || 'llama3.2:3b'}
+            model={settings.aiModel || 'qwen2.5:7b'}
             baseUrl={settings.aiBaseUrl || 'http://127.0.0.1:11434'}
             filePath={currentLogFile}
             filePaths={currentLogFiles}

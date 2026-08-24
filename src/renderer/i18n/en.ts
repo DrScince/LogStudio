@@ -140,7 +140,7 @@ const en = {
     hotkeysHelp: 'Click a field and press the desired key combination. Chord shortcuts use Ctrl+K followed by a second key.',
     aiTitle: 'AI assistant (Ollama)',
     aiHelp:
-      'Local assistant with no cloud cost. On first use the Ollama installer opens; the model downloads on first chat.',
+      'Local assistant with no cloud cost. Default model qwen2.5:7b (~5 GB, much stronger than 3B). Downloaded on first chat.',
     aiEnabled: 'Enable AI assistant',
     aiModel: 'Model',
     aiBaseUrl: 'Ollama URL',

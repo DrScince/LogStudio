@@ -138,7 +138,7 @@ const de: TranslationKeys = {
     hotkeysHelp: 'Feld anklicken und gewünschte Tastenkombination drücken. Akkord-Kürzel nutzen Ctrl+K gefolgt von einer zweiten Taste.',
     aiTitle: 'KI-Assistent (Ollama)',
     aiHelp:
-      'Lokaler Assistent ohne Cloud-Kosten. Beim ersten Nutzen öffnet sich der Ollama-Installer; das Modell wird beim Chat geladen.',
+      'Lokaler Assistent ohne Cloud-Kosten. Standardmodell qwen2.5:7b (~5 GB, deutlich stärker als 3B). Beim ersten Chat wird es heruntergeladen.',
     aiEnabled: 'KI-Assistent aktivieren',
     aiModel: 'Modell',
     aiBaseUrl: 'Ollama URL',
@@ -213,7 +213,7 @@ const de: TranslationKeys = {
     openDownload: 'Download-Seite öffnen',
     modelMissing: 'Modell {{model}} fehlt noch.',
     downloadModel: 'Modell herunterladen',
-    pulling: 'Lade {{model}}…',
+    pulling: 'Lade {{model}}… beim ersten Mal ~5 GB, danach lokal.',
     pullFailed: 'Modell-Download fehlgeschlagen',
     notRunning: 'Ollama läuft nicht',
     setupNeeded: 'Bitte Ollama-Installer abschließen, Aktualisieren tippen, dann erneut fragen.',

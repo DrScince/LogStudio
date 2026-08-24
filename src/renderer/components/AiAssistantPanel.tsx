@@ -122,7 +122,7 @@ const AiAssistantPanel: React.FC<AiAssistantPanelProps> = ({
         lineCount: final.lineCount,
         totalLines,
         note: truncated
-          ? `Excerpt of the currently open log file(s). Showing the most recent ~${final.lineCount} lines of ${totalLines} total.`
+          ? `Priority excerpt of ${labels.join(', ')}: error/warn lines plus file start/end. ${final.lineCount} excerpt lines of ${totalLines} total. Prefer ERROR/FATAL over INFO.`
           : `Full content of the currently open log file(s) (${totalLines} lines).`,
       };
       setFileContext(next);
@@ -436,7 +436,9 @@ export function buildAskPromptFromLog(entry: {
   fullText: string;
 }): string {
   return [
-    'Bitte erkläre diesen Log-Eintrag im Kontext der aktuell geöffneten Log-Datei und schlage mögliche Ursachen sowie nächste Checks vor:',
+    'Analysiere diesen Log-Eintrag anhand des angehängten Dateikontexts.',
+    'Nenne zuerst, was konkret fehlschlug (Fehlercode, Exception, Host). Dann 2–3 wahrscheinliche Ursachen und konkrete nächste Checks.',
+    'Zitiere die relevanten Zeilen. Erfinde nichts, das nicht im Log steht.',
     '',
     `Timestamp: ${entry.timestamp}`,
     `Level: ${entry.level}`,

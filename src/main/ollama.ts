@@ -6,7 +6,7 @@ import * as https from 'https';
 import * as http from 'http';
 
 export const DEFAULT_OLLAMA_BASE = 'http://127.0.0.1:11434';
-export const DEFAULT_OLLAMA_MODEL = 'llama3.2:3b';
+export const DEFAULT_OLLAMA_MODEL = 'qwen2.5:7b';
 
 function getBundledOllamaBinary(): string | null {
   const base = app.isPackaged
@@ -395,6 +395,12 @@ export async function chatWithOllama(params: {
       model: params.model,
       messages: params.messages,
       stream: true,
+      options: {
+        temperature: 0.2,
+        top_p: 0.9,
+        num_ctx: 16384,
+        repeat_penalty: 1.1,
+      },
     });
     const req = http.request(
       {
@@ -453,11 +459,14 @@ export function buildLogAssistantSystemPrompt(fileContext?: {
   note?: string;
 }): string {
   const base = [
-    'You are LogStudio AI, a local assistant that helps developers understand log files.',
-    'Explain errors clearly and practically. Prefer concise German answers unless the user writes in another language.',
-    'When analyzing logs, cover: what happened, likely cause, and concrete next checks.',
-    'Do not invent stack frames, timestamps, or file paths that are not in the provided context.',
-    'Always ground your answer in the provided log context from the currently open file.',
+    'You are LogStudio AI, a senior on-call engineer helping with production logs.',
+    'Answer in the user\'s language (default German). Be concrete, not generic.',
+    'Always cite timestamps, levels, logger/namespace, error codes, hosts, and exception types that appear in the log.',
+    'Structure: 1) What happened 2) Most likely cause (ranked) 3) Immediate checks 4) What is still unknown.',
+    'Quote the relevant log lines instead of paraphrasing vaguely.',
+    'Never invent stack frames, IPs, filenames, HTTP codes, or SQL that are not in the provided context.',
+    'If several errors exist, focus on FATAL/ERROR first, then WARN, and say how they relate.',
+    'If the log is truncated, say so and reason only from the visible excerpt.',
   ].join(' ');
 
   if (!fileContext?.excerpt?.trim()) {
@@ -478,25 +487,4 @@ export function buildLogAssistantSystemPrompt(fileContext?: {
   ]
     .filter(Boolean)
     .join('\n');
-}
-
-/** Keep the last portion of a log so the model sees recent errors without overflowing context. */
-export function buildLogFileExcerpt(content: string, maxChars = 24000): {
-  excerpt: string;
-  truncated: boolean;
-  lineCount: number;
-} {
-  const normalized = content.replace(/\r\n/g, '\n');
-  const lines = normalized.split('\n');
-  if (normalized.length <= maxChars) {
-    return { excerpt: normalized, truncated: false, lineCount: lines.length };
-  }
-  let excerpt = normalized.slice(-maxChars);
-  const firstNl = excerpt.indexOf('\n');
-  if (firstNl > 0 && firstNl < 200) excerpt = excerpt.slice(firstNl + 1);
-  return {
-    excerpt,
-    truncated: true,
-    lineCount: excerpt.split('\n').length,
-  };
 }
