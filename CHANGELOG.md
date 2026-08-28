@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **LogStudio MCP server** (`packages/logstudio-mcp`): stdio MCP server for GitHub Copilot in VS Code / Visual Studio — `read_log_file`, `get_log_excerpt`, `list_errors`, `list_fatal_errors`, `search_log` without a local 7B model.
+
+## [2.11.0-beta.4] - 2026-08-24
+
+### Changed
+- **Smarter local AI**: Default model is now `qwen2.5:7b` (existing 3B installs are migrated). Tighter on-call prompt, lower temperature, 16k context, and error/warn-biased log excerpts so answers cite real log lines instead of guessing.
+
+## [2.11.0-beta.3] - 2026-08-21
+
+### Fixed
+- **Ollama installer on Windows**: No longer writes the setup EXE into `%TEMP%` from Electron (caused `EPERM` / main-process crash under AV). Uses PowerShell download into Downloads + launch, with browser fallback. Errors are caught so LogStudio stays open.
+
+## [2.11.0-beta.2] - 2026-08-21
+
+### Fixed
+- **Ollama installer download**: Use Electron/Chromium TLS (and PowerShell fallback on Windows) so corporate SSL inspection no longer blocks launching the installer (`unable to get local issuer certificate`).
+
+## [2.11.0-beta.1] - 2026-08-21
+
+### Added
+- **Local AI assistant (Ollama)**: In-app chat grounded in the currently open log file. On first use without Ollama, LogStudio launches the official Ollama installer; the model is downloaded on first chat. LogStudio install stays slim (~100 MB).
+
+### Notes
+- Prerelease for early testing — not a final release.
+
 ## [2.10.0] - 2026-08-19
 
 ### Added

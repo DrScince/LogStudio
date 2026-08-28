@@ -67,6 +67,13 @@ jobs:
     - name: Run tests
       run: npm test -- --run
 
+    - name: Test LogStudio MCP server
+      run: |
+        cd packages/logstudio-mcp
+        npm ci --prefer-offline --no-audit
+        npm run build
+        npm run test:run
+
     - name: Generate coverage report
       run: npm run test:coverage
       continue-on-error: true

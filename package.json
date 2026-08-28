@@ -1,6 +1,6 @@
 {
   "name": "logstudio",
-  "version": "2.10.0",
+  "version": "2.11.0-beta.4",
   "description": "Modern log file viewer and monitor",
   "main": "dist/main.js",
   "scripts": {
@@ -17,7 +17,9 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "test:report": "vitest --run --reporter=html"
+    "test:report": "vitest --run --reporter=html",
+    "mcp:build": "npm run build --prefix packages/logstudio-mcp",
+    "mcp:test": "npm run test:run --prefix packages/logstudio-mcp"
   },
   "keywords": [
     "log",

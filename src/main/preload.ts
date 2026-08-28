@@ -112,4 +112,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeOpenFileFromCliListener: () => {
     ipcRenderer.removeAllListeners('open-file-from-cli');
   },
+  ollamaStatus: (baseUrl?: string) => ipcRenderer.invoke('ollama-status', baseUrl),
+  ollamaInstall: () => ipcRenderer.invoke('ollama-install'),
+  ollamaOpenDownload: () => ipcRenderer.invoke('ollama-open-download'),
+  ollamaEnsureRunning: (baseUrl?: string) => ipcRenderer.invoke('ollama-ensure-running', baseUrl),
+  ollamaPullModel: (model?: string, baseUrl?: string) =>
+    ipcRenderer.invoke('ollama-pull-model', model, baseUrl),
+  onOllamaPullProgress: (callback: (info: { model: string; status: string; percent?: number }) => void) => {
+    const listener = (_event: unknown, info: { model: string; status: string; percent?: number }) =>
+      callback(info);
+    ipcRenderer.on('ollama-pull-progress', listener);
+    return () => ipcRenderer.removeListener('ollama-pull-progress', listener);
+  },
+  ollamaChat: (payload: {
+    model?: string;
+    baseUrl?: string;
+    messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+    requestId?: string;
+    fileContext?: { fileName: string; excerpt: string; note?: string };
+  }) => ipcRenderer.invoke('ollama-chat', payload),
+  onOllamaChatToken: (callback: (info: { requestId: string; token: string }) => void) => {
+    const listener = (_event: unknown, info: { requestId: string; token: string }) => callback(info);
+    ipcRenderer.on('ollama-chat-token', listener);
+    return () => ipcRenderer.removeListener('ollama-chat-token', listener);
+  },
 });

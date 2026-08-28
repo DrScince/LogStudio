@@ -85,6 +85,11 @@
   color: var(--text-primary);
 }
 
+.title-bar-action.active {
+  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+}
+
 .title-bar-action:disabled {
   cursor: default;
   opacity: 0.5;

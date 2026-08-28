@@ -1,0 +1,37 @@
+{
+  "name": "@logstudio/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server for LogStudio — analyze log files from GitHub Copilot in VS Code or Visual Studio",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "logstudio-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "keywords": [
+    "mcp",
+    "logstudio",
+    "logs",
+    "copilot"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.3.3",
+    "vitest": "^1.6.1"
+  }
+}
