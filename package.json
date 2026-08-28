@@ -17,7 +17,9 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
-    "test:report": "vitest --run --reporter=html"
+    "test:report": "vitest --run --reporter=html",
+    "mcp:build": "npm run build --prefix packages/logstudio-mcp",
+    "mcp:test": "npm run test:run --prefix packages/logstudio-mcp"
   },
   "keywords": [
     "log",

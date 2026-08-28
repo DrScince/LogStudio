@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **LogStudio MCP server** (`packages/logstudio-mcp`): stdio MCP server for GitHub Copilot in VS Code / Visual Studio — `read_log_file`, `get_log_excerpt`, `list_errors`, `list_fatal_errors`, `search_log` without a local 7B model.
+
 ## [2.11.0-beta.4] - 2026-08-24
 
 ### Changed

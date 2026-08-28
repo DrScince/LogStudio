@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "logstudio": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/packages/logstudio-mcp/dist/index.js"],
+      "env": {
+        "LOGSTUDIO_MCP_ROOT": "${workspaceFolder}"
+      }
+    }
+  }
+}
