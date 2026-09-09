@@ -50,6 +50,41 @@ const scanDirCandidates = async (dir: string, includeSubdirectories: boolean): P
   return results;
 };
 
+/** Stream text files as they are discovered: top-level first, then subdirs. */
+const streamScanTextFiles = async (
+  dir: string,
+  includeSubdirectories: boolean,
+  onBatch: (files: Array<{ name: string; path: string }>) => void
+): Promise<void> => {
+  const items = await fs.promises.readdir(dir, { withFileTypes: true });
+  const topFiles: DiscoveredFile[] = [];
+  const subDirs: string[] = [];
+
+  for (const item of items) {
+    const fullPath = path.join(dir, item.name);
+    if (item.isFile()) {
+      try {
+        const stats = await fs.promises.stat(fullPath);
+        topFiles.push({ name: item.name, path: fullPath, mtimeMs: stats.mtimeMs });
+      } catch {
+        /* ignore */
+      }
+    } else if (includeSubdirectories && item.isDirectory()) {
+      subDirs.push(fullPath);
+    }
+  }
+
+  await filterTextFilesInBatches(sortCandidatesNewestFirst(topFiles), 50, onBatch);
+
+  for (const sub of subDirs) {
+    try {
+      await streamScanTextFiles(sub, true, onBatch);
+    } catch {
+      /* skip inaccessible */
+    }
+  }
+};
+
 const sortCandidatesNewestFirst = (files: DiscoveredFile[]): DiscoveredFile[] => {
   files.sort((a, b) => b.mtimeMs - a.mtimeMs);
   return files;
@@ -222,11 +257,18 @@ function createWindow() {
     frame: false,
     icon: iconPath,
     title: 'LogStudio',
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
     },
+  });
+
+  mainWindow.once('ready-to-show', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+    }
   });
 
   const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
@@ -285,7 +327,8 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
-  setupAutoUpdater();
+  // Defer update check so it does not compete with first paint / tab restore.
+  setTimeout(() => setupAutoUpdater(), 2500);
 
   // Datei öffnen die beim Start als Argument übergeben wurde
   const fileArg = getFileArgument(process.argv);
@@ -359,7 +402,7 @@ ipcMain.handle('watch-log-file', (event, filePath: string) => {
         pollInterval: 50
       },
       usePolling: true,
-      interval: 100
+      interval: 500
     });
 
     watcher.on('change', (path) => {
@@ -411,11 +454,7 @@ ipcMain.handle(
     // Start async scan and return immediately so renderer can begin rendering batches.
     void (async () => {
       try {
-        const candidates = sortCandidatesNewestFirst(
-          await scanDirCandidates(directory, includeSubdirectories)
-        );
-
-        await filterTextFilesInBatches(candidates, 200, (batch) => {
+        await streamScanTextFiles(directory, includeSubdirectories, (batch) => {
           try {
             sender.send('list-log-files-progress', { requestId, files: batch, done: false });
           } catch {
@@ -488,6 +527,9 @@ ipcMain.handle('unwatch-directory', (event, directory: string) => {
 ipcMain.handle('get-file-stats', async (event, filePath: string) => {
   try {
     const stats = await fs.promises.stat(filePath);
+    if (!stats.isFile()) {
+      return { success: false, error: 'Not a file' };
+    }
     return {
       success: true,
       stats: {

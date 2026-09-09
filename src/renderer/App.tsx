@@ -34,6 +34,12 @@ import {
   clearStructuredViewerUi,
   pruneStructuredViewerUi,
 } from './utils/viewerUiState';
+import {
+  flagsFromContentHead,
+  flagsFromExtension,
+  prioritizeOpenTabSnapshots,
+  type FileTypeFlags,
+} from './utils/fileTypeFlags';
 import { I18nProvider, useTranslation } from './i18n';
 import './App.css';
 
@@ -72,8 +78,8 @@ function App() {
   activeTabIdRef.current = activeTabId;
 
   const canReadFile = useCallback(async (filePath: string): Promise<boolean> => {
-    if (!window.electronAPI) return false;
-    const result = await window.electronAPI.readLogFile(filePath);
+    if (!window.electronAPI?.getFileStats) return false;
+    const result = await window.electronAPI.getFileStats(filePath);
     return result.success;
   }, []);
 
@@ -267,41 +273,47 @@ function App() {
       return paths.some((p) => pathBelongsToWorkspace(p, enteringDirs, enteringVfs));
     });
 
-  const detectFileFlags = useCallback(async (filePath: string) => {
-    const lp = filePath.toLowerCase();
-    let isMarkdown = lp.endsWith('.md') || lp.endsWith('.markdown');
-    let isXml = lp.endsWith('.xml');
-    let isJson = false;
-    if (!window.electronAPI) return { isXml, isJson, isMarkdown };
-    if (isMarkdown) return { isXml: false, isJson: false, isMarkdown: true };
-    try {
-      const result = await window.electronAPI.readLogFile(filePath);
-      if (!result.success || !result.content) return { isXml, isJson, isMarkdown };
-      const trimmed = result.content.trimStart();
-      const needsContentCheck =
-        lp.endsWith('.json') || (!isXml && !lp.endsWith('.log') && !lp.endsWith('.txt'));
-      if (needsContentCheck) {
-        if (!isXml && (trimmed.startsWith('<?xml') || /^<[A-Za-z][A-Za-z0-9\-_]*[\s>]/.test(trimmed))) {
-          isXml = true;
-        } else if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-          const fmt = detectLogFormat(result.content);
-          const isJsonLog = fmt.name === 'json-ecs' || fmt.name === 'json-multiline';
-          isJson = !isJsonLog;
-        }
-      }
-    } catch {
-      /* ignore */
+  const detectFileFlags = useCallback(async (filePath: string): Promise<FileTypeFlags> => {
+    const fromExt = flagsFromExtension(filePath);
+    if (!fromExt.needsContentPeek) {
+      return { isXml: fromExt.isXml, isJson: fromExt.isJson, isMarkdown: fromExt.isMarkdown };
     }
-    return { isXml, isJson, isMarkdown };
+    if (!window.electronAPI?.readLogChunk) {
+      return { isXml: fromExt.isXml, isJson: fromExt.isJson, isMarkdown: fromExt.isMarkdown };
+    }
+    try {
+      const peek = await window.electronAPI.readLogChunk(filePath, 0, 4096);
+      if (!peek.success || peek.content == null) {
+        return { isXml: fromExt.isXml, isJson: fromExt.isJson, isMarkdown: fromExt.isMarkdown };
+      }
+      return flagsFromContentHead(filePath, peek.content, (sample) => {
+        const fmt = detectLogFormat(sample);
+        return fmt.name === 'json-ecs' || fmt.name === 'json-multiline';
+      });
+    } catch {
+      return { isXml: fromExt.isXml, isJson: fromExt.isJson, isMarkdown: fromExt.isMarkdown };
+    }
   }, []);
 
   const createTabFromPaths = useCallback(
-    async (filePaths: string[]): Promise<Tab | null> => {
+    async (
+      filePaths: string[],
+      knownFlags?: Partial<FileTypeFlags>
+    ): Promise<Tab | null> => {
       const paths = filePaths.filter(Boolean);
       if (paths.length === 0) return null;
       if (paths.length === 1) {
         if (!(await canReadFile(paths[0]))) return null;
-        const flags = await detectFileFlags(paths[0]);
+        const hasKnown =
+          knownFlags &&
+          (knownFlags.isXml != null || knownFlags.isJson != null || knownFlags.isMarkdown != null);
+        const flags = hasKnown
+          ? {
+              isXml: !!knownFlags?.isXml,
+              isJson: !!knownFlags?.isJson,
+              isMarkdown: !!knownFlags?.isMarkdown,
+            }
+          : await detectFileFlags(paths[0]);
         return {
           id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
           filePath: paths[0],
@@ -311,10 +323,8 @@ function App() {
           ...flags,
         };
       }
-      const readable: string[] = [];
-      for (const p of paths) {
-        if (await canReadFile(p)) readable.push(p);
-      }
+      const checks = await Promise.all(paths.map(async (p) => ((await canReadFile(p)) ? p : null)));
+      const readable = checks.filter((p): p is string => p != null);
       if (readable.length === 0) return null;
       if (readable.length === 1) return await createTabFromPaths(readable);
       return {
@@ -333,25 +343,64 @@ function App() {
     async (
       snapshots: WorkspaceOpenTab[],
       existing: Tab[],
-      preferredActiveKey?: string
+      preferredActiveKey?: string,
+      onProgress?: (state: { tabs: Tab[]; activeId: string | null }) => void
     ): Promise<{ tabs: Tab[]; activeId: string | null }> => {
+      const ordered = prioritizeOpenTabSnapshots(snapshots, preferredActiveKey, openTabKey);
       const next = [...existing];
       const keys = new Set(next.map((t) => openTabKey(tabFilePaths(t))));
-      for (const snap of snapshots) {
-        const key = openTabKey(snap.filePaths);
-        if (keys.has(key)) continue;
-        const tab = await createTabFromPaths(snap.filePaths);
-        if (!tab) continue;
-        next.push(tab);
-        keys.add(key);
-      }
-      const preferred =
+
+      const pickActive = (tabs: Tab[]) =>
         (preferredActiveKey
-          ? next.find((t) => openTabKey(tabFilePaths(t)) === preferredActiveKey)
+          ? tabs.find((t) => openTabKey(tabFilePaths(t)) === preferredActiveKey)
           : undefined) ??
-        next.find((t) => t.id === activeTabIdRef.current) ??
-        next[0];
-      return { tabs: next, activeId: preferred?.id ?? null };
+        tabs.find((t) => t.id === activeTabIdRef.current) ??
+        tabs[0];
+
+      const emit = () => {
+        const active = pickActive(next);
+        onProgress?.({ tabs: [...next], activeId: active?.id ?? null });
+      };
+
+      const buildFromSnap = (snap: WorkspaceOpenTab) =>
+        createTabFromPaths(snap.filePaths, {
+          isXml: snap.isXml,
+          isJson: snap.isJson,
+          isMarkdown: snap.isMarkdown,
+        });
+
+      // Priority: restore the active tab first and paint immediately.
+      if (ordered.length > 0) {
+        const [priority, ...rest] = ordered;
+        const priorityKey = openTabKey(priority.filePaths);
+        if (!keys.has(priorityKey)) {
+          const tab = await buildFromSnap(priority);
+          if (tab) {
+            next.push(tab);
+            keys.add(priorityKey);
+            emit();
+          }
+        } else {
+          emit();
+        }
+
+        const remaining = rest.filter((snap) => !keys.has(openTabKey(snap.filePaths)));
+        if (remaining.length > 0) {
+          const built = await Promise.all(remaining.map((snap) => buildFromSnap(snap)));
+          for (let i = 0; i < remaining.length; i++) {
+            const tab = built[i];
+            if (!tab) continue;
+            const key = openTabKey(remaining[i].filePaths);
+            if (keys.has(key)) continue;
+            next.push(tab);
+            keys.add(key);
+          }
+        }
+      }
+
+      const result = { tabs: next, activeId: pickActive(next)?.id ?? null };
+      onProgress?.(result);
+      return result;
     },
     [createTabFromPaths]
   );
@@ -359,7 +408,7 @@ function App() {
   const pickActiveSource = (dirs: string[], vfs: VirtualFolder[]) =>
     dirs[0] ?? (vfs[0] ? toVirtualFolderId(vfs[0].id) : '');
 
-  // Restore workspace-bound tabs once on startup
+  // Restore workspace-bound tabs once on startup (active file first, rest in background)
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -370,14 +419,14 @@ function App() {
         settings.virtualFolders ?? []
       );
       if (snapshots.length > 0) {
-        const restored = await restoreOpenTabs(snapshots, [], ws?.activeOpenTabKey);
-        if (!cancelled) {
-          setTabs(restored.tabs);
-          setActiveTabId(restored.activeId);
-          pruneStructuredViewerUi(restored.tabs.map((t) => t.id));
-        }
+        await restoreOpenTabs(snapshots, [], ws?.activeOpenTabKey, (partial) => {
+          if (cancelled) return;
+          setTabs(partial.tabs);
+          setActiveTabId(partial.activeId);
+          pruneStructuredViewerUi(partial.tabs.map((t) => t.id));
+        });
       }
-      tabsPersistReady.current = true;
+      if (!cancelled) tabsPersistReady.current = true;
     })();
     return () => {
       cancelled = true;
@@ -537,10 +586,11 @@ function App() {
       enteringVfs
     );
     const snapshots = filterValidOpenTabs(target.openTabs, enteringDirs, enteringVfs);
-    const restored = await restoreOpenTabs(snapshots, kept, target.activeOpenTabKey);
-    setTabs(restored.tabs);
-    setActiveTabId(restored.activeId);
-    pruneStructuredViewerUi(restored.tabs.map((t) => t.id));
+    await restoreOpenTabs(snapshots, kept, target.activeOpenTabKey, (partial) => {
+      setTabs(partial.tabs);
+      setActiveTabId(partial.activeId);
+      pruneStructuredViewerUi(partial.tabs.map((t) => t.id));
+    });
   };
 
   const handleCreateWorkspace = async () => {
@@ -622,10 +672,11 @@ function App() {
         enteringVfs
       );
       const snapshots = filterValidOpenTabs(nextActive.openTabs, enteringDirs, enteringVfs);
-      const restored = await restoreOpenTabs(snapshots, kept, nextActive.activeOpenTabKey);
-      setTabs(restored.tabs);
-      setActiveTabId(restored.activeId);
-      pruneStructuredViewerUi(restored.tabs.map((t) => t.id));
+      await restoreOpenTabs(snapshots, kept, nextActive.activeOpenTabKey, (partial) => {
+        setTabs(partial.tabs);
+        setActiveTabId(partial.activeId);
+        pruneStructuredViewerUi(partial.tabs.map((t) => t.id));
+      });
     } else {
       setSettings((prev) => ({ ...prev, workspaces }));
     }

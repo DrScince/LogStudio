@@ -85,9 +85,9 @@ describe('workspaces', () => {
     const vf = createVirtualFolder('Pinned', ['/elsewhere/app.log']);
     const snap = snapshotWorkspaceOpenTabs(
       [
-        { id: '1', filePath: '/logs/a.log' },
+        { id: '1', filePath: '/logs/a.log', isXml: false },
         { id: '2', filePath: '/tmp/standalone.log' },
-        { id: '3', filePath: '/elsewhere/app.log' },
+        { id: '3', filePath: '/elsewhere/app.log', isMarkdown: true },
       ],
       '1',
       ['/logs'],
@@ -95,7 +95,7 @@ describe('workspaces', () => {
     );
     expect(snap.openTabs).toEqual([
       { filePaths: ['/logs/a.log'] },
-      { filePaths: ['/elsewhere/app.log'] },
+      { filePaths: ['/elsewhere/app.log'], isMarkdown: true },
     ]);
     expect(snap.activeOpenTabKey).toBe(openTabKey(['/logs/a.log']));
     expect(

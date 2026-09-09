@@ -11,6 +11,10 @@ export interface VirtualFolder {
 /** Persisted open tab belonging to a workspace (folder / virtual-folder files). */
 export interface WorkspaceOpenTab {
   filePaths: string[];
+  /** Cached viewer type so cold start can skip content sniffing. */
+  isXml?: boolean;
+  isJson?: boolean;
+  isMarkdown?: boolean;
 }
 
 export interface Workspace {
@@ -192,7 +196,14 @@ export function openTabKey(paths: string[]): string {
 }
 
 export function snapshotWorkspaceOpenTabs(
-  tabs: { id: string; filePath: string; filePaths?: string[] }[],
+  tabs: {
+    id: string;
+    filePath: string;
+    filePaths?: string[];
+    isXml?: boolean;
+    isJson?: boolean;
+    isMarkdown?: boolean;
+  }[],
   activeTabId: string | null,
   directories: string[],
   virtualFolders: VirtualFolder[] = []
@@ -201,7 +212,13 @@ export function snapshotWorkspaceOpenTabs(
     const paths = tabFilePaths(tab);
     return paths.length > 0 && paths.every((p) => pathBelongsToWorkspace(p, directories, virtualFolders));
   });
-  const openTabs: WorkspaceOpenTab[] = bound.map((tab) => ({ filePaths: tabFilePaths(tab) }));
+  const openTabs: WorkspaceOpenTab[] = bound.map((tab) => {
+    const snap: WorkspaceOpenTab = { filePaths: tabFilePaths(tab) };
+    if (tab.isXml) snap.isXml = true;
+    if (tab.isJson) snap.isJson = true;
+    if (tab.isMarkdown) snap.isMarkdown = true;
+    return snap;
+  });
   const active = activeTabId ? bound.find((t) => t.id === activeTabId) : undefined;
   return {
     openTabs,
@@ -215,12 +232,17 @@ export function filterValidOpenTabs(
   virtualFolders: VirtualFolder[] = []
 ): WorkspaceOpenTab[] {
   return (openTabs ?? [])
-    .map((tab) => ({
-      filePaths: (tab.filePaths ?? []).filter((p) =>
+    .map((tab) => {
+      const filePaths = (tab.filePaths ?? []).filter((p) =>
         pathBelongsToWorkspace(p, directories, virtualFolders)
-      ),
-    }))
-    .filter((tab) => tab.filePaths.length > 0);
+      );
+      if (filePaths.length === 0) return null;
+      return {
+        ...tab,
+        filePaths,
+      };
+    })
+    .filter((tab): tab is WorkspaceOpenTab => tab != null);
 }
 
 export function pruneDirectoryMeta(
