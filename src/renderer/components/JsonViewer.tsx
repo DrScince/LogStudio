@@ -19,6 +19,7 @@ interface JsonViewerProps {
   filePath: string;
   tabId?: string;
   hotkeys?: HotkeyMap;
+  onInitialReady?: () => void;
 }
 
 type ViewMode = StructuredViewMode;
@@ -266,9 +267,15 @@ const JsonTreeNode: React.FC<JsonTreeNodeProps> = ({
 // Main JsonViewer component
 // ─────────────────────────────────────────────
 
-const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, tabId, hotkeys }) => {
+const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, tabId, hotkeys, onInitialReady }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
+  const initialReadySentRef = useRef(false);
+  const notifyInitialReady = useCallback(() => {
+    if (initialReadySentRef.current) return;
+    initialReadySentRef.current = true;
+    onInitialReady?.();
+  }, [onInitialReady]);
   const savedUi = tabId ? getStructuredViewerUi(tabId) : undefined;
 
   const [content, setContent] = useState('');
@@ -308,8 +315,11 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, tabId, hotkeys }) => 
     if (!filePath) return;
     setLoading(true);
     setExternallyChanged(false);
-    loadFile(filePath).finally(() => setLoading(false));
-  }, [filePath, loadFile]);
+    loadFile(filePath).finally(() => {
+      setLoading(false);
+      notifyInitialReady();
+    });
+  }, [filePath, loadFile, notifyInitialReady]);
 
   // ── Watch for external changes ─────────────
   useEffect(() => {

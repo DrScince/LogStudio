@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.11.1] - 2026-09-09
+
+### Added
+- **Startup splash screen**: Instant boot splash (HTML) plus React overlay with status (“Restoring tabs…”, “Loading active file…”) until the active file’s content is ready, then a short fade-out.
+
 ## [2.11.0] - 2026-09-09
 
 ### Changed

@@ -13,15 +13,23 @@ interface MarkdownViewerProps {
   filePath: string;
   hotkeys?: HotkeyMap;
   theme?: 'dark' | 'light';
+  onInitialReady?: () => void;
 }
 
 const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
   filePath,
   hotkeys,
   theme = 'dark',
+  onInitialReady,
 }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
+  const initialReadySentRef = useRef(false);
+  const notifyInitialReady = useCallback(() => {
+    if (initialReadySentRef.current) return;
+    initialReadySentRef.current = true;
+    onInitialReady?.();
+  }, [onInitialReady]);
 
   const [content, setContent] = useState('');
   const [savedContent, setSavedContent] = useState('');
@@ -59,8 +67,11 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
     if (!filePath) return;
     setLoading(true);
     setExternallyChanged(false);
-    loadFile(filePath).finally(() => setLoading(false));
-  }, [filePath, loadFile]);
+    loadFile(filePath).finally(() => {
+      setLoading(false);
+      notifyInitialReady();
+    });
+  }, [filePath, loadFile, notifyInitialReady]);
 
   useEffect(() => {
     if (!filePath) return;

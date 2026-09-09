@@ -30,6 +30,8 @@ interface LogViewerProps {
   autoDetect?: boolean;
   enabledFormats?: string[];
   hotkeys?: HotkeyMap;
+  /** Fired once after the first successful content load (or empty state). */
+  onInitialReady?: () => void;
 }
 
 type ResizableColumn = 'timestamp' | 'level' | 'namespace';
@@ -114,9 +116,16 @@ const LogViewer: React.FC<LogViewerProps> = ({
   autoDetect = true,
   enabledFormats,
   hotkeys,
+  onInitialReady,
 }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
+  const initialReadySentRef = useRef(false);
+  const notifyInitialReady = useCallback(() => {
+    if (initialReadySentRef.current) return;
+    initialReadySentRef.current = true;
+    onInitialReady?.();
+  }, [onInitialReady]);
   const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<LogEntry[]>([]);
   const [selectedLevels, setSelectedLevels] = useState<LogLevel[]>([]);
@@ -544,7 +553,11 @@ const LogViewer: React.FC<LogViewerProps> = ({
           window.electronAPI.removeLogFileChangedListener();
         };
       }
+      return;
     }
+
+    // Empty viewer (no file selected yet)
+    notifyInitialReady();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filePath, filePaths?.join('|')]); // Use join to create stable dependency for filePaths
 
@@ -686,11 +699,15 @@ const LogViewer: React.FC<LogViewerProps> = ({
       console.error('Error loading multiple log files:', error);
     } finally {
       setLoading(false);
+      notifyInitialReady();
     }
-  }, [schema, autoDetect]);
+  }, [schema, autoDetect, enabledFormats, notifyInitialReady]);
 
   const loadLogFile = async () => {
-    if (!filePath || !window.electronAPI) return;
+    if (!filePath || !window.electronAPI) {
+      notifyInitialReady();
+      return;
+    }
 
     const isInitialLoad = !hasLoadedRef.current;
     if (isInitialLoad) {
@@ -791,6 +808,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
     } finally {
       if (isInitialLoad) {
         setLoading(false);
+        notifyInitialReady();
       }
     }
   };

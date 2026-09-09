@@ -24,6 +24,7 @@ interface XmlViewerProps {
   filePath: string;
   tabId?: string;
   hotkeys?: HotkeyMap;
+  onInitialReady?: () => void;
 }
 
 type ViewMode = StructuredViewMode;
@@ -360,9 +361,15 @@ function findFoldableRegions(lines: string[]): Map<number, { end: number; tagNam
 // Main XmlViewer component
 // ─────────────────────────────────────────────
 
-const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys }) => {
+const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys, onInitialReady }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
+  const initialReadySentRef = useRef(false);
+  const notifyInitialReady = useCallback(() => {
+    if (initialReadySentRef.current) return;
+    initialReadySentRef.current = true;
+    onInitialReady?.();
+  }, [onInitialReady]);
   const savedUi = tabId ? getStructuredViewerUi(tabId) : undefined;
   const [content, setContent] = useState('');
   const [savedContent, setSavedContent] = useState('');
@@ -416,8 +423,11 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys }) => {
     setFoldMap(new Map());
     foldIdRef.current = 0;
     setCurrentLine(1);
-    loadFile(filePath).finally(() => setLoading(false));
-  }, [filePath, loadFile]);  // eslint-disable-line react-hooks/exhaustive-deps
+    loadFile(filePath).finally(() => {
+      setLoading(false);
+      notifyInitialReady();
+    });
+  }, [filePath, loadFile, notifyInitialReady]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep a ref to isDirty so the watcher callback can read the current value
   const isDirtyRef = useRef(false);
