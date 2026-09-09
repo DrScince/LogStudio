@@ -12,6 +12,7 @@ import SettingsPanel from './components/SettingsPanel';
 import AboutPanel from './components/AboutPanel';
 import TitleBar from './components/TitleBar';
 import Toast from './components/Toast';
+import StartupSplash, { SplashStatus } from './components/StartupSplash';
 import { loadSettings, saveSettings, AppSettings, DirectoryMeta } from './utils/settings';
 import {
   createWorkspace,
@@ -71,11 +72,50 @@ function App() {
   const manualCheckPending = useRef(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragError, setDragError] = useState<string | null>(null);
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [splashFading, setSplashFading] = useState(false);
+  const [splashStatus, setSplashStatus] = useState<SplashStatus>('starting');
   const tabsPersistReady = useRef(false);
   const tabsRef = useRef(tabs);
   const activeTabIdRef = useRef(activeTabId);
+  const splashDoneRef = useRef(false);
+  const splashStartedAtRef = useRef(Date.now());
+  const awaitingFileReadyRef = useRef(false);
   tabsRef.current = tabs;
   activeTabIdRef.current = activeTabId;
+
+  const dismissSplash = useCallback(() => {
+    if (splashDoneRef.current) return;
+    splashDoneRef.current = true;
+    awaitingFileReadyRef.current = false;
+    const elapsed = Date.now() - splashStartedAtRef.current;
+    const minVisibleMs = 450;
+    const wait = Math.max(0, minVisibleMs - elapsed);
+    window.setTimeout(() => {
+      setSplashFading(true);
+      window.setTimeout(() => setSplashVisible(false), 380);
+    }, wait);
+  }, []);
+
+  const handleViewerInitialReady = useCallback(() => {
+    if (splashDoneRef.current) return;
+    dismissSplash();
+  }, [dismissSplash]);
+
+  // Remove HTML boot splash once React splash is mounted
+  useEffect(() => {
+    const boot = document.getElementById('boot-splash');
+    if (!boot) return;
+    boot.classList.add('boot-splash--hide');
+    const t = window.setTimeout(() => boot.remove(), 280);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Safety: never leave the splash up forever
+  useEffect(() => {
+    const t = window.setTimeout(() => dismissSplash(), 15000);
+    return () => window.clearTimeout(t);
+  }, [dismissSplash]);
 
   const canReadFile = useCallback(async (filePath: string): Promise<boolean> => {
     if (!window.electronAPI?.getFileStats) return false;
@@ -412,6 +452,7 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setSplashStatus('restoring');
       const ws = settings.workspaces.find((w) => w.id === settings.activeWorkspaceId);
       const snapshots = filterValidOpenTabs(
         ws?.openTabs,
@@ -419,12 +460,23 @@ function App() {
         settings.virtualFolders ?? []
       );
       if (snapshots.length > 0) {
-        await restoreOpenTabs(snapshots, [], ws?.activeOpenTabKey, (partial) => {
+        setSplashStatus('loadingFile');
+        awaitingFileReadyRef.current = true;
+        const restored = await restoreOpenTabs(snapshots, [], ws?.activeOpenTabKey, (partial) => {
           if (cancelled) return;
           setTabs(partial.tabs);
           setActiveTabId(partial.activeId);
           pruneStructuredViewerUi(partial.tabs.map((t) => t.id));
         });
+        if (cancelled) return;
+        if (!restored.activeId) {
+          awaitingFileReadyRef.current = false;
+          dismissSplash();
+        }
+        // else: active viewer calls onInitialReady when content is loaded
+      } else {
+        awaitingFileReadyRef.current = false;
+        if (!cancelled) dismissSplash();
       }
       if (!cancelled) tabsPersistReady.current = true;
     })();
@@ -1086,6 +1138,18 @@ function App() {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
+      <StartupSplash
+        visible={splashVisible}
+        fading={splashFading}
+        status={splashStatus}
+        statusLabel={
+          splashStatus === 'loadingFile'
+            ? t('app.splashLoadingFile')
+            : splashStatus === 'restoring'
+              ? t('app.splashRestoring')
+              : t('app.splashStarting')
+        }
+      />
       {isDragOver && (
         <div className="drag-overlay" onClick={() => setIsDragOver(false)}>
           <div className="drag-overlay-content">
@@ -1254,6 +1318,7 @@ function App() {
             filePath={activeTab.filePath}
             tabId={activeTab.id}
             hotkeys={settings.hotkeys}
+            onInitialReady={handleViewerInitialReady}
             key={activeTabId ?? ''}
           />
         ) : activeTab?.isJson ? (
@@ -1261,6 +1326,7 @@ function App() {
             filePath={activeTab.filePath}
             tabId={activeTab.id}
             hotkeys={settings.hotkeys}
+            onInitialReady={handleViewerInitialReady}
             key={activeTabId ?? ''}
           />
         ) : activeTab?.isMarkdown ? (
@@ -1268,6 +1334,7 @@ function App() {
             filePath={activeTab.filePath}
             hotkeys={settings.hotkeys}
             theme={settings.theme}
+            onInitialReady={handleViewerInitialReady}
             key={activeTabId ?? ''}
           />
         ) : (
@@ -1285,6 +1352,7 @@ function App() {
               autoDetect={settings.autoDetect}
               enabledFormats={settings.enabledFormats}
               hotkeys={settings.hotkeys}
+              onInitialReady={handleViewerInitialReady}
               key={`${activeTabId}-${resetFilterTrigger}`}
             />
             <NamespaceToolbar
