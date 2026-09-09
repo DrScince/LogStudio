@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-09-09
+
 ### Changed
 - **Faster startup**: Window shows as soon as the UI is ready. Restored tabs no longer fully read each file up front — existence uses cheap `stat`, type flags are cached, and the last active file is restored first so you can work immediately while other tabs and the sidebar load in the background. Directory listing streams top-level files before recursing into subfolders. Auto-update check is deferred after first paint.
 
