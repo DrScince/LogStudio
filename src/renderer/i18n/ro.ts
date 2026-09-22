@@ -80,6 +80,7 @@ const ro: TranslationKeys = {
     autoLoadNewFiles: 'Încarcă automat fișiere noi',
     enabledFormats: 'Formate detectate',
     formatPipe: 'Pattern / Application Logs',
+    formatCopilot: 'GitHub Copilot / VS Output',
     formatLog4j: 'Log4j / Logback',
     formatJson: 'Jurnale JSON',
     formatLogfmt: 'Key Value (logfmt)',

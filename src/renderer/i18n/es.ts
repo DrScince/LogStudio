@@ -80,6 +80,7 @@ const es: TranslationKeys = {
     autoLoadNewFiles: 'Cargar nuevos archivos automáticamente',
     enabledFormats: 'Formatos detectados',
     formatPipe: 'Pattern / Application Logs',
+    formatCopilot: 'GitHub Copilot / VS Output',
     formatLog4j: 'Log4j / Logback',
     formatJson: 'Registros JSON',
     formatLogfmt: 'Key Value (logfmt)',

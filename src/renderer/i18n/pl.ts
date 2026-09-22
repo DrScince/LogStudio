@@ -81,6 +81,7 @@ const pl: TranslationKeys = {
     autoLoadNewFiles: 'Automatycznie ładuj nowe pliki',
     enabledFormats: 'Rozpoznawane formaty',
     formatPipe: 'Pattern / Application Logs',
+    formatCopilot: 'GitHub Copilot / VS Output',
     formatLog4j: 'Log4j / Logback',
     formatJson: 'Logi JSON',
     formatLogfmt: 'Key Value (logfmt)',

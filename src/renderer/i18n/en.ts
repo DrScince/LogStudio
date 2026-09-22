@@ -83,6 +83,7 @@ const en = {
     autoLoadNewFiles: 'Auto-load new files',
     enabledFormats: 'Detected Formats',
     formatPipe: 'Pattern / Application Logs',
+    formatCopilot: 'GitHub Copilot / VS Output',
     formatLog4j: 'Log4j / Logback',
     formatJson: 'JSON Logs',
     formatLogfmt: 'Key Value (logfmt)',

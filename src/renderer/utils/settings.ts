@@ -100,7 +100,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   editorOrder: ['vscode', 'notepadplusplus', 'notepad'],
   language: detectLanguage(),
   autoDetect: true,
-  enabledFormats: ['pipe', 'log4j', 'json', 'logfmt', 'syslog', 'apache', 'german'],
+  enabledFormats: ['pipe', 'copilot', 'log4j', 'json', 'logfmt', 'syslog', 'apache', 'german'],
   includeSubdirectories: false,
   hotkeys: DEFAULT_HOTKEYS,
 };
@@ -124,6 +124,18 @@ export function loadSettings(): AppSettings {
       // Migration: legacy single logDirectory → logDirectories list
       if (base.logDirectory && base.logDirectories.length === 0) {
         base.logDirectories = [base.logDirectory];
+      }
+      // Migration: ensure Copilot/VS format group is enabled for existing installs
+      if (Array.isArray(base.enabledFormats) && !base.enabledFormats.includes('copilot')) {
+        const pipeIdx = base.enabledFormats.indexOf('pipe');
+        base.enabledFormats =
+          pipeIdx >= 0
+            ? [
+                ...base.enabledFormats.slice(0, pipeIdx + 1),
+                'copilot',
+                ...base.enabledFormats.slice(pipeIdx + 1),
+              ]
+            : ['copilot', ...base.enabledFormats];
       }
       return ensureWorkspaces(base);
     }
