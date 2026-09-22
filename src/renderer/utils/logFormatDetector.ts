@@ -11,6 +11,7 @@
  *   syslog-rfc3164  – <PRI>Mon DD HH:mm:ss host app[pid]: msg
  *   apache-combined – IP - user [date] "METHOD URL HTTP/x" status bytes
  *   german-date     – DD.MM.YYYY HH:mm:ss … (with indented continuation lines)
+ *   bracket-iso     – [YYYY-MM-DDThh:mm:ssZ] [LEVEL] [Namespace] Message  (VS / Copilot)
  *   generic         – Any line starting with an ISO timestamp + optional level keyword
  */
 
@@ -29,6 +30,7 @@ export type FormatName =
   | 'syslog-rfc3164'
   | 'apache-combined'
   | 'german-date'
+  | 'bracket-iso'
   | 'xml'
   | 'plain-text'
   | 'generic';
@@ -95,6 +97,8 @@ const RE = {
   sys3164: /^<(\d+)>(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+(\S+?)(?:\[(\d+)\])?\s*:\s*(.*)/,
   apache:  /^(\S+) \S+ (\S+) \[([^\]]+)\] "([^"]*)" (\d{3}) (\S+)/,
   german:  /^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}:\d{2}:\d{2})\s*(.*)/,
+  // VS Code / GitHub Copilot style: [ISO] [LEVEL] [Logger] message
+  bracketIso: /^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)\]\s+\[(DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|TRACE)\]\s+(?:\[([^\]]*)\]\s+)?(.*)$/i,
   genTs:   /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:\d{2})?)\s+(DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|TRACE|WARNING)?\s*(.*)/,
 };
 
@@ -102,7 +106,7 @@ const RE = {
 
 /** Maps format group keys (from settings) to the FormatNames they cover. */
 const FORMAT_GROUP_MAP: Record<string, FormatName[]> = {
-  pipe:   ['pipe-separated', 'iso-simple', 'generic'],
+  pipe:   ['pipe-separated', 'iso-simple', 'bracket-iso', 'generic'],
   log4j:  ['log4j'],
   json:   ['json-ecs', 'json-multiline'],
   logfmt: ['logfmt'],
@@ -163,6 +167,7 @@ export function detectLogFormat(content: string, enabledFormatGroups?: string[])
     [RE.pipeSep,  'pipe-separated',  'Pipe-Separated'     ],
     [RE.log4j,    'log4j',           'Log4j / Logback'    ],
     [RE.isoSim,   'iso-simple',      'ISO Timestamp'      ],
+    [RE.bracketIso,'bracket-iso',    'Bracket ISO (VS/Copilot)'],
     [RE.jsonLine, 'json-ecs',        'JSON / ECS'         ],
     [RE.logfmt,   'logfmt',          'Logfmt'             ],
     [RE.sys5424,  'syslog-rfc5424',  'Syslog RFC 5424'    ],
@@ -296,6 +301,21 @@ function parseIsoSimple(lines: string[], lo: number): LogEntry[] {
       level: normalizeLevel(m[2]),
       namespace: m[3],
       message: m[4].trim(),
+    };
+  }, lo);
+}
+
+/** VS Code / GitHub Copilot: [ISO] [LEVEL] [Namespace] Message */
+function parseBracketIso(lines: string[], lo: number): LogEntry[] {
+  return buildLogEntries(lines, (line) => {
+    const m = RE.bracketIso.exec(line);
+    if (!m) return null;
+    return {
+      timestamp: m[1],
+      level: normalizeLevel(m[2]),
+      namespace: (m[3] ?? '').trim(),
+      message: (m[4] ?? '').trim(),
+      fullText: line,
     };
   }, lo);
 }
@@ -565,21 +585,29 @@ export function parseWithFormat(
   lineOffset = 0,
 ): LogEntry[] {
   const lines = content.split('\n');
+  let entries: LogEntry[];
   switch (format.name) {
-    case 'pipe-separated':  return parsePipeSep(lines, lineOffset);
-    case 'log4j':           return parseLog4j(lines, lineOffset);
-    case 'iso-simple':      return parseIsoSimple(lines, lineOffset);
-    case 'json-ecs':        return parseJsonEcs(lines, lineOffset);
-    case 'json-multiline':  return parseJsonMultiline(content, lineOffset);
-    case 'logfmt':          return parseLogfmt(lines, lineOffset);
-    case 'syslog-rfc5424':  return parseSyslog5424(lines, lineOffset);
-    case 'syslog-rfc3164':  return parseSyslog3164(lines, lineOffset);
-    case 'apache-combined': return parseApache(lines, lineOffset);
-    case 'german-date':     return parseGermanDate(lines, lineOffset);
-    case 'xml':             return parsePlainText(lines, lineOffset);
-    case 'plain-text':      return parsePlainText(lines, lineOffset);
-    default:                return parseGeneric(lines, lineOffset);
+    case 'pipe-separated':  entries = parsePipeSep(lines, lineOffset); break;
+    case 'log4j':           entries = parseLog4j(lines, lineOffset); break;
+    case 'iso-simple':      entries = parseIsoSimple(lines, lineOffset); break;
+    case 'bracket-iso':     entries = parseBracketIso(lines, lineOffset); break;
+    case 'json-ecs':        entries = parseJsonEcs(lines, lineOffset); break;
+    case 'json-multiline':  entries = parseJsonMultiline(content, lineOffset); break;
+    case 'logfmt':          entries = parseLogfmt(lines, lineOffset); break;
+    case 'syslog-rfc5424':  entries = parseSyslog5424(lines, lineOffset); break;
+    case 'syslog-rfc3164':  entries = parseSyslog3164(lines, lineOffset); break;
+    case 'apache-combined': entries = parseApache(lines, lineOffset); break;
+    case 'german-date':     entries = parseGermanDate(lines, lineOffset); break;
+    case 'xml':             entries = parsePlainText(lines, lineOffset); break;
+    case 'plain-text':      entries = parsePlainText(lines, lineOffset); break;
+    default:                entries = parseGeneric(lines, lineOffset); break;
   }
+
+  // Never leave a non-empty file blank — fall back to one entry per line.
+  if (entries.length === 0 && lines.some((l) => l.trim())) {
+    return parsePlainText(lines, lineOffset);
+  }
+  return entries;
 }
 
 /** Convenience wrapper: detect format then parse. */
