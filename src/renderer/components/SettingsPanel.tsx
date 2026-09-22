@@ -17,13 +17,14 @@ const EDITOR_LABELS: Record<EditorId, string> = {
 };
 
 const FORMAT_GROUPS = [
-  { key: 'pipe',   labelKey: 'settings.formatPipe'   as const },
-  { key: 'log4j',  labelKey: 'settings.formatLog4j'  as const },
-  { key: 'json',   labelKey: 'settings.formatJson'   as const },
-  { key: 'logfmt', labelKey: 'settings.formatLogfmt' as const },
-  { key: 'syslog', labelKey: 'settings.formatSyslog' as const },
-  { key: 'apache', labelKey: 'settings.formatApache' as const },
-  { key: 'german', labelKey: 'settings.formatGerman' as const },
+  { key: 'pipe',    labelKey: 'settings.formatPipe'    as const },
+  { key: 'copilot', labelKey: 'settings.formatCopilot' as const },
+  { key: 'log4j',   labelKey: 'settings.formatLog4j'   as const },
+  { key: 'json',    labelKey: 'settings.formatJson'    as const },
+  { key: 'logfmt',  labelKey: 'settings.formatLogfmt'  as const },
+  { key: 'syslog',  labelKey: 'settings.formatSyslog'  as const },
+  { key: 'apache',  labelKey: 'settings.formatApache'  as const },
+  { key: 'german',  labelKey: 'settings.formatGerman'  as const },
 ];
 
 type SettingsTab = 'general' | 'source' | 'schema' | 'tools';

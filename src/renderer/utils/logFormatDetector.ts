@@ -11,7 +11,9 @@
  *   syslog-rfc3164  – <PRI>Mon DD HH:mm:ss host app[pid]: msg
  *   apache-combined – IP - user [date] "METHOD URL HTTP/x" status bytes
  *   german-date     – DD.MM.YYYY HH:mm:ss … (with indented continuation lines)
+ *   vs-copilot      – [ISO] [LEVEL] [Logger] Message  (VS Output / GitHub Copilot)
  *   generic         – Any line starting with an ISO timestamp + optional level keyword
+ *   plain-text      – Last-resort fallback: one LogEntry per non-empty line
  */
 
 import { LogEntry, LogLevel } from '../types/log';
@@ -29,6 +31,7 @@ export type FormatName =
   | 'syslog-rfc3164'
   | 'apache-combined'
   | 'german-date'
+  | 'vs-copilot'
   | 'xml'
   | 'plain-text'
   | 'generic';
@@ -95,6 +98,14 @@ const RE = {
   sys3164: /^<(\d+)>(\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+(\S+?)(?:\[(\d+)\])?\s*:\s*(.*)/,
   apache:  /^(\S+) \S+ (\S+) \[([^\]]+)\] "([^"]*)" (\d{3}) (\S+)/,
   german:  /^(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}:\d{2}:\d{2})\s*(.*)/,
+  /**
+   * VS Code / Visual Studio output & GitHub Copilot language-server lines, e.g.
+   *   [2026-03-18T14:22:01.142Z] [INFO] [GitHub.Copilot] message
+   *   [2026-03-18T14:22:01.142Z] [info] message
+   * Level may be upper- or lowercase; logger/category bracket is optional.
+   */
+  vsCopilot:
+    /^\[(\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d{1,9})?(?:Z|[+-]\d{2}:?\d{2})?)?)\]\s+\[(DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|TRACE|VERBOSE)\]\s+(?:\[([^\]]*)\]\s+)?(.*)$/i,
   genTs:   /^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:\d{2})?)\s+(DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|TRACE|WARNING)?\s*(.*)/,
 };
 
@@ -102,19 +113,44 @@ const RE = {
 
 /** Maps format group keys (from settings) to the FormatNames they cover. */
 const FORMAT_GROUP_MAP: Record<string, FormatName[]> = {
-  pipe:   ['pipe-separated', 'iso-simple', 'generic'],
-  log4j:  ['log4j'],
-  json:   ['json-ecs', 'json-multiline'],
-  logfmt: ['logfmt'],
-  syslog: ['syslog-rfc5424', 'syslog-rfc3164'],
-  apache: ['apache-combined'],
-  german: ['german-date'],
+  pipe:    ['pipe-separated', 'iso-simple', 'generic'],
+  copilot: ['vs-copilot'],
+  log4j:   ['log4j'],
+  json:    ['json-ecs', 'json-multiline'],
+  logfmt:  ['logfmt'],
+  syslog:  ['syslog-rfc5424', 'syslog-rfc3164'],
+  apache:  ['apache-combined'],
+  german:  ['german-date'],
 };
+
+/** Copilot / VS Output branding hints used to boost detection confidence. */
+const COPILOT_HINT_RE =
+  /\b(?:GitHub\.Copilot|GitHub Copilot|CopilotChat|copilot-agent|Copilot\.Agent|github\.copilot)\b/i;
 
 function scoreLines(lines: string[], re: RegExp): number {
   const nonEmpty = lines.filter((l) => l.trim()).length;
   if (nonEmpty === 0) return 0;
   return lines.filter((l) => l.trim() && re.test(l)).length / nonEmpty;
+}
+
+/**
+ * Dedicated VS/Copilot detector: high line-match score and/or branding hints
+ * (so Copilot dumps are not left to the generic plain-text fallback).
+ */
+function detectVsCopilot(sampleLines: string[]): DetectedFormat | null {
+  const score = scoreLines(sampleLines, RE.vsCopilot);
+  const branded = sampleLines.some((l) => COPILOT_HINT_RE.test(l));
+  // Prefer structured Copilot parsing whenever branding is present and at least
+  // some lines match, or when most lines match the bracketed ISO pattern.
+  if (score >= 0.55 || (branded && score >= 0.25)) {
+    const confidence = Math.min(1, score + (branded ? 0.2 : 0));
+    return {
+      name: 'vs-copilot',
+      displayName: 'GitHub Copilot / VS',
+      confidence,
+    };
+  }
+  return null;
 }
 
 /**
@@ -159,6 +195,16 @@ export function detectLogFormat(content: string, enabledFormatGroups?: string[])
     return { name: 'json-multiline', displayName: 'JSON (Multi-line)', confidence: 1.0 };
   }
 
+  // Prefer dedicated VS / Copilot detection before generic scoring
+  const copilotAllowed =
+    !enabledFormatGroups ||
+    enabledFormatGroups.length === 0 ||
+    enabledFormatGroups.includes('copilot');
+  if (copilotAllowed) {
+    const vs = detectVsCopilot(sampleLines);
+    if (vs) return vs;
+  }
+
   const allCandidates: [RegExp, FormatName, string][] = [
     [RE.pipeSep,  'pipe-separated',  'Pipe-Separated'     ],
     [RE.log4j,    'log4j',           'Log4j / Logback'    ],
@@ -197,6 +243,11 @@ export function detectLogFormat(content: string, enabledFormatGroups?: string[])
       bestScore = score;
       best = { name, displayName, confidence: score };
     }
+  }
+
+  // No structured format matched — mark as plain-text so the UI shows the fallback.
+  if (best.confidence === 0 && sampleLines.some((l) => l.trim())) {
+    return { name: 'plain-text', displayName: 'Plain Text', confidence: 0 };
   }
 
   return best;
@@ -296,6 +347,21 @@ function parseIsoSimple(lines: string[], lo: number): LogEntry[] {
       level: normalizeLevel(m[2]),
       namespace: m[3],
       message: m[4].trim(),
+    };
+  }, lo);
+}
+
+/** VS Code / Visual Studio / GitHub Copilot output lines. */
+function parseVsCopilot(lines: string[], lo: number): LogEntry[] {
+  return buildLogEntries(lines, (line) => {
+    const m = RE.vsCopilot.exec(line);
+    if (!m) return null;
+    return {
+      timestamp: m[1],
+      level: normalizeLevel(m[2]),
+      namespace: (m[3] ?? '').trim(),
+      message: (m[4] ?? '').trim(),
+      fullText: line,
     };
   }, lo);
 }
@@ -565,21 +631,30 @@ export function parseWithFormat(
   lineOffset = 0,
 ): LogEntry[] {
   const lines = content.split('\n');
+  let entries: LogEntry[];
   switch (format.name) {
-    case 'pipe-separated':  return parsePipeSep(lines, lineOffset);
-    case 'log4j':           return parseLog4j(lines, lineOffset);
-    case 'iso-simple':      return parseIsoSimple(lines, lineOffset);
-    case 'json-ecs':        return parseJsonEcs(lines, lineOffset);
-    case 'json-multiline':  return parseJsonMultiline(content, lineOffset);
-    case 'logfmt':          return parseLogfmt(lines, lineOffset);
-    case 'syslog-rfc5424':  return parseSyslog5424(lines, lineOffset);
-    case 'syslog-rfc3164':  return parseSyslog3164(lines, lineOffset);
-    case 'apache-combined': return parseApache(lines, lineOffset);
-    case 'german-date':     return parseGermanDate(lines, lineOffset);
-    case 'xml':             return parsePlainText(lines, lineOffset);
-    case 'plain-text':      return parsePlainText(lines, lineOffset);
-    default:                return parseGeneric(lines, lineOffset);
+    case 'pipe-separated':  entries = parsePipeSep(lines, lineOffset); break;
+    case 'log4j':           entries = parseLog4j(lines, lineOffset); break;
+    case 'iso-simple':      entries = parseIsoSimple(lines, lineOffset); break;
+    case 'vs-copilot':      entries = parseVsCopilot(lines, lineOffset); break;
+    case 'json-ecs':        entries = parseJsonEcs(lines, lineOffset); break;
+    case 'json-multiline':  entries = parseJsonMultiline(content, lineOffset); break;
+    case 'logfmt':          entries = parseLogfmt(lines, lineOffset); break;
+    case 'syslog-rfc5424':  entries = parseSyslog5424(lines, lineOffset); break;
+    case 'syslog-rfc3164':  entries = parseSyslog3164(lines, lineOffset); break;
+    case 'apache-combined': entries = parseApache(lines, lineOffset); break;
+    case 'german-date':     entries = parseGermanDate(lines, lineOffset); break;
+    case 'xml':             entries = parsePlainText(lines, lineOffset); break;
+    case 'plain-text':      entries = parsePlainText(lines, lineOffset); break;
+    default:                entries = parseGeneric(lines, lineOffset); break;
   }
+
+  // Last-resort plain-text fallback only — structured formats (incl. vs-copilot)
+  // must win whenever they produce entries.
+  if (entries.length === 0 && lines.some((l) => l.trim())) {
+    return parsePlainText(lines, lineOffset);
+  }
+  return entries;
 }
 
 /** Convenience wrapper: detect format then parse. */

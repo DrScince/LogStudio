@@ -14,6 +14,7 @@ interface MarkdownViewerProps {
   hotkeys?: HotkeyMap;
   theme?: 'dark' | 'light';
   onInitialReady?: () => void;
+  onTogglePlainText?: () => void;
 }
 
 const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
@@ -21,6 +22,7 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
   hotkeys,
   theme = 'dark',
   onInitialReady,
+  onTogglePlainText,
 }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
@@ -360,6 +362,16 @@ const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
         >
           {previewEnabled ? t('markdown.hidePreview') : t('markdown.showPreview')}
         </button>
+        {onTogglePlainText && (
+          <button
+            type="button"
+            className="md-btn"
+            onClick={onTogglePlainText}
+            title={t('markdown.openAsPlainText')}
+          >
+            {t('markdown.openAsPlainText')}
+          </button>
+        )}
         <button
           type="button"
           className="md-btn"

@@ -7,6 +7,7 @@ import { isChordStarter, matchesBinding } from '../utils/hotkeys';
 import {
   childNodeKey,
   getStructuredViewerUi,
+  resolveStructuredDisplayMode,
   setStructuredViewerUi,
   type StructuredViewMode,
 } from '../utils/viewerUiState';
@@ -25,6 +26,10 @@ interface XmlViewerProps {
   tabId?: string;
   hotkeys?: HotkeyMap;
   onInitialReady?: () => void;
+  /** Demote this tab to the plain LogViewer when structured viewing is not useful. */
+  onOpenAsPlainText?: () => void;
+  /** Toggle plain-text mode (same as toolbar button on every file). */
+  onTogglePlainText?: () => void;
 }
 
 type ViewMode = StructuredViewMode;
@@ -361,7 +366,14 @@ function findFoldableRegions(lines: string[]): Map<number, { end: number; tagNam
 // Main XmlViewer component
 // ─────────────────────────────────────────────
 
-const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys, onInitialReady }) => {
+const XmlViewer: React.FC<XmlViewerProps> = ({
+  filePath,
+  tabId,
+  hotkeys,
+  onInitialReady,
+  onOpenAsPlainText,
+  onTogglePlainText,
+}) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
   const initialReadySentRef = useRef(false);
@@ -768,6 +780,9 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys, onIniti
 
   const parseError = xmlDoc?.querySelector('parsererror');
   const rootElement = !parseError ? xmlDoc?.documentElement ?? null : null;
+  const hasTreeParseError = Boolean(content.trim()) && (!xmlDoc || Boolean(parseError) || !rootElement);
+  // Soft fallback: keep the user's tree preference, but show raw text when XML is invalid.
+  const displayMode = resolveStructuredDisplayMode(viewMode, hasTreeParseError);
 
   // ── Lines + fold analysis ──────────────────
   const contentLines = useMemo(() => content.split('\n'), [content]);
@@ -881,15 +896,9 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys, onIniti
   const fileName = filePath.split(/[/\\]/).pop() ?? filePath;
 
   // ── Tree expand / collapse all ─────────────
-  const triggerCollapse = (collapsed: boolean) => {
-    if (!collapsed) {
-      setCollapsedPaths(new Set());
-      return;
-    }
-    if (!rootElement) {
-      setCollapsedPaths(new Set());
-      return;
-    }
+  const expandAll = () => setCollapsedPaths(new Set());
+  const collapseAll = () => {
+    if (!rootElement) return;
     setCollapsedPaths(new Set(collectXmlExpandableKeys(rootElement, '0')));
   };
 
@@ -933,6 +942,26 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys, onIniti
         </div>
       )}
 
+      {/* ── Parse-error → plain-text fallback banner ── */}
+      {hasTreeParseError && (
+        <div className="xml-fallback-banner" role="status">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M8 5v4M8 11v.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+          </svg>
+          <span>{t('xml.parseErrorFallback')}</span>
+          {onOpenAsPlainText && (
+            <button
+              className="xml-btn xml-btn-primary xml-btn-sm"
+              onClick={onOpenAsPlainText}
+              title={t('xml.openAsPlainText')}
+            >
+              {t('xml.openAsPlainText')}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Toolbar ─────────────────────────────── */}
       <div className="xml-toolbar">
         <span className="xml-toolbar-filename">
@@ -950,7 +979,7 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys, onIniti
         {/* View toggle */}
         <div className="xml-view-toggle">
           <button
-            className={`xml-view-btn ${viewMode === 'raw' ? 'active' : ''}`}
+            className={`xml-view-btn ${displayMode === 'raw' ? 'active' : ''}`}
             onClick={() => setViewMode('raw')}
             title={t('xml.viewRaw')}
           >
@@ -960,9 +989,11 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys, onIniti
             {t('xml.viewRaw')}
           </button>
           <button
-            className={`xml-view-btn ${viewMode === 'tree' ? 'active' : ''}`}
+            className={`xml-view-btn ${viewMode === 'tree' && !hasTreeParseError ? 'active' : ''}`}
             onClick={() => setViewMode('tree')}
-            title={t('xml.viewTree')}
+            title={hasTreeParseError ? t('xml.parseError') : t('xml.viewTree')}
+            disabled={hasTreeParseError}
+            aria-disabled={hasTreeParseError}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <rect x="1" y="2" width="4" height="3" rx="1" stroke="currentColor" strokeWidth="1.2"/>
@@ -975,15 +1006,15 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys, onIniti
           </button>
         </div>
 
-        {viewMode === 'tree' && (
+        {displayMode === 'tree' && (
           <>
-            <button className="xml-btn" onClick={() => triggerCollapse(false)} title={t('xml.expandAll')}>
+            <button className="xml-btn" onClick={expandAll} title={t('xml.expandAll')}>
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                 <path d="M2 5l6 6 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               {t('xml.expandAll')}
             </button>
-            <button className="xml-btn" onClick={() => triggerCollapse(true)} title={t('xml.collapseAll')}>
+            <button className="xml-btn" onClick={collapseAll} title={t('xml.collapseAll')}>
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                 <path d="M2 11l6-6 6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -993,6 +1024,19 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys, onIniti
         )}
 
         <div className="xml-toolbar-spacer" />
+
+        {(onTogglePlainText || onOpenAsPlainText) && (
+          <button
+            className="xml-btn"
+            onClick={onTogglePlainText ?? onOpenAsPlainText}
+            title={t('xml.openAsPlainText')}
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path d="M5 4L1 8l4 4M11 4l4 4-4 4M9 2l-2 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {t('xml.openAsPlainText')}
+          </button>
+        )}
 
         {/* Save status */}
         {saveStatus === 'saved' && <span className="xml-status xml-status-ok">✓ {t('xml.saved')}</span>}
@@ -1010,8 +1054,8 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys, onIniti
         )}
       </div>
 
-      {/* ── Raw view ────────────────────────────── */}
-      {viewMode === 'raw' && (
+      {/* ── Raw view (also used as fallback when tree parse fails) ── */}
+      {displayMode === 'raw' && (
         <div className="xml-raw-scroller" ref={scrollerRef}>
           <div className="xml-editor-layout">
             <div className="xml-line-gutter">
@@ -1076,41 +1120,29 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, tabId, hotkeys, onIniti
       )}
 
       {/* ── Tree view ───────────────────────────── */}
-      {viewMode === 'tree' && (
+      {displayMode === 'tree' && rootElement && (
         <div className="xml-tree-scroller">
-          {parseError ? (
-            <div className="xml-parse-error">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.4"/>
-                <path d="M8 5v4M8 11v.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-              </svg>
-              {t('xml.parseError')}
-            </div>
-          ) : rootElement ? (
-            <div className="xml-tree-root">
-              {/* Declaration comment if present */}
-              {xmlSourceForTree.startsWith('<?xml') && (
-                <div className="xml-tree-decl">
-                  {xmlSourceForTree.match(/^<\?xml[^?]*\?>/)?.[0] ?? '<?xml version="1.0"?>'}
-                </div>
-              )}
-              <XmlTreeNode
-                node={rootElement}
-                depth={0}
-                nodeKey="0"
-                collapsedPaths={collapsedPaths}
-                onToggleCollapse={toggleCollapse}
-                xmlDoc={xmlDoc ?? undefined}
-                onContentChange={(newXml) => {
-                  setContent(newXml);
-                  setFoldMap(new Map());
-                  foldIdRef.current = 0;
-                }}
-              />
-            </div>
-          ) : (
-            <div className="xml-parse-error">{t('xml.parseError')}</div>
-          )}
+          <div className="xml-tree-root">
+            {/* Declaration comment if present */}
+            {xmlSourceForTree.startsWith('<?xml') && (
+              <div className="xml-tree-decl">
+                {xmlSourceForTree.match(/^<\?xml[^?]*\?>/)?.[0] ?? '<?xml version="1.0"?>'}
+              </div>
+            )}
+            <XmlTreeNode
+              node={rootElement}
+              depth={0}
+              nodeKey="0"
+              collapsedPaths={collapsedPaths}
+              onToggleCollapse={toggleCollapse}
+              xmlDoc={xmlDoc ?? undefined}
+              onContentChange={(newXml) => {
+                setContent(newXml);
+                setFoldMap(new Map());
+                foldIdRef.current = 0;
+              }}
+            />
+          </div>
         </div>
       )}
     </div>

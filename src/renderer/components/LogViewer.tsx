@@ -32,6 +32,12 @@ interface LogViewerProps {
   hotkeys?: HotkeyMap;
   /** Fired once after the first successful content load (or empty state). */
   onInitialReady?: () => void;
+  /** Skip format detection and parse every line as plain text. */
+  forcePlainText?: boolean;
+  /** Whether plain-text mode is currently active (for toggle button state). */
+  plainTextActive?: boolean;
+  /** Toggle plain-text mode for this tab. */
+  onTogglePlainText?: () => void;
 }
 
 type ResizableColumn = 'timestamp' | 'level' | 'namespace';
@@ -117,6 +123,9 @@ const LogViewer: React.FC<LogViewerProps> = ({
   enabledFormats,
   hotkeys,
   onInitialReady,
+  forcePlainText = false,
+  plainTextActive = false,
+  onTogglePlainText,
 }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
@@ -143,7 +152,6 @@ const LogViewer: React.FC<LogViewerProps> = ({
   const [isCompactSearchMode, setIsCompactSearchMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [detectedFormat, setDetectedFormat] = useState<DetectedFormat | null>(null);
-  const [rawContent, setRawContent] = useState<string | null>(null);
   const [expandedLines, setExpandedLines] = useState<Set<number>>(new Set());
   const [viewerHeight, setViewerHeight] = useState(600);
 
@@ -559,7 +567,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
     // Empty viewer (no file selected yet)
     notifyInitialReady();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filePath, filePaths?.join('|')]); // Use join to create stable dependency for filePaths
+  }, [filePath, filePaths?.join('|'), forcePlainText]); // Reload when plain-text mode toggles
 
   // Reload file when schema changes
   useEffect(() => {
@@ -650,7 +658,14 @@ const LogViewer: React.FC<LogViewerProps> = ({
         const result = await window.electronAPI.readLogFile(path);
         if (result.success && result.content) {
           let entries;
-          if (autoDetect) {
+          if (forcePlainText) {
+            const fmt: DetectedFormat = { name: 'plain-text', displayName: 'Plain Text', confidence: 1 };
+            entries = parseWithFormat(result.content, fmt);
+            if (!detectedFormatRef.current) {
+              detectedFormatRef.current = fmt;
+              setDetectedFormat(fmt);
+            }
+          } else if (autoDetect) {
             const fmt = detectLogFormat(result.content, enabledFormats);
             entries = parseWithFormat(result.content, fmt);
             // Store format from the first file
@@ -701,7 +716,7 @@ const LogViewer: React.FC<LogViewerProps> = ({
       setLoading(false);
       notifyInitialReady();
     }
-  }, [schema, autoDetect, enabledFormats, notifyInitialReady]);
+  }, [schema, autoDetect, enabledFormats, forcePlainText, notifyInitialReady]);
 
   const loadLogFile = async () => {
     if (!filePath || !window.electronAPI) {
@@ -727,21 +742,20 @@ const LogViewer: React.FC<LogViewerProps> = ({
         if (isInitialLoad) {
           // Initial load - parse everything
           let entries;
-          if (autoDetect) {
+          if (forcePlainText) {
+            const fmt: DetectedFormat = { name: 'plain-text', displayName: 'Plain Text', confidence: 1 };
+            detectedFormatRef.current = fmt;
+            setDetectedFormat(fmt);
+            entries = parseWithFormat(result.content, fmt);
+          } else if (autoDetect) {
             const fmt = detectLogFormat(result.content, enabledFormats);
             detectedFormatRef.current = fmt;
             setDetectedFormat(fmt);
-            if (fmt.name === 'xml' || fmt.name === 'plain-text') {
-              setRawContent(result.content);
-              entries = [];
-            } else {
-              setRawContent(null);
-              entries = parseWithFormat(result.content, fmt);
-            }
+            // plain-text / xml formats still produce one entry per line
+            entries = parseWithFormat(result.content, fmt);
           } else {
             detectedFormatRef.current = null;
             setDetectedFormat(null);
-            setRawContent(null);
             entries = parseLogFile(result.content, schema);
           }
           console.log(`LogViewer: Initial load - ${entries.length} entries parsed`);
@@ -782,21 +796,19 @@ const LogViewer: React.FC<LogViewerProps> = ({
           // File was truncated or replaced - reload everything
           console.log(`LogViewer: File truncated or replaced - reloading`);
           let entries;
-          if (autoDetect) {
+          if (forcePlainText) {
+            const fmt: DetectedFormat = { name: 'plain-text', displayName: 'Plain Text', confidence: 1 };
+            detectedFormatRef.current = fmt;
+            setDetectedFormat(fmt);
+            entries = parseWithFormat(result.content, fmt);
+          } else if (autoDetect) {
             const fmt = detectLogFormat(result.content, enabledFormats);
             detectedFormatRef.current = fmt;
             setDetectedFormat(fmt);
-            if (fmt.name === 'xml' || fmt.name === 'plain-text') {
-              setRawContent(result.content);
-              entries = [];
-            } else {
-              setRawContent(null);
-              entries = parseWithFormat(result.content, fmt);
-            }
+            entries = parseWithFormat(result.content, fmt);
           } else {
             detectedFormatRef.current = null;
             setDetectedFormat(null);
-            setRawContent(null);
             entries = parseLogFile(result.content, schema);
           }
           setLogEntries(entries);
@@ -1607,6 +1619,23 @@ const LogViewer: React.FC<LogViewerProps> = ({
             </div>
           </div>
           <div className={`log-viewer-stats ${hasActiveFilters ? 'has-filters' : ''}`}>
+          {onTogglePlainText && (
+            <button
+              type="button"
+              className={`plain-text-mode-button ${plainTextActive || forcePlainText ? 'active' : ''}`}
+              onClick={onTogglePlainText}
+              title={
+                plainTextActive || forcePlainText
+                  ? t('logviewer.exitPlainText')
+                  : t('logviewer.viewAsPlainText')
+              }
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <path d="M5 4L1 8l4 4M11 4l4 4-4 4M9 2l-2 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {t('logviewer.plainText')}
+            </button>
+          )}
           {autoDetect && detectedFormat && (() => {
             const conf = detectedFormat.confidence;
             const confClass = conf >= 0.7 ? 'high' : conf >= 0.4 ? 'medium' : 'low';

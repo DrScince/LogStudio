@@ -8,6 +8,17 @@ export interface StructuredViewerUiState {
   collapsedPaths: string[];
 }
 
+/**
+ * When tree parsing fails, fall back to raw/plain text without discarding the
+ * user's preferred viewMode (so tree restores once content becomes valid again).
+ */
+export function resolveStructuredDisplayMode(
+  viewMode: StructuredViewMode,
+  hasTreeParseError: boolean
+): StructuredViewMode {
+  return viewMode === 'tree' && hasTreeParseError ? 'raw' : viewMode;
+}
+
 const cache = new Map<string, StructuredViewerUiState>();
 
 export function getStructuredViewerUi(tabId: string): StructuredViewerUiState | undefined {

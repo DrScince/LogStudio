@@ -28,7 +28,7 @@ describe('SettingsPanel', () => {
     editorOrder: ['vscode', 'notepadplusplus', 'notepad'],
     language: 'en',
     autoDetect: true,
-    enabledFormats: ['pipe', 'log4j', 'json', 'logfmt', 'syslog', 'apache', 'german'],
+    enabledFormats: ['pipe', 'copilot', 'log4j', 'json', 'logfmt', 'syslog', 'apache', 'german'],
     includeSubdirectories: false,
     hotkeys: {
       save:           { ctrl: true,  alt: false, shift: false, key: 's' },

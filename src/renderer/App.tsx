@@ -42,6 +42,11 @@ import {
   type FileTypeFlags,
 } from './utils/fileTypeFlags';
 import { I18nProvider, useTranslation } from './i18n';
+import {
+  clearAllStructuredViewerUi,
+  clearStructuredViewerUi,
+  pruneStructuredViewerUi,
+} from './utils/viewerUiState';
 import './App.css';
 
 function App() {
@@ -937,6 +942,26 @@ function App() {
     setActiveTabId(tabId);
   }, []);
 
+  /** Switch active tab into plain-text LogViewer mode (keeps XML/JSON/MD flags for restore). */
+  const handleOpenAsPlainText = useCallback(() => {
+    const id = activeTabIdRef.current;
+    if (!id) return;
+    setTabs((prev) =>
+      prev.map((tab) => (tab.id === id ? { ...tab, forcePlainText: true } : tab))
+    );
+  }, []);
+
+  /** Toggle plain-text mode for the active tab (works for every file type). */
+  const handleTogglePlainText = useCallback(() => {
+    const id = activeTabIdRef.current;
+    if (!id) return;
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === id ? { ...tab, forcePlainText: !tab.forcePlainText } : tab
+      )
+    );
+  }, []);
+
   const handleTabClose = useCallback((tabId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     clearStructuredViewerUi(tabId);
@@ -1313,12 +1338,43 @@ function App() {
           includeSubdirectories={settings.includeSubdirectories}
           editorOrder={settings.editorOrder}
         />
-        {activeTab?.isXml ? (
+        {activeTab?.forcePlainText ? (
+          <>
+            <LogViewer
+              filePath={currentLogFile}
+              filePaths={currentLogFiles}
+              schema={settings.logSchema}
+              autoRefresh={settings.autoRefresh}
+              refreshInterval={settings.refreshInterval}
+              selectedNamespaces={selectedNamespaces}
+              onNamespacesChange={handleNamespacesChange}
+              onResetFilters={handleResetFilters}
+              editorOrder={settings.editorOrder}
+              autoDetect={settings.autoDetect}
+              enabledFormats={settings.enabledFormats}
+              hotkeys={settings.hotkeys}
+              forcePlainText
+              plainTextActive
+              onTogglePlainText={handleTogglePlainText}
+              onInitialReady={handleViewerInitialReady}
+              key={`${activeTabId}-plain-${resetFilterTrigger}`}
+            />
+            <NamespaceToolbar
+              namespaces={namespaces}
+              namespaceCounts={namespaceCounts}
+              selectedNamespaces={selectedNamespaces}
+              onNamespaceToggle={handleNamespaceToggle}
+              isVisible={!!currentLogFile || !!(currentLogFiles && currentLogFiles.length > 0)}
+            />
+          </>
+        ) : activeTab?.isXml ? (
           <XmlViewer
             filePath={activeTab.filePath}
             tabId={activeTab.id}
             hotkeys={settings.hotkeys}
             onInitialReady={handleViewerInitialReady}
+            onOpenAsPlainText={handleOpenAsPlainText}
+            onTogglePlainText={handleTogglePlainText}
             key={activeTabId ?? ''}
           />
         ) : activeTab?.isJson ? (
@@ -1327,6 +1383,8 @@ function App() {
             tabId={activeTab.id}
             hotkeys={settings.hotkeys}
             onInitialReady={handleViewerInitialReady}
+            onOpenAsPlainText={handleOpenAsPlainText}
+            onTogglePlainText={handleTogglePlainText}
             key={activeTabId ?? ''}
           />
         ) : activeTab?.isMarkdown ? (
@@ -1335,6 +1393,7 @@ function App() {
             hotkeys={settings.hotkeys}
             theme={settings.theme}
             onInitialReady={handleViewerInitialReady}
+            onTogglePlainText={handleTogglePlainText}
             key={activeTabId ?? ''}
           />
         ) : (
@@ -1353,6 +1412,8 @@ function App() {
               enabledFormats={settings.enabledFormats}
               hotkeys={settings.hotkeys}
               onInitialReady={handleViewerInitialReady}
+              plainTextActive={false}
+              onTogglePlainText={handleTogglePlainText}
               key={`${activeTabId}-${resetFilterTrigger}`}
             />
             <NamespaceToolbar
