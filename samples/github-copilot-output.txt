@@ -1,0 +1,23 @@
+[2026-03-18T14:22:01.142Z] [INFO] [GitHub.Copilot] Copilot language server starting
+[2026-03-18T14:22:01.188Z] [INFO] [GitHub.Copilot] agentVersion=1.270.0 node=v20.18.1
+[2026-03-18T14:22:01.201Z] [INFO] [GitHub.Copilot] auth status: SignedIn user=DrScince
+[2026-03-18T14:22:01.455Z] [INFO] [GitHub.Copilot] Fetched model metadata in 248ms
+[2026-03-18T14:22:02.011Z] [INFO] [GitHub.Copilot] Registered completion provider for typescript
+[2026-03-18T14:22:12.334Z] [INFO] [GitHub.Copilot] [fetchCompletions] editor=vscode document=file:///workspace/src/renderer/App.tsx
+[2026-03-18T14:22:12.891Z] [INFO] [GitHub.Copilot] prompt.chars=4821 prompt.tokens≈1205
+[2026-03-18T14:22:13.402Z] [INFO] [GitHub.Copilot] choices=1 finishReason=stop latencyMs=511
+[2026-03-18T14:22:13.410Z] [INFO] [GitHub.Copilot] shown completion id=cmp_7f3a21
+[2026-03-18T14:23:01.002Z] [WARN] [GitHub.Copilot] Rate limit approaching remaining=42/150
+[2026-03-18T14:24:44.771Z] [INFO] [GitHub.Copilot] chat.request id=chat_9c12 model=gpt-4.1
+[2026-03-18T14:24:45.120Z] [INFO] [GitHub.Copilot] tool.call name=read_file path=D:\Projects\iACF\...\SapDmClientTestService.cs
+[2026-03-18T14:24:45.880Z] [INFO] [GitHub.Copilot] tool.result ok bytes=18432
+[2026-03-18T14:24:48.201Z] [ERROR] [GitHub.Copilot] EdgeProcess exited immediately after start (exitCode=0)
+[2026-03-18T14:24:48.205Z] [ERROR] [GitHub.Copilot] ProcessStartInfo: RedirectStandardOutput=true CreateNoWindow=true WindowStyle=Hidden
+[2026-03-18T14:24:48.210Z] [INFO] [GitHub.Copilot] suggestion: use UseShellExecute=true and do not redirect stdout for GUI browsers
+[2026-03-18T14:25:10.044Z] [INFO] [GitHub.Copilot] panel.open "GitHub Copilot Chat"
+[2026-03-18T14:25:12.500Z] [INFO] [GitHub.Copilot] context.files=3 context.tokens≈8900
+[2026-03-18T14:25:18.933Z] [INFO] [GitHub.Copilot] response.done finishReason=stop latencyMs=6433
+[2026-03-18T14:26:02.111Z] [WARN] [GitHub.Copilot] Network retry attempt=1/3 status=429
+[2026-03-18T14:26:03.400Z] [INFO] [GitHub.Copilot] Network retry succeeded
+[2026-03-18T14:27:55.018Z] [INFO] [GitHub.Copilot] telemetry event=ghostText.shown count=14
+[2026-03-18T14:28:01.777Z] [INFO] [GitHub.Copilot] Copilot language server idle
