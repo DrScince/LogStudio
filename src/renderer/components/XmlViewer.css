@@ -29,6 +29,28 @@
   flex: 1;
 }
 
+/* ── Parse-error plain-text fallback banner ───────────── */
+.xml-fallback-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: color-mix(in srgb, var(--error, #e74c3c) 12%, var(--bg-secondary));
+  border-bottom: 1px solid color-mix(in srgb, var(--error, #e74c3c) 30%, transparent);
+  font-size: 12px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.xml-fallback-banner svg {
+  color: var(--error, #e74c3c);
+  flex-shrink: 0;
+}
+
+.xml-fallback-banner span {
+  flex: 1;
+}
+
 .xml-btn-sm {
   padding: 2px 10px;
   font-size: 11px;
@@ -108,6 +130,16 @@
 .xml-view-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.xml-view-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.xml-view-btn:disabled:hover {
+  background: transparent;
+  color: var(--text-secondary);
 }
 
 .xml-view-btn.active {

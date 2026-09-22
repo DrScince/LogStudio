@@ -5,6 +5,7 @@ import { HotkeyMap, DEFAULT_HOTKEYS } from '../utils/settings';
 import { isChordStarter, matchesBinding } from '../utils/hotkeys';
 import {
   getStructuredViewerUi,
+  resolveStructuredDisplayMode,
   setStructuredViewerUi,
   StructuredViewMode,
 } from '../utils/viewerUiState';
@@ -14,6 +15,8 @@ interface JsonViewerProps {
   filePath: string;
   hotkeys?: HotkeyMap;
   tabId?: string;
+  /** Demote this tab to the plain LogViewer when structured viewing is not useful. */
+  onOpenAsPlainText?: () => void;
 }
 
 function jsonPathKey(path: (string | number)[]): string {
@@ -259,7 +262,7 @@ const JsonTreeNode: React.FC<JsonTreeNodeProps> = ({
 // Main JsonViewer component
 // ─────────────────────────────────────────────
 
-const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId }) => {
+const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId, onOpenAsPlainText }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
   const savedUi = tabId ? getStructuredViewerUi(tabId) : undefined;
@@ -487,6 +490,10 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId }) => 
     catch { return { valid: false, value: null as unknown }; }
   }, [content]);
 
+  const hasTreeParseError = Boolean(content.trim()) && !parsedResult.valid;
+  // Soft fallback: keep the user's tree preference, but show raw text when JSON is invalid.
+  const displayMode = resolveStructuredDisplayMode(viewMode, hasTreeParseError);
+
   // ── Highlighted HTML ───────────────────────
   const highlightedHtml = React.useMemo(() => highlightJson(content), [content]);
 
@@ -551,6 +558,26 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId }) => 
         </div>
       )}
 
+      {/* ── Parse-error → plain-text fallback banner ── */}
+      {hasTreeParseError && (
+        <div className="json-fallback-banner" role="status">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M8 5v4M8 11v.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+          <span>{t('json.parseErrorFallback')}</span>
+          {onOpenAsPlainText && (
+            <button
+              className="json-btn json-btn-primary json-btn-sm"
+              onClick={onOpenAsPlainText}
+              title={t('json.openAsPlainText')}
+            >
+              {t('json.openAsPlainText')}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Toolbar ───────────────────────────── */}
       <div className="json-toolbar">
         <span className="json-toolbar-filename">
@@ -568,7 +595,7 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId }) => 
         {/* View toggle */}
         <div className="json-view-toggle">
           <button
-            className={`json-view-btn ${viewMode === 'raw' ? 'active' : ''}`}
+            className={`json-view-btn ${displayMode === 'raw' ? 'active' : ''}`}
             onClick={() => setViewMode('raw')}
             title={t('json.viewRaw')}
           >
@@ -578,9 +605,11 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId }) => 
             {t('json.viewRaw')}
           </button>
           <button
-            className={`json-view-btn ${viewMode === 'tree' ? 'active' : ''}`}
+            className={`json-view-btn ${viewMode === 'tree' && !hasTreeParseError ? 'active' : ''}`}
             onClick={() => setViewMode('tree')}
-            title={t('json.viewTree')}
+            title={hasTreeParseError ? t('json.parseError') : t('json.viewTree')}
+            disabled={hasTreeParseError}
+            aria-disabled={hasTreeParseError}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <rect x="1" y="2" width="4" height="3" rx="1" stroke="currentColor" strokeWidth="1.2" />
@@ -593,7 +622,7 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId }) => 
           </button>
         </div>
 
-        {viewMode === 'tree' && (
+        {displayMode === 'tree' && (
           <>
             <button className="json-btn" onClick={expandAll} title={t('json.expandAll')}>
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
@@ -627,8 +656,8 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId }) => 
         )}
       </div>
 
-      {/* ── Raw view ──────────────────────────── */}
-      {viewMode === 'raw' && (
+      {/* ── Raw view (also used as fallback when tree parse fails) ── */}
+      {displayMode === 'raw' && (
         <div className="json-raw-scroller" ref={scrollerRef}>
           <div className="json-raw-content">
             <pre
@@ -652,22 +681,18 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId }) => 
       )}
 
       {/* ── Tree view ─────────────────────────── */}
-      {viewMode === 'tree' && (
+      {displayMode === 'tree' && parsedResult.valid && (
         <div className="json-tree-scroller">
-          {!parsedResult.valid ? (
-            <div className="json-parse-error">{t('json.parseError')}</div>
-          ) : (
-            <div className="json-tree-root">
-              <JsonTreeNode
-                value={parsedResult.value}
-                depth={0}
-                path={[]}
-                collapsedPaths={collapsedPaths}
-                onToggleCollapse={handleToggleCollapse}
-                onValueChange={handleTreeValueChange}
-              />
-            </div>
-          )}
+          <div className="json-tree-root">
+            <JsonTreeNode
+              value={parsedResult.value}
+              depth={0}
+              path={[]}
+              collapsedPaths={collapsedPaths}
+              onToggleCollapse={handleToggleCollapse}
+              onValueChange={handleTreeValueChange}
+            />
+          </div>
         </div>
       )}
     </div>

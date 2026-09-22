@@ -834,6 +834,19 @@ function App() {
     setActiveTabId(tabId);
   }, []);
 
+  /** Demote XML/JSON/Markdown tab to plain LogViewer text mode. */
+  const handleOpenAsPlainText = useCallback(() => {
+    const id = activeTabIdRef.current;
+    if (!id) return;
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === id
+          ? { ...tab, isXml: false, isJson: false, isMarkdown: false }
+          : tab
+      )
+    );
+  }, []);
+
   const handleTabClose = useCallback((tabId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     clearStructuredViewerUi(tabId);
@@ -1203,6 +1216,7 @@ function App() {
             filePath={activeTab.filePath}
             hotkeys={settings.hotkeys}
             tabId={activeTab.id}
+            onOpenAsPlainText={handleOpenAsPlainText}
             key={activeTabId ?? ''}
           />
         ) : activeTab?.isJson ? (
@@ -1210,6 +1224,7 @@ function App() {
             filePath={activeTab.filePath}
             hotkeys={settings.hotkeys}
             tabId={activeTab.id}
+            onOpenAsPlainText={handleOpenAsPlainText}
             key={activeTabId ?? ''}
           />
         ) : activeTab?.isMarkdown ? (
