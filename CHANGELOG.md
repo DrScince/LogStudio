@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-09-22
+
+### Added
+- **GitHub Copilot / VS log format**: Detects and parses bracketed ISO lines (`[timestamp] [LEVEL] [Logger] message`), including lowercase levels and Copilot branding hints. New settings group “GitHub Copilot / VS Output” (enabled by default).
+- **Plain-text mode toggle**: Every open file (Log, XML, JSON, Markdown) has a **Plain text** button to switch to one-line-per-entry viewing; toggle again to restore the structured viewer. Active mode shows a **TXT** tab badge.
+- **Plain-text fallback**: When no structured format matches, files are shown as plain text instead of an empty view. Invalid XML/JSON tree views fall back to raw text with a banner.
+
+### Changed
+- Structured XML/JSON tree preference is kept when temporarily falling back to raw view so Tree restores once content is valid again.
+
 ## [2.11.1] - 2026-09-09
 
 ### Added
