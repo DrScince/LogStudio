@@ -227,6 +227,9 @@ const en = {
     searchResizePane: 'Resize search results pane',
     detectedFormat: 'Format: {{format}}',
     copiedToClipboard: 'Copied to clipboard',
+    plainText: 'Plain text',
+    viewAsPlainText: 'View as plain text (one line per entry)',
+    exitPlainText: 'Exit plain text mode',
   },
   // XML Viewer
   xml: {
@@ -276,6 +279,7 @@ const en = {
     pdfStageSave: 'Saving file…',
     pdfStageDone: 'Done',
     pdfStagePreview: 'Preparing preview…',
+    openAsPlainText: 'Open as plain text',
     save: 'Save',
     revert: 'Revert',
     unsavedChanges: 'Unsaved changes',

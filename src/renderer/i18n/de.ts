@@ -223,6 +223,9 @@ const de: TranslationKeys = {
     searchResizePane: 'Größe des Suchbereichs anpassen',
     detectedFormat: 'Format: {{format}}',
     copiedToClipboard: 'In Zwischenablage kopiert',
+    plainText: 'Plain text',
+    viewAsPlainText: 'Als Text anzeigen (eine Zeile pro Eintrag)',
+    exitPlainText: 'Plain-Text-Modus beenden',
   },
   xml: {
     viewRaw: 'Raw',
@@ -270,6 +273,7 @@ const de: TranslationKeys = {
     pdfStageSave: 'Datei speichern…',
     pdfStageDone: 'Fertig',
     pdfStagePreview: 'Vorschau vorbereiten…',
+    openAsPlainText: 'Als Text öffnen',
     save: 'Speichern',
     revert: 'Zurücksetzen',
     unsavedChanges: 'Ungespeicherte Änderungen',

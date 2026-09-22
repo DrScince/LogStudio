@@ -724,6 +724,33 @@ mark.search-highlight-active {
   margin-left: 1px;
 }
 
+.plain-text-mode-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.plain-text-mode-button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.plain-text-mode-button.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+
 .filter-badge-level {
   max-width: 180px;
 }

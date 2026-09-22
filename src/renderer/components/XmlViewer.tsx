@@ -19,6 +19,8 @@ interface XmlViewerProps {
   tabId?: string;
   /** Demote this tab to the plain LogViewer when structured viewing is not useful. */
   onOpenAsPlainText?: () => void;
+  /** Toggle plain-text mode (same as toolbar button on every file). */
+  onTogglePlainText?: () => void;
 }
 
 type XmlValueKind = 'text' | 'bool' | 'number' | 'path';
@@ -305,7 +307,7 @@ function findFoldableRegions(lines: string[]): Map<number, { end: number; tagNam
 // Main XmlViewer component
 // ─────────────────────────────────────────────
 
-const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys, tabId, onOpenAsPlainText }) => {
+const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys, tabId, onOpenAsPlainText, onTogglePlainText }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
   const savedUi = tabId ? getStructuredViewerUi(tabId) : undefined;
@@ -893,6 +895,19 @@ const XmlViewer: React.FC<XmlViewerProps> = ({ filePath, hotkeys, tabId, onOpenA
         )}
 
         <div className="xml-toolbar-spacer" />
+
+        {(onTogglePlainText || onOpenAsPlainText) && (
+          <button
+            className="xml-btn"
+            onClick={onTogglePlainText ?? onOpenAsPlainText}
+            title={t('xml.openAsPlainText')}
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path d="M5 4L1 8l4 4M11 4l4 4-4 4M9 2l-2 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {t('xml.openAsPlainText')}
+          </button>
+        )}
 
         {/* Save status */}
         {saveStatus === 'saved' && <span className="xml-status xml-status-ok">✓ {t('xml.saved')}</span>}

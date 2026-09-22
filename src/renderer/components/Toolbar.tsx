@@ -12,6 +12,8 @@ export interface Tab {
   isXml?: boolean;
   isJson?: boolean;
   isMarkdown?: boolean;
+  /** Force LogViewer plain-text mode (one entry per line), keeping structured flags for restore. */
+  forcePlainText?: boolean;
 }
 
 interface ToolbarProps {
@@ -83,9 +85,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
                   title={tooltipText}
                 >
                   <span className="toolbar-tab-label">{getTabLabel(tab)}</span>
-                  {tab.isXml && <span className="toolbar-tab-badge">XML</span>}
-                  {tab.isJson && <span className="toolbar-tab-badge toolbar-tab-badge-json">JSON</span>}
-                  {tab.isMarkdown && <span className="toolbar-tab-badge toolbar-tab-badge-md">MD</span>}
+                  {tab.isXml && !tab.forcePlainText && <span className="toolbar-tab-badge">XML</span>}
+                  {tab.isJson && !tab.forcePlainText && <span className="toolbar-tab-badge toolbar-tab-badge-json">JSON</span>}
+                  {tab.isMarkdown && !tab.forcePlainText && <span className="toolbar-tab-badge toolbar-tab-badge-md">MD</span>}
+                  {tab.forcePlainText && <span className="toolbar-tab-badge toolbar-tab-badge-txt">TXT</span>}
                   <button
                     className="toolbar-tab-close"
                     onClick={(e) => onTabClose(tab.id, e)}

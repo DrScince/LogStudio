@@ -17,6 +17,8 @@ interface JsonViewerProps {
   tabId?: string;
   /** Demote this tab to the plain LogViewer when structured viewing is not useful. */
   onOpenAsPlainText?: () => void;
+  /** Toggle plain-text mode (same as toolbar button on every file). */
+  onTogglePlainText?: () => void;
 }
 
 function jsonPathKey(path: (string | number)[]): string {
@@ -262,7 +264,7 @@ const JsonTreeNode: React.FC<JsonTreeNodeProps> = ({
 // Main JsonViewer component
 // ─────────────────────────────────────────────
 
-const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId, onOpenAsPlainText }) => {
+const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId, onOpenAsPlainText, onTogglePlainText }) => {
   const { t } = useTranslation();
   const hk = hotkeys ?? DEFAULT_HOTKEYS;
   const savedUi = tabId ? getStructuredViewerUi(tabId) : undefined;
@@ -640,6 +642,19 @@ const JsonViewer: React.FC<JsonViewerProps> = ({ filePath, hotkeys, tabId, onOpe
         )}
 
         <div className="json-toolbar-spacer" />
+
+        {(onTogglePlainText || onOpenAsPlainText) && (
+          <button
+            className="json-btn"
+            onClick={onTogglePlainText ?? onOpenAsPlainText}
+            title={t('json.openAsPlainText')}
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path d="M5 4L1 8l4 4M11 4l4 4-4 4M9 2l-2 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {t('json.openAsPlainText')}
+          </button>
+        )}
 
         {saveStatus === 'saved' && <span className="json-status json-status-ok">✓ {t('json.saved')}</span>}
         {saveStatus === 'error' && <span className="json-status json-status-err">{t('json.saveError')}</span>}

@@ -163,6 +163,17 @@
   border-color: color-mix(in srgb, #0969da 30%, transparent);
 }
 
+.toolbar-tab-badge-txt {
+  background: color-mix(in srgb, #8b949e 18%, transparent);
+  color: #c9d1d9;
+  border-color: color-mix(in srgb, #8b949e 35%, transparent);
+}
+:root.light .toolbar-tab-badge-txt {
+  background: color-mix(in srgb, #57606a 12%, transparent);
+  color: #57606a;
+  border-color: color-mix(in srgb, #57606a 28%, transparent);
+}
+
 .toolbar-tab-close {
   display: flex;
   align-items: center;

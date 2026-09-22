@@ -222,6 +222,9 @@ const ro: TranslationKeys = {
     searchResizePane: 'Redimensionează panoul de rezultate',
     detectedFormat: 'Format: {{format}}',
     copiedToClipboard: 'Copiat în clipboard',
+    plainText: 'Text simplu',
+    viewAsPlainText: 'Afișează ca text (o linie per înregistrare)',
+    exitPlainText: 'Ieși din modul text',
   },
   xml: {
     viewRaw: 'Raw',
@@ -269,6 +272,7 @@ const ro: TranslationKeys = {
     pdfStageSave: 'Se salvează fișierul…',
     pdfStageDone: 'Gata',
     pdfStagePreview: 'Se pregătește previzualizarea…',
+    openAsPlainText: 'Deschide ca text',
     save: 'Salvează',
     revert: 'Anulează modificările',
     unsavedChanges: 'Modificări nesalvate',
