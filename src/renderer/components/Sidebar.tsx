@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useTranslation } from '../i18n';
@@ -41,9 +41,16 @@ interface SidebarProps {
   activeTabFiles?: string[];
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  /** Expanded sidebar width in px. */
+  width?: number;
+  onWidthChange?: (width: number) => void;
   includeSubdirectories?: boolean;
   editorOrder?: string[];
 }
+
+const DEFAULT_SIDEBAR_WIDTH = 280;
+const MIN_SIDEBAR_WIDTH = 180;
+const MAX_SIDEBAR_WIDTH = 640;
 
 interface FileWithDate {
   name: string;
@@ -76,6 +83,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   activeTabFiles = [],
   isCollapsed = false,
   onToggleCollapse,
+  width = DEFAULT_SIDEBAR_WIDTH,
+  onWidthChange,
   includeSubdirectories = false,
   editorOrder,
 }) => {
@@ -84,6 +93,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [loading, setLoading] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   // Context menu for directory tabs
   const [dirContextMenu, setDirContextMenu] = useState<{ x: number; y: number; dir: string } | null>(null);
@@ -519,9 +530,66 @@ const Sidebar: React.FC<SidebarProps> = ({
   // Display label: custom label if set, otherwise basename
   const dirDisplayLabel = (dir: string) => directoryMeta[dir]?.label || dirBasename(dir);
 
+  const clampSidebarWidth = useCallback((value: number) => {
+    const maxFromViewport =
+      typeof window !== 'undefined' ? Math.floor(window.innerWidth * 0.55) : MAX_SIDEBAR_WIDTH;
+    const max = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, maxFromViewport));
+    return Math.min(max, Math.max(MIN_SIDEBAR_WIDTH, Math.round(value)));
+  }, []);
+
+  const startSidebarResize = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (isCollapsed || !onWidthChange) return;
+      event.preventDefault();
+      event.stopPropagation();
+      resizeStateRef.current = {
+        startX: event.clientX,
+        startWidth: clampSidebarWidth(width),
+      };
+      setIsResizing(true);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    },
+    [clampSidebarWidth, isCollapsed, onWidthChange, width]
+  );
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const onMove = (event: MouseEvent) => {
+      const state = resizeStateRef.current;
+      if (!state || !onWidthChange) return;
+      const next = clampSidebarWidth(state.startWidth + (event.clientX - state.startX));
+      onWidthChange(next);
+    };
+
+    const onUp = () => {
+      resizeStateRef.current = null;
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [clampSidebarWidth, isResizing, onWidthChange]);
+
+  const sidebarStyle: React.CSSProperties | undefined = isCollapsed
+    ? undefined
+    : { width: clampSidebarWidth(width) };
+
   return (
     <>
-    <div className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+    <div
+      className={`sidebar ${isCollapsed ? 'collapsed' : ''}${isResizing ? ' resizing' : ''}`}
+      style={sidebarStyle}
+    >
       <div className="sidebar-inner">
 
         {/* ── Vertical directory tab strip (full height, left side) ── */}
@@ -806,6 +874,16 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>{/* end sidebar-main */}
 
       </div>{/* end sidebar-inner */}
+
+      {!isCollapsed && onWidthChange && (
+        <button
+          type="button"
+          className="sidebar-resize-handle"
+          aria-label={t('sidebar.resizeSidebar')}
+          title={t('sidebar.resizeSidebar')}
+          onMouseDown={startSidebarResize}
+        />
+      )}
     </div>
 
     {/* ── Directory tab context menu (portal to body, avoids backdrop-filter stacking context) ── */}

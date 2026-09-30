@@ -13,6 +13,7 @@ const de: TranslationKeys = {
     refresh: 'Aktualisieren',
     collapseSidebar: 'Dateileiste einklappen',
     expandSidebar: 'Dateileiste ausklappen',
+    resizeSidebar: 'Dateileiste in der Breite anpassen',
     openAll: 'Alle {{count}} Dateien dieses Tages öffnen (Strg = zum aktiven Tab hinzufügen)',
     addDirectory: 'Verzeichnis hinzufügen',
     removeDirectory: 'Verzeichnis entfernen',
