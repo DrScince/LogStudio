@@ -11,6 +11,7 @@ import {
   fileBasename,
 } from '../utils/workspaces';
 import { getDirectoryColor, getDirectoryIcon } from '../utils/directoryIcons';
+import { getFileIconInfo } from '../utils/fileIcons';
 import DirectoryIconPicker from './DirectoryIconPicker';
 import DirectoryColorPicker from './DirectoryColorPicker';
 import './Sidebar.css';
@@ -774,14 +775,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                             {files.map((file) => {
                               const isActive = currentFile === file.path;
                               const isInActiveTab = activeTabFiles.includes(file.path);
+                              const fileIcon = getFileIconInfo(file.name);
                               return (
                                 <li
                                   key={file.path}
                                   className={`log-file-item ${isActive ? 'active' : ''} ${isInActiveTab ? 'in-active-tab' : ''}`}
+                                  title={file.name}
                                   onClick={(e) => handleFileClick(file.path, e)}
                                   onContextMenu={(e) => handleFileContextMenu(e, file.path)}
                                 >
-                                  {file.name}
+                                  <span
+                                    className={`log-file-item-icon log-file-item-icon--${fileIcon.colorClass}`}
+                                    aria-hidden
+                                  >
+                                    <FontAwesomeIcon icon={fileIcon.icon} />
+                                  </span>
+                                  <span className="log-file-item-name">{file.name}</span>
                                 </li>
                               );
                             })}
