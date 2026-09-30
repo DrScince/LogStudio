@@ -42,11 +42,6 @@ import {
   type FileTypeFlags,
 } from './utils/fileTypeFlags';
 import { I18nProvider, useTranslation } from './i18n';
-import {
-  clearAllStructuredViewerUi,
-  clearStructuredViewerUi,
-  pruneStructuredViewerUi,
-} from './utils/viewerUiState';
 import './App.css';
 
 function App() {
