@@ -1,5 +1,7 @@
 .sidebar {
+  position: relative;
   width: 280px;
+  flex-shrink: 0;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   display: flex;
@@ -8,6 +10,48 @@
   backdrop-filter: blur(10px);
   transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.22s ease;
   will-change: width;
+}
+
+.sidebar.resizing {
+  transition: none;
+  user-select: none;
+}
+
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 8px;
+  height: 100%;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 5;
+}
+
+.sidebar-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sidebar-resize-handle:hover::after,
+.sidebar.resizing .sidebar-resize-handle::after,
+.sidebar-resize-handle:focus-visible::after {
+  background: var(--accent-primary);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+}
+
+.sidebar-resize-handle:focus-visible {
+  outline: none;
 }
 
 /* ── Full-height inner flex-row: [dir tabs] + [sidebar-main] ─ */

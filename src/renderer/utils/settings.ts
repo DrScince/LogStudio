@@ -80,6 +80,8 @@ export interface AppSettings {
   autoDetect: boolean;
   enabledFormats: string[];
   includeSubdirectories: boolean;
+  /** File sidebar width in px (expanded state). */
+  sidebarWidth: number;
   hotkeys: HotkeyMap;
 }
 
@@ -102,6 +104,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoDetect: true,
   enabledFormats: ['pipe', 'copilot', 'log4j', 'json', 'logfmt', 'syslog', 'apache', 'german'],
   includeSubdirectories: false,
+  sidebarWidth: 280,
   hotkeys: DEFAULT_HOTKEYS,
 };
 

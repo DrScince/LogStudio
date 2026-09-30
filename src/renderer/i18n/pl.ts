@@ -13,6 +13,7 @@ const pl: TranslationKeys = {
     refresh: 'Odśwież',
     collapseSidebar: 'Zwiń panel plików',
     expandSidebar: 'Rozwiń panel plików',
+    resizeSidebar: 'Zmień szerokość panelu plików',
     openAll: 'Otwórz wszystkie {{count}} pliki z tego dnia (Ctrl = dodaj do aktywnej karty)',
     addDirectory: 'Dodaj katalog',
     removeDirectory: 'Usuń katalog',
