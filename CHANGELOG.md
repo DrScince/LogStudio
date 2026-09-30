@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-09-30
+
+### Added
+- **Sidebar file type icons**: Color-coded icons per extension (dll, pdb, xml, json, config, log, source files, …), similar to VS Code’s file explorer.
+- **Single-line filenames**: Long names stay on one line with ellipsis; the full name is available via tooltip.
+
+### Fixed
+- **App would not start**: Removed a duplicate `viewerUiState` import that broke the Vite/Babel transform and left the boot splash hanging.
+- **Dev startup localhost mismatch**: Vite binds to `127.0.0.1` and Electron loads the same URL, avoiding IPv6/`localhost` resolution issues.
+- **Mermaid blocking startup**: Mermaid is excluded from Vite `optimizeDeps` and import failures are handled so Markdown preview issues no longer prevent the app from loading.
+- **Stuck splash screen**: Shorter React splash safety timeout plus an HTML boot-splash failsafe and a clear error page if the renderer bundle fails to load.
+
 ## [2.12.0] - 2026-09-22
 
 ### Added
