@@ -273,7 +273,9 @@ function createWindow() {
 
   const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
   if (isDev) {
-    const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
+    // Prefer IPv4 loopback: on some hosts `localhost` resolves to ::1 only while
+    // Vite may bind 127.0.0.1 (or vice versa), which leaves Electron on the splash.
+    const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
     const waitForDevServer = async (url: string, attempts = 40): Promise<void> => {
       for (let i = 0; i < attempts; i++) {
         try {

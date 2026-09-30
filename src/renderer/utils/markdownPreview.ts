@@ -147,7 +147,24 @@ export async function renderMermaidDiagrams(
 
   if (blocks.length === 0) return;
 
-  const mermaid = (await import('mermaid')).default;
+  let mermaid: {
+    initialize: (config: Record<string, unknown>) => void;
+    parse: (code: string) => Promise<unknown> | unknown;
+    render: (id: string, code: string) => Promise<{ svg: string }>;
+  };
+  try {
+    mermaid = (await import('mermaid')).default;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    for (const block of blocks) {
+      const host = document.createElement('div');
+      host.className = 'md-mermaid md-mermaid-error';
+      host.innerHTML = `<pre><code>${escapeHtml(block.code)}</code></pre><p>${escapeHtml(message)}</p>`;
+      block.el.replaceWith(host);
+    }
+    return;
+  }
+
   // Re-initialize every time so light/dark switches cleanly (mermaid keeps global config).
   mermaid.initialize({
     startOnLoad: false,

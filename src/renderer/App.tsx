@@ -111,9 +111,9 @@ function App() {
     return () => window.clearTimeout(t);
   }, []);
 
-  // Safety: never leave the splash up forever
+  // Safety: never leave the splash up forever (e.g. viewer never signals ready)
   useEffect(() => {
-    const t = window.setTimeout(() => dismissSplash(), 15000);
+    const t = window.setTimeout(() => dismissSplash(), 6000);
     return () => window.clearTimeout(t);
   }, [dismissSplash]);
 

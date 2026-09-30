@@ -76,5 +76,17 @@
     </div>
     <div id="root"></div>
     <script type="module" src="./main.tsx"></script>
+    <script>
+      // If the renderer bundle fails to load, never leave the boot splash forever.
+      window.setTimeout(function () {
+        var boot = document.getElementById('boot-splash');
+        var root = document.getElementById('root');
+        if (!boot || !root || root.childElementCount > 0) return;
+        boot.classList.add('boot-splash--hide');
+        var status = boot.querySelector('.boot-status');
+        if (status) status.textContent = 'Start fehlgeschlagen – siehe Konsole (F12)';
+        window.setTimeout(function () { boot.remove(); }, 280);
+      }, 8000);
+    </script>
   </body>
 </html>
