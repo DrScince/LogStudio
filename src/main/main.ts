@@ -4,10 +4,13 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as chokidar from 'chokidar';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { getFileArgument } from './cliArgs';
 
 let mainWindow: BrowserWindow | null = null;
 let logWatchers: Map<string, chokidar.FSWatcher> = new Map();
 let dirWatchers: Map<string, chokidar.FSWatcher> = new Map();
+/** Last file requested via CLI / file association until the renderer consumes it. */
+let pendingOpenFile: string | null = null;
 
 type DiscoveredFile = { name: string; path: string; mtimeMs: number };
 
@@ -116,23 +119,21 @@ const filterTextFilesInBatches = async (
   return accepted;
 };
 
-// Datei die per Kontext-Menü / Kommandozeile übergeben wurde
-const getFileArgument = (argv: string[]): string | null => {
-  // In packaged form: argv = ['path/to/exe', 'path/to/file']
-  // In dev: argv = ['electron', '.', 'path/to/file']
-  const args = app.isPackaged ? argv.slice(1) : argv.slice(2);
-  const filePath = args.find(
-    (a) => !a.startsWith('-') && (a.endsWith('.log') || a.endsWith('.txt') || a.endsWith('.xml'))
-  );
-  return filePath ?? null;
-};
-
-const openFileInRenderer = (filePath: string) => {
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
+const queueOpenFile = (filePath: string) => {
+  pendingOpenFile = filePath;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
+  // May arrive before React registers its listener; preload buffers until then,
+  // and the renderer also pulls pendingOpenFile via IPC after mount.
+  if (!mainWindow.webContents.isLoadingMainFrame()) {
     mainWindow.webContents.send('open-file-from-cli', filePath);
   }
+};
+
+const flushPendingOpenFile = () => {
+  if (!pendingOpenFile || !mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('open-file-from-cli', pendingOpenFile);
 };
 
 const RELEASES_LATEST_API_URL = 'https://api.github.com/repos/DrScince/LogStudio/releases/latest';
@@ -327,39 +328,42 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
-  createWindow();
-  // Defer update check so it does not compete with first paint / tab restore.
-  setTimeout(() => setupAutoUpdater(), 2500);
-
-  // Datei öffnen die beim Start als Argument übergeben wurde
-  const fileArg = getFileArgument(process.argv);
-  if (fileArg) {
-    mainWindow?.webContents.once('did-finish-load', () => {
-      openFileInRenderer(fileArg);
-    });
-  }
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
-});
-
-// Single-Instance: wenn LogStudio bereits läuft und eine zweite Instanz
-// mit einer Datei gestartet wird, Fokus auf bestehende und Datei öffnen
+// Single-Instance first: a second OS "open with" while starting must not spawn
+// another window that races the first instance's pending file open.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', (_event, argv) => {
-    const fileArg = getFileArgument(argv);
+    const fileArg = getFileArgument(argv, { isPackaged: app.isPackaged });
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.focus();
     }
-    if (fileArg) openFileInRenderer(fileArg);
+    if (fileArg) queueOpenFile(fileArg);
+  });
+
+  app.whenReady().then(() => {
+    createWindow();
+    // Defer update check so it does not compete with first paint / tab restore.
+    setTimeout(() => setupAutoUpdater(), 2500);
+
+    // File association / "Open with" / CLI path from this process start.
+    const fileArg = getFileArgument(process.argv, { isPackaged: app.isPackaged });
+    if (fileArg) {
+      pendingOpenFile = fileArg;
+      mainWindow?.webContents.once('did-finish-load', () => {
+        // Small delay so the first React paint can subscribe; pending IPC +
+        // preload buffer cover the remaining race.
+        setTimeout(() => flushPendingOpenFile(), 50);
+      });
+    }
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
   });
 }
 
@@ -370,6 +374,12 @@ app.on('window-all-closed', () => {
 });
 
 // IPC Handlers
+ipcMain.handle('consume-pending-open-file', () => {
+  const filePath = pendingOpenFile;
+  pendingOpenFile = null;
+  return filePath;
+});
+
 ipcMain.handle('read-log-file', async (event, filePath: string) => {
   try {
     const content = await fs.promises.readFile(filePath, 'utf-8');

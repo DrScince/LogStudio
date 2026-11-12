@@ -55,6 +55,7 @@ export interface ElectronAPI {
   removeFilesDroppedListener: () => void;
   onOpenFileFromCli: (callback: (filePath: string) => void) => void;
   removeOpenFileFromCliListener: () => void;
+  consumePendingOpenFile: () => Promise<string | null>;
 }
 
 declare global {

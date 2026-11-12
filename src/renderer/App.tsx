@@ -81,6 +81,8 @@ function App() {
   const splashDoneRef = useRef(false);
   const splashStartedAtRef = useRef(Date.now());
   const awaitingFileReadyRef = useRef(false);
+  /** CLI/file-association path received before session restore finished. */
+  const pendingCliFileRef = useRef<string | null>(null);
   tabsRef.current = tabs;
   activeTabIdRef.current = activeTabId;
 
@@ -448,7 +450,9 @@ function App() {
   const pickActiveSource = (dirs: string[], vfs: VirtualFolder[]) =>
     dirs[0] ?? (vfs[0] ? toVirtualFolderId(vfs[0].id) : '');
 
-  // Restore workspace-bound tabs once on startup (active file first, rest in background)
+  // Restore workspace-bound tabs once on startup (active file first, rest in background).
+  // File-association / CLI opens are deferred until after restore so they become active
+  // and are not overwritten by the previous session.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -478,7 +482,30 @@ function App() {
         awaitingFileReadyRef.current = false;
         if (!cancelled) dismissSplash();
       }
-      if (!cancelled) tabsPersistReady.current = true;
+      if (cancelled) return;
+      tabsPersistReady.current = true;
+
+      // Prefer any file queued before/during restore (preload buffer or main pending).
+      const deferred = pendingCliFileRef.current;
+      pendingCliFileRef.current = null;
+      let fromMain: string | null = null;
+      if (window.electronAPI?.consumePendingOpenFile) {
+        try {
+          fromMain = (await window.electronAPI.consumePendingOpenFile()) ?? null;
+        } catch {
+          fromMain = null;
+        }
+      }
+      const startupFile = deferred || fromMain;
+      if (startupFile) {
+        setSplashStatus('loadingFile');
+        awaitingFileReadyRef.current = true;
+        const opened = await openFileInTab(startupFile);
+        if (!opened) {
+          awaitingFileReadyRef.current = false;
+          dismissSplash();
+        }
+      }
     })();
     return () => {
       cancelled = true;
@@ -839,12 +866,16 @@ function App() {
   };
 
   const openFileInTab = useCallback(async (filePath: string): Promise<boolean> => {
-    // Check if file is already open in a single-file tab (not a group tab)
-    const existingTab = tabs.find((tab) => 
-      tab.filePath === filePath && 
-      (!tab.filePaths || tab.filePaths.length <= 1)
+    // Prefer tabsRef so CLI opens after session restore see the restored tabs.
+    const normalize = (p: string) => p.replace(/\\/g, '/').toLowerCase();
+    const target = normalize(filePath);
+    const existingTab = tabsRef.current.find(
+      (tab) =>
+        tab.filePath &&
+        normalize(tab.filePath) === target &&
+        (!tab.filePaths || tab.filePaths.length <= 1)
     );
-    
+
     if (existingTab) {
       // Switch to existing tab
       setActiveTabId(existingTab.id);
@@ -896,7 +927,7 @@ function App() {
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(newTabId);
     return true;
-  }, [tabs]);
+  }, []);
 
   const openMultipleFilesInTab = useCallback((filePaths: string[]) => {
     if (filePaths.length === 0) return;
@@ -1136,9 +1167,16 @@ function App() {
 
   useEffect(() => {
     window.electronAPI?.onOpenFileFromCli?.((filePath) => {
-      openFileInTab(filePath);
+      if (!tabsPersistReady.current) {
+        // Hold until session restore finishes so the requested file stays active.
+        pendingCliFileRef.current = filePath;
+        return;
+      }
+      void openFileInTab(filePath);
     });
-    return () => { window.electronAPI?.removeOpenFileFromCliListener?.(); };
+    return () => {
+      window.electronAPI?.removeOpenFileFromCliListener?.();
+    };
   }, [openFileInTab]);
 
   // ESC schließt das Drag-Overlay wenn es hängen bleibt

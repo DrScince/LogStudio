@@ -4,6 +4,21 @@ import { contextBridge, ipcRenderer } from 'electron';
 // weil file.path nur im Preload-Kontext verfügbar ist.
 let _dropCallback: ((paths: string[]) => void) | null = null;
 
+// Buffer CLI/file-association opens until React registers its listener.
+// Without this, did-finish-load can send open-file-from-cli before mount
+// and the first double-click is lost (second click via second-instance works).
+let _cliFileCallback: ((filePath: string) => void) | null = null;
+let _pendingCliFile: string | null = null;
+
+ipcRenderer.on('open-file-from-cli', (_event, filePath: string) => {
+  if (typeof filePath !== 'string' || !filePath) return;
+  if (_cliFileCallback) {
+    _cliFileCallback(filePath);
+  } else {
+    _pendingCliFile = filePath;
+  }
+});
+
 window.addEventListener('dragover', (e: DragEvent) => {
   e.preventDefault();
   if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
@@ -106,10 +121,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   removeFilesDroppedListener: () => {
     _dropCallback = null;
   },
+  consumePendingOpenFile: () =>
+    ipcRenderer.invoke('consume-pending-open-file') as Promise<string | null>,
   onOpenFileFromCli: (callback: (filePath: string) => void) => {
-    ipcRenderer.on('open-file-from-cli', (_event, filePath) => callback(filePath));
+    _cliFileCallback = callback;
+    if (_pendingCliFile) {
+      const pending = _pendingCliFile;
+      _pendingCliFile = null;
+      callback(pending);
+    }
   },
   removeOpenFileFromCliListener: () => {
-    ipcRenderer.removeAllListeners('open-file-from-cli');
+    _cliFileCallback = null;
   },
 });
