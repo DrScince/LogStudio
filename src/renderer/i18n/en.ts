@@ -12,6 +12,7 @@ const en = {
     refresh: 'Refresh',
     collapseSidebar: 'Collapse file sidebar',
     expandSidebar: 'Expand file sidebar',
+    resizeSidebar: 'Resize file sidebar',
     openAll: 'Open all {{count}} files from this day (Ctrl = add to active tab)',
     addDirectory: 'Add directory',
     removeDirectory: 'Remove directory',

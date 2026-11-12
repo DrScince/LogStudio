@@ -1330,6 +1330,13 @@ function App() {
           activeTabFiles={activeTabFiles}
           isCollapsed={isFileSidebarCollapsed}
           onToggleCollapse={() => setIsFileSidebarCollapsed((prev) => !prev)}
+          width={settings.sidebarWidth}
+          onWidthChange={(nextWidth) => {
+            setSettings((prev) => {
+              if (prev.sidebarWidth === nextWidth) return prev;
+              return { ...prev, sidebarWidth: nextWidth };
+            });
+          }}
           includeSubdirectories={settings.includeSubdirectories}
           editorOrder={settings.editorOrder}
         />

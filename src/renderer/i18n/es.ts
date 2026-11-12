@@ -13,6 +13,7 @@ const es: TranslationKeys = {
     refresh: 'Actualizar',
     collapseSidebar: 'Contraer panel de archivos',
     expandSidebar: 'Expandir panel de archivos',
+    resizeSidebar: 'Cambiar el ancho del panel de archivos',
     openAll: 'Abrir todos los {{count}} archivos de este día (Ctrl = añadir a la pestaña activa)',    addDirectory: 'Agregar directorio',
     removeDirectory: 'Eliminar directorio',
     noDirectories: 'No hay directorios configurados.',

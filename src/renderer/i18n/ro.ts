@@ -13,6 +13,7 @@ const ro: TranslationKeys = {
     refresh: 'Reîncarcă',
     collapseSidebar: 'Restrânge panoul de fișiere',
     expandSidebar: 'Extinde panoul de fișiere',
+    resizeSidebar: 'Redimensionează panoul de fișiere',
     openAll: 'Deschide toate {{count}} fișierele din această zi (Ctrl = adaugă la tab activ)',    addDirectory: 'Adaugă director',
     removeDirectory: 'Elimină directorul',
     noDirectories: 'Nu există directoare configurate.',
