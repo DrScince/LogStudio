@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-11-12
+
+### Added
+- **Resizable file sidebar**: Drag the right edge of the Files panel to change its width (180–640 px). The chosen width is remembered across restarts.
+
+### Fixed
+- **Open with LogStudio / file association**: Double-clicking a `.log` (or other associated) file now opens that file on the *first* launch instead of showing an empty window or only the previous session. A second double-click is no longer required.
+
 ## [2.13.0] - 2026-09-30
 
 ### Added
